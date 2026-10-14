@@ -76,6 +76,12 @@ under `policy.known_api4_entities` in civikitchen.yaml, with its entities and
 a reason naming the provider. Unused entries and entries without a provider
 fail.
 
+An extension that uses another one only after checking at runtime that it is
+installed lists it under `policy.optional_extensions`, with a reason saying
+how the code checks. Its entities then need no `<requires>`. Listing an
+extension that `info.xml` requires, or one whose entities the code never
+uses, fails.
+
 ### The strings in an APIv4 call are checked
 
 Entity, action and field names are string literals, so a typo in a select

@@ -42,6 +42,7 @@ final class Policy
         'hook_style' => 'ckconform: which hook declaration style this repo uses',
         'known_hooks' => 'ckconform: hook names this repo defines itself',
         'known_api4_entities' => 'ckconform: APIv4 entities supplied by required third-party extensions, reason mandatory',
+        'optional_extensions' => 'ckconform: extensions the code checks for at runtime before use, so they need no <requires>; reason mandatory',
         'bundles' => 'ckconform: vendored front-end bundles that are not repo source',
         'deploy_hygiene' => 'ckconform: deploy-only files deliberately shipped, reason mandatory',
         'vendored_paths' => 'cklint + ckfmt + ckeslint: third-party source this repo carries verbatim, reason mandatory',
@@ -195,6 +196,7 @@ final class Policy
         if (isset($policy['vendor'])) $out['vendor'] = [is_array($policy['vendor']) ? $policy['vendor']['mode'] . ' -- ' . $policy['vendor']['reason'] : $policy['vendor']];
         if (isset($policy['known_hooks'])) $out['known_hooks'] = [implode(',', $policy['known_hooks'])];
         if (isset($policy['known_api4_entities'])) $out['known_api4_entities'] = [implode(',', $policy['known_api4_entities']['entities']) . ' -- ' . $policy['known_api4_entities']['reason']];
+        if (isset($policy['optional_extensions'])) $out['optional_extensions'] = [implode(',', $policy['optional_extensions']['extensions']) . ' -- ' . $policy['optional_extensions']['reason']];
         if (isset($policy['bundles'])) $out['bundles'] = [$policy['bundles']['mode'] . ' -- ' . $policy['bundles']['reason']];
         if (isset($policy['deploy_hygiene'])) $out['deploy_hygiene'] = [implode(',', $policy['deploy_hygiene']['paths']) . ' -- ' . $policy['deploy_hygiene']['reason']];
         foreach ($policy['vendored_paths'] ?? [] as $item) $out['vendored_paths'][] = $item['path'] . ' -- ' . $item['reason'];

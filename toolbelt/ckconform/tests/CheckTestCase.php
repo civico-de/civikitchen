@@ -154,6 +154,7 @@ abstract class CheckTestCase extends TestCase
                 case 'vendor': $policy['vendor'] = $plain === 'committed' ? ['mode' => $plain, 'reason' => $reason] : $value; break;
                 case 'known_hooks': $policy['known_hooks'] = $list; break;
                 case 'known_api4_entities': $policy['known_api4_entities'] = ['entities' => $list, 'reason' => $reason]; break;
+                case 'optional_extensions': $policy['optional_extensions'] = ['extensions' => $list, 'reason' => $reason]; break;
                 case 'bundles': $policy['bundles'] = ['mode' => $plain, 'reason' => $reason]; break;
                 case 'deploy_hygiene':
                 case 'deploy_hygiene': $policy['deploy_hygiene'] = ['paths' => $list, 'reason' => $reason]; break;

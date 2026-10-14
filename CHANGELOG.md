@@ -14,6 +14,14 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- `policy.optional_extensions` in civikitchen.yaml names extensions the code
+  uses only after a runtime check that they are installed. ckconform's
+  api4-entity check then stops asking for a `<requires>` of their APIv4
+  entities, and fails on an entry the code never uses or that `info.xml`
+  requires.
+
 ### Changed
 
 - The template's CI stack keeps the MariaDB datadir in a tmpfs. The test

@@ -33,6 +33,7 @@
         "hook_style": {"enum": ["listener"]},
         "known_hooks": {"$ref": "#/$defs/stringList"},
         "known_api4_entities": {"type": "object", "additionalProperties": false, "required": ["entities", "reason"], "properties": {"entities": {"$ref": "#/$defs/stringList"}, "reason": {"$ref": "#/$defs/reason"}}},
+        "optional_extensions": {"description": "Extensions the code uses only after checking at runtime that they are installed, so info.xml does not <requires> them (api4-entity accepts their APIv4 entities without that <requires>).", "type": "object", "additionalProperties": false, "required": ["extensions", "reason"], "properties": {"extensions": {"$ref": "#/$defs/stringList"}, "reason": {"$ref": "#/$defs/reason"}}},
         "bundles": {"type": "object", "additionalProperties": false, "required": ["mode", "reason"], "properties": {"mode": {"enum": ["committed"]}, "reason": {"$ref": "#/$defs/reason"}}},
         "deploy_hygiene": {"type": "object", "additionalProperties": false, "required": ["paths", "reason"], "properties": {"paths": {"$ref": "#/$defs/stringList"}, "reason": {"$ref": "#/$defs/reason"}}},
         "vendored_paths": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/pathReason"}},

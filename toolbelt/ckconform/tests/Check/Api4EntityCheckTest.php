@@ -304,6 +304,45 @@ final class Api4EntityCheckTest extends CheckTestCase
         self::assertSame([], $reporter->messages('warn'), $reporter->render());
     }
 
+    public function testSilentForAnExtensionDeclaredOptional(): void
+    {
+        $this->core(['Contact' => null]);
+        $this->bundle('riverlea', 'RiverleaStream', null, null);
+        $context = $this->repo([
+            '__policy_fixture' => "optional_extensions = riverlea -- checked with ExtensionUtil before each call\n",
+            'CRM/X.php' => '<?php $x = \Civi\Api4\RiverleaStream::get();',
+        ], git: true);
+
+        $reporter = $this->run_(new Api4EntityCheck(), $context);
+        $this->assertPasses($reporter);
+        self::assertSame([], $reporter->messages('warn'), $reporter->render());
+    }
+
+    public function testFailsOnAnOptionalExtensionTheCodeNeverUses(): void
+    {
+        $this->core(['Contact' => null]);
+        $this->bundle('riverlea', 'RiverleaStream', null, null);
+        $context = $this->repo([
+            '__policy_fixture' => "optional_extensions = riverlea -- checked before each call\n",
+            'CRM/X.php' => '<?php $x = \Civi\Api4\Contact::get();',
+        ], git: true);
+
+        $this->assertFails($this->run_(new Api4EntityCheck(), $context), "optional_extensions lists 'riverlea', whose entities the code never uses");
+    }
+
+    public function testFailsOnAnOptionalExtensionThatIsRequired(): void
+    {
+        $this->core(['Contact' => null]);
+        $this->bundle('riverlea', 'RiverleaStream', null, null);
+        $context = $this->repo([
+            '__policy_fixture' => "optional_extensions = riverlea -- checked before each call\n",
+            'info.xml' => $this->infoXml(extra: '<requires><ext>riverlea</ext></requires>'),
+            'CRM/X.php' => '<?php $x = \Civi\Api4\RiverleaStream::get();',
+        ], git: true);
+
+        $this->assertFails($this->run_(new Api4EntityCheck(), $context), "optional_extensions lists 'riverlea', which info.xml <requires>");
+    }
+
     /**
      * civi_mail, search_kit and flexmailer are core plumbing: no core extension
      * declares them, so demanding it would be noise nobody reads.

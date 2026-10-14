@@ -47,6 +47,8 @@ final class Api4EntityCheck implements Check
         $classUses = [];
         $referenced = $this->referencedEntities($context, $classUses);
         $external = $this->declaredExternalEntities($context, $referenced, $reporter);
+        $optional = $this->optionalExtensions($context, $reporter);
+        $providers = [];
 
         foreach ($referenced as $entity) {
             // Entities the extension defines itself are its own business.
@@ -64,7 +66,10 @@ final class Api4EntityCheck implements Check
             }
 
             $provider = $this->providingExtension($classFile);
-            if ($provider !== null && !in_array($provider, $context->requiredExtensions(), true)) {
+            if ($provider !== null) {
+                $providers[$provider] = true;
+            }
+            if ($provider !== null && !in_array($provider, [...$context->requiredExtensions(), ...$optional], true)) {
                 $undeclared[$provider] = $entity;
             }
 
@@ -74,6 +79,12 @@ final class Api4EntityCheck implements Check
             $since = $this->parseSince($classFile);
             if ($since !== null && version_compare($since, $declaredVer, '>')) {
                 $tooNew[] = sprintf('%s(@since %s)', $entity, $since);
+            }
+        }
+
+        foreach ($optional as $key) {
+            if (!isset($providers[$key])) {
+                $reporter->fail("civikitchen.yaml: optional_extensions lists '{$key}', whose entities the code never uses — remove the stale exception");
             }
         }
 
@@ -138,6 +149,26 @@ final class Api4EntityCheck implements Check
         }
 
         return $entities;
+    }
+
+    /**
+     * Extensions the code checks for at runtime before using them, so their
+     * entities need no <requires>. Listing a required extension is a contradiction.
+     *
+     * @return list<string>
+     */
+    private function optionalExtensions(Context $context, Reporter $reporter): array
+    {
+        $raw = $context->policyValue('optional_extensions');
+        if ($raw === null) {
+            return [];
+        }
+        $keys = array_values(array_filter(array_map('trim', explode(',', Policy::stripReason($raw)))));
+        foreach (array_intersect($keys, $context->requiredExtensions()) as $key) {
+            $reporter->fail("civikitchen.yaml: optional_extensions lists '{$key}', which info.xml <requires>");
+        }
+
+        return $keys;
     }
 
     /**
