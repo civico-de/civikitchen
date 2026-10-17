@@ -32,23 +32,21 @@ function ck_headless(string ...$optional): \Civi\Test\CiviEnvBuilder {
   foreach ($info->requires->ext ?? [] as $required) {
     $keys[] = trim((string) $required);
   }
-  $keys = [...$keys, ...$optional, trim((string) $info['key'])];
-  $builder = \Civi\Test::headless()
-    ->callback('ck_forget_signature', 'ck-forget-signature')
-    ->callback(
-      static function () use ($keys): void {
-        ck_install_in_order($keys);
-      },
-      'ck-install:' . implode(',', $keys),
-    );
-  // Last step, so it drains what every earlier step queued. Its signature
-  // carries the install files, so editing them rebuilds the test database.
-  $builder = $builder->callback(
-    'ck_discard_bootstrap_status',
-    'ck-discard-bootstrap-status;' . ck_install_signature(dirname(__DIR__, 2), $info),
-  );
-  if (!$builder instanceof \Civi\Test\CiviEnvBuilder) {
-    throw new RuntimeException('ck_headless: callback() did not return the builder');
+  $keys = [...$keys, ...array_values($optional), trim((string) $info['key'])];
+  // Core's callback() declares no return type, so each step is checked.
+  $steps = [
+    ['ck_forget_signature', 'ck-forget-signature'],
+    [static fn () => ck_install_in_order($keys), 'ck-install:' . implode(',', $keys)],
+    // Last, so it drains what every earlier step queued. Its signature carries
+    // the install files, so editing them rebuilds the test database.
+    ['ck_discard_bootstrap_status', 'ck-discard-bootstrap-status;' . ck_install_signature(dirname(__DIR__, 2), $info)],
+  ];
+  $builder = \Civi\Test::headless();
+  foreach ($steps as [$callback, $signature]) {
+    $builder = $builder->callback($callback, $signature);
+    if (!$builder instanceof \Civi\Test\CiviEnvBuilder) {
+      throw new RuntimeException('ck_headless: callback() did not return the builder');
+    }
   }
   return $builder;
 }
