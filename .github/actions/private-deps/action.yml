@@ -128,6 +128,21 @@ runs:
         CK_SIBLING_TOKEN: ${{ steps.app.outputs.token || github.token }}
       run: ${{ github.action_path }}/checkout-siblings.sh
 
+    # A sibling that loads its own vendor/ gets it built here, on the runner
+    # and with the same read token, before the read-only mount.
+    - name: Composer install in the siblings that ship runtime packages
+      if: ${{ inputs.sibling_repo != '' }}
+      shell: bash
+      env:
+        CK_SIBLING_DIRS: ${{ steps.siblings.outputs.paths }}
+        CK_COMPOSER_TOKEN: ${{ steps.app.outputs.token || github.token }}
+      run: |
+        set -euo pipefail
+        if [ -n "${CK_COMPOSER_TOKEN:-}" ]; then
+          composer config -g github-oauth.github.com "$CK_COMPOSER_TOKEN"
+        fi
+        ${{ github.action_path }}/install-sibling-vendor.sh
+
     # The organisation's default civikitchen.yaml, next to the sibling for the
     # same two reasons (dot-prefixed: invisible to the extension scanner and
     # to cklint). It reaches ckconform through the extension's own mount.
@@ -162,8 +177,8 @@ runs:
     # project directory — the directory of the FIRST -f file, i.e. .docker/,
     # not the workspace this override was written from.
     #
-    # Read-only and as is: no composer install runs in the siblings, and the
-    # stack's composer step skips their read-only mounts.
+    # Read-only: the stack's composer step skips these mounts, so a sibling's
+    # vendor/ is the one the step above built.
     - name: Compose override — mount and enable the siblings
       id: override
       if: ${{ inputs.sibling_repo != '' }}

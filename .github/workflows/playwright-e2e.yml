@@ -71,8 +71,9 @@ on:
           interfaces. The prepare/test/cleanup commands address it through
           CK_SIBLING_DIR (absolute path), CK_SIBLING_KEY (that extension key)
           and CK_SIBLING_OVERRIDE (a compose override file that bind-mounts it
-          read-only). Mounted as-is (no composer install there); private
-          sibling needs the composer_app_* secrets. Empty mounts nothing.
+          read-only). A sibling whose composer.lock carries runtime packages
+          gets `composer install --no-dev` first; a private sibling or package
+          needs the composer_app_* secrets. Empty mounts nothing.
         type: string
         default: ''
       composer_app_repositories:

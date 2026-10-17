@@ -205,8 +205,9 @@ on:
           read-only beside this one under the key from ITS info.xml — for
           extensions implementing a sibling's interfaces. Enabled LEFT TO
           RIGHT in list order before this extension, so a sibling another
-          sibling requires comes first. Mounted as-is (no composer install there); a private
-          sibling needs the composer_app_* secrets. Empty mounts nothing.
+          sibling requires comes first. A sibling whose composer.lock carries
+          runtime packages gets `composer install --no-dev` first; a private
+          sibling or package needs the composer_app_* secrets. Empty mounts nothing.
         type: string
         default: ''
       composer_app_repositories:

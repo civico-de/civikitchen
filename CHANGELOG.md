@@ -16,6 +16,9 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Fixed
 
+- A `sibling_repo` whose committed `composer.lock` carries runtime packages
+  gets `composer install --no-dev` on the runner before it is mounted. A
+  sibling that loads its own `vendor/autoload.php` failed to enable before.
 - The managed `ck_headless()` installs the whole `<requires>` closure, each
   extension after its own dependencies and one per install. An extension
   no longer has to repeat a dependency's requirements in its own `info.xml`
