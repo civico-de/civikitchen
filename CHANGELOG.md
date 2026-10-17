@@ -14,6 +14,11 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Fixed
+
+- ckconform's `crm-scope` check ignores PHP comments in `.mgd.php` files. A
+  docblock that names `{crmScope}{ts}` was read as an unscoped template body.
+
 ## [1.45.0] - 2026-10-17
 
 ### Added

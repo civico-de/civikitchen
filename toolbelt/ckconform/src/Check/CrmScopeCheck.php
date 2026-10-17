@@ -6,6 +6,7 @@ namespace CiviKitchen\Ckconform\Check;
 
 use CiviKitchen\Ckconform\Check;
 use CiviKitchen\Ckconform\Context;
+use CiviKitchen\Ckconform\PhpSource;
 use CiviKitchen\Ckconform\Reporter;
 use CiviKitchen\Ckconform\SmartySource;
 
@@ -60,6 +61,10 @@ final class CrmScopeCheck implements Check
             $source = $context->read($relative);
             if ($source === null || !str_contains($source, '{ts')) {
                 continue;
+            }
+            if (str_ends_with($relative, '.php')) {
+                // Only the string literals are template bodies; a comment naming the tags is prose.
+                $source = PhpSource::withoutComments($source);
             }
             foreach ($this->findings($source, $key) as $reason => $lines) {
                 $where = count($lines) === 1

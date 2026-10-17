@@ -255,6 +255,29 @@ final class CrmScopeCheckTest extends CheckTestCase
         $this->assertSilent($this->run_(new CrmScopeCheck(), $context));
     }
 
+    /** A docblock that names the tags is prose, not a template body. */
+    public function testTagsNamedInAPhpCommentAreIgnored(): void
+    {
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(key: 'de.example.greeter'),
+            'managed/Welcome.mgd.php' => <<<'PHP'
+                <?php
+                /**
+                 * Strings are English inside {crmScope}{ts}, translated through l10n/.
+                 */
+                // A bare {ts} would resolve in core's domain.
+                return [
+                  [
+                    'values' => [
+                      'msg_text' => "{crmScope extensionKey='de.example.greeter'}{ts}Welcome{/ts}{/crmScope}",
+                    ],
+                  ],
+                ];
+                PHP,
+        ], git: true);
+        $this->assertSilent($this->run_(new CrmScopeCheck(), $context));
+    }
+
     /** In a PHP string literal the wrapper's own quotes arrive escaped. */
     public function testAnEscapedQuotedExtensionKeyInMgdPhpIsAccepted(): void
     {
