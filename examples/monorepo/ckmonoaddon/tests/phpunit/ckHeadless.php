@@ -4,16 +4,15 @@ declare(strict_types = 1);
 
 /**
  * ck_headless(): \Civi\Test::headless() with this extension's info.xml
- * <requires> queued for install before the extension itself.
+ * <requires>, and theirs in turn, installed before the extension itself.
  *
  * Civi\Test's installMe() takes the key verbatim and leaves <requires>
  * uninstalled, so the next CIVICRM_UF=UnitTests boot dies in the class scan.
- * The list comes from info.xml, not from CRM_Extension_Manager: touching the
- * extension system here runs BEFORE Civi\Test rebuilds the headless schema
- * and leaves caches behind that the rebuilt site no longer matches. One level
- * deep, like the image entrypoint — a dependency's own <requires> are core or
- * registry extensions. A dependency the site does not have is an install
- * error, not a silent skip.
+ * The closure is resolved inside the step, through CRM_Extension_Manager:
+ * touching the extension system here runs BEFORE Civi\Test rebuilds the
+ * headless schema and leaves caches behind that the rebuilt site no longer
+ * matches. A dependency the site does not have is an install error, not a
+ * silent skip.
  *
  * Civi\Test reuses the scratch database while the step signatures match, and
  * an install() step signs only the key; a no-op step signed with the
@@ -29,17 +28,19 @@ declare(strict_types = 1);
 function ck_headless(string ...$optional): \Civi\Test\CiviEnvBuilder {
   ck_restore_core_foreign_keys();
   $info = ck_extension_info(dirname(__DIR__, 2));
-  $builder = \Civi\Test::headless();
-  // One step per extension, never one install() with the whole list: the
-  // manager installs a list in one pass, and an extension whose schema
-  // references a dependency's table then fails its own table lookup.
+  $keys = [];
   foreach ($info->requires->ext ?? [] as $required) {
-    $builder = $builder->install([trim((string) $required)]);
+    $keys[] = trim((string) $required);
   }
-  foreach ($optional as $key) {
-    $builder = $builder->install([$key]);
-  }
-  $builder = $builder->install([trim((string) $info['key'])]);
+  $keys = [...$keys, ...$optional, trim((string) $info['key'])];
+  $builder = \Civi\Test::headless()
+    ->callback('ck_forget_signature', 'ck-forget-signature')
+    ->callback(
+      static function () use ($keys): void {
+        ck_install_in_order($keys);
+      },
+      'ck-install:' . implode(',', $keys),
+    );
   // Last step, so it drains what every earlier step queued. Its signature
   // carries the install files, so editing them rebuilds the test database.
   $builder = $builder->callback(
@@ -50,6 +51,34 @@ function ck_headless(string ...$optional): \Civi\Test\CiviEnvBuilder {
     throw new RuntimeException('ck_headless: callback() did not return the builder');
   }
   return $builder;
+}
+
+/**
+ * Civi\Test saves the signature only after the last step, so a rebuild that
+ * fails halfway keeps the previous one and the next run trusts a wiped schema.
+ */
+function ck_forget_signature(): void {
+  $database = \Civi\Test::dsn('database');
+  if (!is_string($database) || \Civi\Test::execute('DELETE FROM `' . $database . '`.civitest_revs') === FALSE) {
+    throw new RuntimeException('ck_headless: could not forget the saved signature');
+  }
+}
+
+/**
+ * Each key after its own <requires>, transitively, one install() per
+ * extension: the manager installs a list in one pass, and an extension whose
+ * schema references a dependency's table then fails its own table lookup.
+ * Installing an installed extension is a no-op.
+ *
+ * @param list<string> $keys
+ */
+function ck_install_in_order(array $keys): void {
+  $manager = \CRM_Extension_System::singleton()->getManager();
+  foreach ($keys as $key) {
+    foreach ($manager->findInstallRequirements([$key]) as $each) {
+      $manager->install([$each]);
+    }
+  }
 }
 
 /**

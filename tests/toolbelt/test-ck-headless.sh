@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# The managed test bootstrap's ck_headless() queues the extension's info.xml
-# <requires> before the extension itself, without touching the extension
-# system, restores the core foreign keys its own signing drops before 6.20, signs
+# The managed test bootstrap's ck_headless() installs the extension's info.xml
+# <requires>, transitively and one per install(), before the extension itself,
+# touching the extension system only once its step runs; it restores the core foreign keys its own signing drops before 6.20, signs
 # a step with the extension's install files, and drains the status messages the
 # build queues. Civi is stubbed: what is under test is the
 # info.xml reader and the calls the builder receives.
@@ -29,11 +29,11 @@ cat > "$work/stubs.php" <<'PHP'
 <?php
 namespace Civi\Test {
   class CiviEnvBuilder {
-    public array $installed = [];
     public array $steps = [];
-    // One step per call, recorded in order — the helper must not batch them.
-    public function install($names): self { $this->installed[] = implode("+", (array) $names); return $this; }
+    public function install($names): self { \CkProbe::$installed[] = implode("+", (array) $names); return $this; }
     public function callback($cb, $sig = NULL): self { $this->steps[] = [$cb, $sig]; return $this; }
+    // Runs the steps as apply() would, once the schema is rebuilt.
+    public function run(): void { \CkProbe::$rebuilt = TRUE; foreach ($this->steps as [$cb]) { $cb($this); } }
   }
 }
 namespace Civi\Test\CiviEnvBuilder {
@@ -57,7 +57,9 @@ namespace {
     public static bool $signed = FALSE;
     public static bool $preInstall = FALSE;
     public static bool $builtAfterRestore = FALSE;
+    public static bool $rebuilt = FALSE;
     public static array $executed = [];
+    public static array $installed = [];
   }
   class CRM_Utils_System {
     public static string $version = '6.19.0';
@@ -71,7 +73,28 @@ namespace {
   // Touching the extension system before the headless rebuild is the bug this
   // helper avoids: the stub makes any such call loud.
   class CRM_Extension_System {
-    public static function singleton(): never { throw new RuntimeException('ck_headless touched CRM_Extension_System'); }
+    public static function singleton(): self {
+      if (!CkProbe::$rebuilt) { throw new RuntimeException('ck_headless touched CRM_Extension_System'); }
+      return new self();
+    }
+    public function getManager(): CRM_Extension_Manager { return new CRM_Extension_Manager(); }
+  }
+  // org.example.dep requires org.example.deep, which the fixture never names.
+  class CRM_Extension_Manager {
+    private const REQUIRES = ['org.example.dep' => ['org.example.deep'], 'org.example.deep' => []];
+    public function findInstallRequirements(array $keys): array {
+      $order = [];
+      $visit = function (string $key) use (&$visit, &$order): void {
+        foreach (self::REQUIRES[$key] ?? [] as $required) { $visit($required); }
+        $order[] = $key;
+      };
+      array_map($visit, $keys);
+      return array_values(array_unique($order));
+    }
+    public function install(array $keys): void {
+      if (count($keys) !== 1) { throw new RuntimeException('one extension per install()'); }
+      if (!in_array($keys[0], CkProbe::$installed, TRUE)) { CkProbe::$installed[] = $keys[0]; }
+    }
   }
 }
 PHP
@@ -82,23 +105,23 @@ probe='
   CRM_Utils_System::$version = getenv("CK_CORE") ?: "6.19.0";
   $b = ck_headless();
   $last = end($b->steps);
-  echo implode(",", $b->installed), "|",
+  $b->run();
+  echo implode(",", CkProbe::$installed), "|",
     (CkProbe::$signed && CkProbe::$preInstall ? "restored" : "no-restore"), "|",
     (CkProbe::$builtAfterRestore ? "before-build" : "after-build"), "|",
     str_replace("\n", " ", implode(";", CkProbe::$executed)), "|",
     ($last[1] ?? "none"), "|";
-  if (is_callable($last[0] ?? NULL)) { ($last[0])($b); }
   echo (CRM_Core_Session::$status === [] ? "drained" : "kept"), "\n";
 '
 out="$(php -r "$probe" "$work/stubs.php" "$work/ext/tests/phpunit/ckHeadless.php")"
 IFS='|' read -r installed restored order executed sig drained <<<"$out"
-[[ "$installed" == "org.example.base,org.example.dep,org.example.fixture" ]] \
-  || fail "expected the info.xml requires, trimmed, own key last; got '$installed'"
+[[ "$installed" == "org.example.base,org.example.deep,org.example.dep,org.example.fixture" ]] \
+  || fail "expected the requires closure, trimmed, each after its own requires, own key last; got '$installed'"
 
 # An optional integration installs after <requires>, before the extension.
-out="$(php -r 'require $argv[1]; require $argv[2]; echo implode(",", ck_headless("org.example.optional")->installed);' \
+out="$(php -r 'require $argv[1]; require $argv[2]; ck_headless("org.example.optional")->run(); echo implode(",", CkProbe::$installed);' \
   "$work/stubs.php" "$work/ext/tests/phpunit/ckHeadless.php")"
-[[ "$out" == "org.example.base,org.example.dep,org.example.optional,org.example.fixture" ]] \
+[[ "$out" == "org.example.base,org.example.deep,org.example.dep,org.example.optional,org.example.fixture" ]] \
   || fail "expected optional extensions between <requires> and the own key; got '$out'"
 
 # Signing CoreSchemaStep drops the core foreign keys, so the generated SQL has
@@ -112,8 +135,18 @@ out="$(php -r 'require $argv[1]; require $argv[2]; echo implode(",", ck_headless
 # 6.20 keeps the keys while signing, and replaying the SQL would add them twice.
 out="$(CK_CORE=6.20.beta1 php -r "$probe" "$work/stubs.php" "$work/ext/tests/phpunit/ckHeadless.php")"
 IFS='|' read -r _ restored _ executed _ _ <<<"$out"
-[[ "$restored" == "no-restore" && -z "$executed" ]] \
+[[ "$restored" == "no-restore" && "$executed" != *"CORE SCHEMA SQL"* ]] \
   || fail "on 6.20 the core schema SQL must not be replayed; got '$restored' '$executed'"
+
+# A rebuild that dies halfway leaves the previous signature in civitest_revs,
+# and the next run trusts a wiped schema. The first step forgets it.
+out="$(php -r 'require $argv[1]; require $argv[2];
+  CRM_Utils_System::$version = "6.20.0";
+  $b = ck_headless(); ($b->steps[0][0])($b);
+  echo $b->steps[0][1], "|", implode(";", CkProbe::$executed);' \
+  "$work/stubs.php" "$work/ext/tests/phpunit/ckHeadless.php")"
+[[ "$out" == "ck-forget-signature|DELETE FROM \`civicrm_test\`.civitest_revs" ]] \
+  || fail "the first step must forget the saved signature; got '$out'"
 
 # The build queues managed-entity errors; the last step drains them, so no test
 # starts with status messages it did not cause.

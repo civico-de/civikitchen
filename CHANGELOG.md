@@ -16,6 +16,10 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Fixed
 
+- The managed `ck_headless()` installs the whole `<requires>` closure, each
+  extension after its own dependencies and one per install. An extension
+  no longer has to repeat a dependency's requirements in its own `info.xml`
+  to get a working test database.
 - ckconform's `crm-scope` check ignores PHP comments in `.mgd.php` files. A
   docblock that names `{crmScope}{ts}` was read as an unscoped template body.
 
