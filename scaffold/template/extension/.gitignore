@@ -11,6 +11,9 @@ node_modules/
 .phpunit.cache/
 .phpstan-cache/
 
+# Evidence the shell e2e suites write (OUT_DIR in tests/e2e/lib.sh)
+/tests/e2e/**/out/
+
 # Docker secrets
 .docker/.env
 

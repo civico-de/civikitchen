@@ -14,6 +14,28 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- The managed `tests/e2e/lib.sh` covers what shell suites kept in their own
+  copies:
+  - `app` and a flavor-aware `cv` run as the web user from the site root of a
+    standalone or buildkit image.
+  - `cv_scr <file>` runs a host PHP file, and `site_key` reads the site key.
+  - `hit`, `body_lacks`, `cfg_value` and `auth_header` make HTTP calls, and
+    `mail_clear` empties maildev.
+  - `BASE_URL` and `MAILDEV_URL` default to the published ports of `app` and
+    `maildev`, so a stack on other ports needs no override. A maildev that is
+    not published leaves `MAILDEV_URL` empty instead of reaching another
+    stack's maildev on 1080.
+
+  A repository's own helpers go into `tests/e2e/lib.local.sh`, which lib.sh
+  sources last, so a `template_custom` entry for lib.sh is no longer needed.
+  After `ckinit --update`, `cv` runs from the site root, both via compose and
+  inside the image. On buildkit images it runs as `buildkit` instead of
+  `www-data`.
+- The seeded `.gitignore` ignores `tests/e2e/**/out/`, where the suites leave
+  their evidence. Existing repositories add the line themselves.
+
 ## [1.45.1] - 2026-10-17
 
 ### Fixed

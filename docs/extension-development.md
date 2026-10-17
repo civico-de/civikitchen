@@ -243,7 +243,18 @@ policy:
 ```
 
 Repository-specific test setup goes into `tests/phpunit/bootstrap.local.php`,
-which the managed bootstrap loads when it exists.
+which the managed bootstrap loads when it exists. The shell suites work the
+same way. The managed tests/e2e/lib.sh carries the shared plumbing:
+
+- `check`, `note` and `finish` for the verdict
+- `app` and `cv` as the web user of either image flavor
+- `cv_scr` and `sql`, which run a host PHP file or a query
+- `hit`, `body_lacks`, `cfg_value` and `auth_header` for HTTP calls with
+  `$BASE_URL`, which defaults to the app's published port
+- the maildev helpers, with `$MAILDEV_URL` taken from maildev's published port
+
+A suite's domain helpers go into `tests/e2e/lib.local.sh`, which lib.sh
+sources last. They can use everything above and override its defaults.
 
 ## Civix workflow
 

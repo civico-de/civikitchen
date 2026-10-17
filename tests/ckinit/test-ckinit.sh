@@ -849,20 +849,90 @@ grep -q 'drifted   .gitlab-ci.yml' <<<"$out" || { echo "a drifted GitLab caller 
 "$root/scaffold/ckinit.php" --update "$work/gitlab" >/dev/null
 grep -q 'civikitchen/v1/' "$work/gitlab/.gitlab-ci.yml"
 grep -q 'CK_LIFECYCLE: "0"' "$work/gitlab/.gitlab-ci.yml"
-# Inside the image (GitLab jobs) the e2e helpers call cv directly, not via compose.
-mkdir -p "$work/fakebin"
-printf '%s\n' '#!/bin/sh' 'echo "direct:$*"' > "$work/fakebin/cv"
-chmod +x "$work/fakebin/cv"
-out=$(PATH="$work/fakebin:$PATH" CK_IN_IMAGE=1 bash -c '. "$1"; cv ext:list' _ "$work/gitlab/tests/e2e/lib.sh")
-[ "$out" = 'direct:ext:list' ] || { echo "lib.sh ignored CK_IN_IMAGE: $out" >&2; exit 1; }
+# The managed e2e lib.sh, with docker, cv, mariadb and curl stubbed.
+lib="$work/gitlab/tests/e2e/lib.sh"
+mkdir -p "$work/fakebin" "$work/site"
+cat > "$work/fakebin/docker" <<'SH'
+#!/bin/sh
+case "$*" in
+  "compose port app 80") echo "0.0.0.0:8123" ;;
+  "compose port maildev 1080") echo "${FAKE_MAILDEV:-0.0.0.0:1091}" ;;
+  *"civicrm.standalone.php"*) echo "${FAKE_FLAVOR:-standalone}" ;;
+  *) echo "compose:$*"; [ -t 0 ] || cat ;;
+esac
+SH
+printf '%s\n' '#!/bin/sh' 'echo "direct:$PWD:$*"' > "$work/fakebin/cv"
 # sql goes through the mariadb client: MariaDB 11 images ship no mysql binary.
 printf '%s\n' '#!/bin/sh' 'echo "mariadb:$*"' > "$work/fakebin/mariadb"
-printf '%s\n' '#!/bin/sh' 'echo "compose:$*"' > "$work/fakebin/docker"
-chmod +x "$work/fakebin/mariadb" "$work/fakebin/docker"
-out=$(PATH="$work/fakebin:$PATH" CK_IN_IMAGE=1 bash -c '. "$1"; sql "SELECT 1"' _ "$work/gitlab/tests/e2e/lib.sh")
+chmod +x "$work/fakebin/docker" "$work/fakebin/cv" "$work/fakebin/mariadb"
+in_image() { PATH="$work/fakebin:$PATH" CK_IN_IMAGE=1 CK_APP_USER=www-data CK_APP_CWD="$work/site" bash -c "$@"; }
+via_compose() { PATH="$work/fakebin:$PATH" COMPOSE_DIR="$work" bash -c "$@"; }
+
+# Inside the image (GitLab jobs) the helpers run directly from the site root.
+out=$(in_image '. "$1"; cv ext:list; app pwd; echo "$BASE_URL $MAILDEV_URL"' _ "$lib")
+[ "$out" = "direct:$work/site:ext:list"$'\n'"$work/site"$'\n'"http://localhost:8080 http://localhost:1080" ] \
+  || { echo "lib.sh in the image: $out" >&2; exit 1; }
+out=$(in_image '. "$1"; sql "SELECT 1"' _ "$lib")
 [ "$out" = 'mariadb:-h db -N -B -ucivicrm -pcivicrm civicrm -e SELECT 1' ] || { echo "lib.sh sql in the image: $out" >&2; exit 1; }
-out=$(PATH="$work/fakebin:$PATH" COMPOSE_DIR="$work" bash -c '. "$1"; sql "SELECT 1"' _ "$work/gitlab/tests/e2e/lib.sh")
-[ "$out" = 'compose:compose exec -T db mariadb -N -B -ucivicrm -pcivicrm civicrm -e SELECT 1' ] || { echo "lib.sh sql via compose: $out" >&2; exit 1; }
+
+# Through compose, cv and app run as the probed flavor's web user from its site
+# root; BASE_URL and MAILDEV_URL follow the published ports.
+out=$(via_compose '. "$1"; echo "$BASE_URL $MAILDEV_URL"; cv ext:list; sql "SELECT 1"' _ "$lib" </dev/null)
+[ "$out" = $'http://localhost:8123 http://localhost:1091\ncompose:compose exec -T -u www-data -w /var/www/html app cv ext:list\ncompose:compose exec -T db mariadb -N -B -ucivicrm -pcivicrm civicrm -e SELECT 1' ] \
+  || { echo "lib.sh via compose: $out" >&2; exit 1; }
+out=$(FAKE_FLAVOR=buildkit via_compose '. "$1"; cv ext:list' _ "$lib" </dev/null)
+[ "$out" = 'compose:compose exec -T -u buildkit -w /home/buildkit/buildkit/build/site/web app cv ext:list' ] || { echo "lib.sh cv on buildkit: $out" >&2; exit 1; }
+out=$(FAKE_FLAVOR=down via_compose '. "$1"; cv ext:list' _ "$lib" 2>&1 </dev/null || true)
+grep -q 'does not answer' <<<"$out" || { echo "lib.sh guessed a flavor for a stack that is down: $out" >&2; exit 1; }
+# A half override is probed like none; an unpublished port (:0) is no URL.
+out=$(CK_APP_USER=buildkit FAKE_MAILDEV='0.0.0.0:0' via_compose 'set -u; . "$1"; echo "[$MAILDEV_URL]"; cv ext:list' _ "$lib" </dev/null)
+[ "$out" = $'[]\ncompose:compose exec -T -u www-data -w /var/www/html app cv ext:list' ] || { echo "lib.sh override or port 0: $out" >&2; exit 1; }
+# cv_scr hands the host file to the container on stdin.
+printf '<?php echo 1;\n' > "$work/seed.php"
+out=$(via_compose '. "$1"; cv_scr "$2"' _ "$lib" "$work/seed.php")
+if ! grep -q '^compose:compose exec -T -u www-data -w /var/www/html app bash -c f=$(mktemp --suffix=.php) && cat > "$f" && cv scr "$f"; rc=$?' <<<"$out" \
+  || ! grep -q '^<?php echo 1;$' <<<"$out"; then
+  echo "lib.sh cv_scr: $out" >&2
+  exit 1
+fi
+
+# hit hands curl its configuration on stdin, so a credential reaches no argv.
+printf '%s\n' '#!/bin/sh' 'echo "argv:$*"' 'cat' > "$work/fakebin/curl"
+chmod +x "$work/fakebin/curl"
+out=$(in_image '. "$1"; TOKEN=secret; hit probe "http://x/a?b=1" "$(auth_header)" "header = \"X-Other: 1\""' _ "$lib")
+expected='argv:-K -
+url = "http://x/a?b=1"
+output = "'"$work"'/gitlab/tests/e2e/out/probe.body"
+write-out = "%{http_code}"
+silent
+globoff
+header = "X-Civi-Auth: Bearer secret"
+header = "X-Other: 1"'
+[ "$out" = "$expected" ] || { echo "lib.sh hit: $out" >&2; exit 1; }
+# cfg_value escapes a JSON payload for a double-quoted curl config value.
+out=$(in_image '. "$1"; cfg_value "$2"' _ "$lib" '{"k":"a\b"}')
+[ "$out" = '{\"k\":\"a\\b\"}' ] || { echo "lib.sh cfg_value: $out" >&2; exit 1; }
+# body_lacks fails on a missing or empty body instead of passing silently.
+printf 'all fine' > "$work/gitlab/tests/e2e/out/ok.body"
+: > "$work/gitlab/tests/e2e/out/empty.body"
+in_image '. "$1"; body_lacks ok "error" && ! body_lacks ok "fine" && ! body_lacks empty "x" && ! body_lacks missing "x"' _ "$lib" \
+  || { echo "lib.sh body_lacks" >&2; exit 1; }
+# A suite file keeps its evidence next to itself.
+printf '%s\n' '. "$(dirname "$0")/lib.sh"; echo "$OUT_DIR"' > "$work/gitlab/tests/e2e/probe.sh"
+out=$(PATH="$work/fakebin:$PATH" CK_IN_IMAGE=1 CK_APP_USER=www-data CK_APP_CWD="$work/site" bash "$work/gitlab/tests/e2e/probe.sh")
+[ "$out" = "$work/gitlab/tests/e2e/out" ] || { echo "lib.sh OUT_DIR: $out" >&2; exit 1; }
+/bin/rm "$work/gitlab/tests/e2e/probe.sh"
+
+# Repository helpers in lib.local.sh load after the managed ones and may use them.
+printf '%s\n' 'local_helper() { note "local $RUN_ID"; }' > "$work/gitlab/tests/e2e/lib.local.sh"
+out=$(RUN_ID=7 in_image '. "$1"; local_helper' _ "$lib")
+[ "$out" = '  · local 7' ] || { echo "lib.sh did not load lib.local.sh: $out" >&2; exit 1; }
+/bin/rm "$work/gitlab/tests/e2e/lib.local.sh"
+# A caller under set -e can source lib.sh while the stack is still down.
+printf '%s\n' '#!/bin/sh' 'exit 1' > "$work/fakebin/docker"
+out=$(via_compose 'set -euo pipefail; . "$1"; echo "sourced:$BASE_URL"' _ "$lib")
+[ "$out" = 'sourced:' ] || { echo "lib.sh aborted a set -e caller: $out" >&2; exit 1; }
+/bin/rm -r "$work/gitlab/tests/e2e/out"
 # The root pass writes GitHub callers only, so an extension below a root refuses.
 git init -q "$work/gitlab-mono"
 cp -R "$work/gitlab" "$work/gitlab-mono/ext"

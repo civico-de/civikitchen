@@ -483,9 +483,9 @@ user:
 - civikitchen-ci runs `ck ci`, then cklifecycle.
 - civikitchen-e2e runs `npm run test:e2e` when the repository has a
   playwright.config.ts or .js. The site has the admin/admin login of the
-  GitHub job. CK_IN_IMAGE=1 is set, so the managed tests/e2e/lib.sh calls cv
-  directly instead of through compose; a repository's own helpers check the
-  same variable.
+  GitHub job. CK_IN_IMAGE=1 is set, so the managed tests/e2e/lib.sh runs cv,
+  `app` and `sql` directly instead of through compose. Helpers in
+  tests/e2e/lib.local.sh that build on them need no check of their own.
 
 Both jobs run in branch and merge request pipelines. A project that wants
 only one adds GitLab's workflow rules below the managed block, where these
