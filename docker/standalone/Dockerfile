@@ -77,10 +77,13 @@ RUN --mount=type=secret,id=composer_auth,env=COMPOSER_AUTH for repo in . package
 FROM download-${CIVICRM_SOURCE} AS download
 # Core bugs a dev stack must not reproduce, each with its upstream link, until
 # the release carries the fix. The log lands in the image as core-patches.log.
+# The script reads core's version.xml through the toolbelt's ck, in checkout layout.
 COPY docker/standalone/core-patches /tmp/core-patches
-COPY docker/standalone/apply-core-patches.sh /tmp/apply-core-patches.sh
+COPY toolbelt/bin/ck /tmp/ck/toolbelt/bin/ck
+COPY toolbelt/lib /tmp/ck/toolbelt/lib
+COPY docker/standalone/apply-core-patches.sh /tmp/ck/docker/standalone/apply-core-patches.sh
 RUN apt-get update && apt-get install -y --no-install-recommends patch \
-    && bash /tmp/apply-core-patches.sh /tmp/civicrm/civicrm-standalone/core /tmp/core-patches \
+    && bash /tmp/ck/docker/standalone/apply-core-patches.sh /tmp/civicrm/civicrm-standalone/core /tmp/core-patches \
        > /tmp/core-patches.log \
     && cat /tmp/core-patches.log
 

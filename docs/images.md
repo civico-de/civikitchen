@@ -42,7 +42,10 @@ The image carries fixes for core bugs until a release contains them, one file
 per bug in
 [docker/standalone/core-patches/](https://github.com/civico-de/civikitchen/tree/main/docker/standalone/core-patches/),
 each naming its upstream issue. A patch the release already contains is
-skipped; any other mismatch fails the build. The image lists what it applied
+skipped; any other mismatch fails the build. A patch for a bug that a later
+release introduced carries a `Since: X.Y.Z` line and is skipped on older cores
+(the version comes from core's `xml/version.xml`; `6.20.beta1` counts as older
+than `6.20.0`). The image lists what it applied
 in `/usr/local/share/civikitchen/core-patches.log`. A site on the unpatched
 release still shows the bug
 ([ADR-0016](adr/0016-core-bugs-are-patched-into-the-standalone-image.md)).

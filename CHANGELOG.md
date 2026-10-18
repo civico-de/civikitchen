@@ -20,6 +20,15 @@ except that a break the consumers are adjusted for ships as a minor, marked
   runs the script as that CiviCRM user, for example
   `cv_scr --user=admin /dev/stdin <<< "$code"`. A local helper that wraps
   `cv scr --user` can go; `cv_scr <file>` behaves as before.
+- A standalone core patch can name the first core release that needs it on a
+  `Since: X.Y.Z` line; the image build skips it on older cores instead of
+  failing because the patch does not apply there.
+
+### Fixed
+
+- The SearchKit smart group panel on standalone images with CiviCRM 6.19.1 or
+  newer shows its group type options again, through a core patch until a
+  release carries the upstream fix.
 
 ## [1.46.0] - 2026-10-17
 

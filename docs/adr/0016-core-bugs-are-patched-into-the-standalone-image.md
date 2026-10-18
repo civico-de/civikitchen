@@ -20,6 +20,10 @@ without one fails the build.
 A patch that the release already contains is skipped. A patch that neither
 applies nor is contained fails the build.
 
+A patch for a bug that a later release introduced names that release on a
+`Since: X.Y.Z` line. On an older core, read from `xml/version.xml`, the patch
+is skipped as not applicable.
+
 `/usr/local/share/civikitchen/core-patches.log` lists what the image applied.
 
 ## Rationale
