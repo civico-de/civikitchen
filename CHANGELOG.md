@@ -14,6 +14,12 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Fixed
+
+- `playwright-e2e` checks out the caller before its first step: the compose
+  project name step ran in `working_directory` before that directory existed,
+  so the job failed on every runner without a tree left from an earlier run.
+
 ## [1.47.0] - 2026-10-18
 
 ### Added

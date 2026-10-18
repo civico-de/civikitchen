@@ -112,6 +112,10 @@ jobs:
     env:
       BASE_URL: ${{ inputs.base_url }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       # One compose project per CALL, not per run: a caller that runs this
       # workflow twice in one run (two identity providers, say) lands both
       # copies on the same Docker host of a multi-slot self-hosted runner, and
@@ -123,10 +127,6 @@ jobs:
         run: |
           suffix=$(printf '%s' "$CK_COMMAND" | sha256sum | cut -c1-8)
           echo "COMPOSE_PROJECT_NAME=ck-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-pw-${suffix}" >> "$GITHUB_ENV"
-
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
 
       - name: Validate inputs
         if: ${{ inputs.sibling_repo != '' }}

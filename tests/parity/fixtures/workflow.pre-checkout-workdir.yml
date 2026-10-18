@@ -1,0 +1,43 @@
+# Fixture for the pre-checkout-workdir gate: `early` and `inherited` run a step
+# in a subdirectory before the checkout; `root` and `after` do it right.
+name: Fixture
+on: workflow_call
+
+defaults:
+  run:
+    working-directory: tests/e2e
+
+jobs:
+  early:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Compose project name
+        run: echo "COMPOSE_PROJECT_NAME=x" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+  inherited:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo inherited
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+  root:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Workspace root
+        working-directory: .
+        run: echo root
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+  after:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: After checkout
+        run: echo after
