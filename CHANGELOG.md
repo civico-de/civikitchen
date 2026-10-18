@@ -14,6 +14,13 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- The managed `tests/e2e/lib.sh` takes `cv_scr --user=<name> <file>`, which
+  runs the script as that CiviCRM user, for example
+  `cv_scr --user=admin /dev/stdin <<< "$code"`. A local helper that wraps
+  `cv scr --user` can go; `cv_scr <file>` behaves as before.
+
 ## [1.46.0] - 2026-10-17
 
 ### Added

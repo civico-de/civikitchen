@@ -248,13 +248,19 @@ same way. The managed tests/e2e/lib.sh carries the shared plumbing:
 
 - `check`, `note` and `finish` for the verdict
 - `app` and `cv` as the web user of either image flavor
-- `cv_scr` and `sql`, which run a host PHP file or a query
+- `cv_scr [--user=<name>] <file>` and `sql`, which run a host PHP file
+  (as that CiviCRM user when given) or a query; inline PHP goes through
+  `cv_scr /dev/stdin <<< "$code"`
 - `hit`, `body_lacks`, `cfg_value` and `auth_header` for HTTP calls with
   `$BASE_URL`, which defaults to the app's published port
 - the maildev helpers, with `$MAILDEV_URL` taken from maildev's published port
 
 A suite's domain helpers go into `tests/e2e/lib.local.sh`, which lib.sh
 sources last. They can use everything above and override its defaults.
+
+The suites leave their evidence in `out/` next to themselves. The seeded
+`.gitignore` ignores `/tests/e2e/**/out/`; a repository whose `.gitignore`
+predates that adds the line by hand, since ckinit never rewrites it.
 
 ## Civix workflow
 

@@ -861,10 +861,18 @@ case "$*" in
   *) echo "compose:$*"; [ -t 0 ] || cat ;;
 esac
 SH
-printf '%s\n' '#!/bin/sh' 'echo "direct:$PWD:$*"' > "$work/fakebin/cv"
+# cv scr prints the script it got and exits with $FAKE_CV_RC.
+cat > "$work/fakebin/cv" <<'SH'
+#!/bin/sh
+echo "direct:$PWD:$*"
+if [ "$1" = scr ]; then for f; do :; done; cat "$f"; fi
+exit "${FAKE_CV_RC:-0}"
+SH
+# BSD mktemp lacks --suffix; the image's GNU one has it.
+printf '%s\n' '#!/bin/sh' 'exec /usr/bin/mktemp "$TMPDIR/ckscr.XXXXXX"' > "$work/fakebin/mktemp"
 # sql goes through the mariadb client: MariaDB 11 images ship no mysql binary.
 printf '%s\n' '#!/bin/sh' 'echo "mariadb:$*"' > "$work/fakebin/mariadb"
-chmod +x "$work/fakebin/docker" "$work/fakebin/cv" "$work/fakebin/mariadb"
+chmod +x "$work/fakebin/docker" "$work/fakebin/cv" "$work/fakebin/mariadb" "$work/fakebin/mktemp"
 in_image() { PATH="$work/fakebin:$PATH" CK_IN_IMAGE=1 CK_APP_USER=www-data CK_APP_CWD="$work/site" bash -c "$@"; }
 via_compose() { PATH="$work/fakebin:$PATH" COMPOSE_DIR="$work" bash -c "$@"; }
 
@@ -895,6 +903,20 @@ if ! grep -q '^compose:compose exec -T -u www-data -w /var/www/html app bash -c 
   echo "lib.sh cv_scr: $out" >&2
   exit 1
 fi
+out=$(via_compose '. "$1"; cv_scr --user=admin "$2"' _ "$lib" "$work/seed.php")
+grep -q '&& cv scr --user=admin "$f"; rc=$?' <<<"$out" || { echo "lib.sh cv_scr --user via compose: $out" >&2; exit 1; }
+# In the image cv scr gets the user as one argument, inline code on stdin, and
+# its exit code comes back; the temp file is gone either way.
+mkdir -p "$work/scrtmp"
+out=$(TMPDIR="$work/scrtmp" in_image '. "$1"; cv_scr "--user=o'"'"'brien x" /dev/stdin <<< "<?php echo 2;"' _ "$lib")
+[[ "$out" == "direct:$work/site:scr --user=o'brien x $work/scrtmp/ckscr."??????$'\n<?php echo 2;' ]] \
+  || { echo "lib.sh cv_scr --user inline: $out" >&2; exit 1; }
+out=$(TMPDIR="$work/scrtmp" in_image '. "$1"; cv_scr "$2"' _ "$lib" "$work/seed.php")
+[[ "$out" == "direct:$work/site:scr $work/scrtmp/ckscr."??????$'\n<?php echo 1;' ]] \
+  || { echo "lib.sh cv_scr without --user: $out" >&2; exit 1; }
+rc=0; FAKE_CV_RC=3 TMPDIR="$work/scrtmp" in_image '. "$1"; cv_scr --user=admin "$2"' _ "$lib" "$work/seed.php" >/dev/null || rc=$?
+[ "$rc" = 3 ] || { echo "lib.sh cv_scr exit code: $rc" >&2; exit 1; }
+[ -z "$(ls -A "$work/scrtmp")" ] || { echo "lib.sh cv_scr left temp files: $(ls "$work/scrtmp")" >&2; exit 1; }
 
 # hit hands curl its configuration on stdin, so a credential reaches no argv.
 printf '%s\n' '#!/bin/sh' 'echo "argv:$*"' 'cat' > "$work/fakebin/curl"
