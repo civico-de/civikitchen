@@ -73,11 +73,14 @@ namespace {
   // Touching the extension system before the headless rebuild is the bug this
   // helper avoids: the stub makes any such call loud.
   class CRM_Extension_System {
+    private static ?self $current = NULL;
+    private ?CRM_Extension_Manager $manager = NULL;
     public static function singleton(): self {
       if (!CkProbe::$rebuilt) { throw new RuntimeException('ck_headless touched CRM_Extension_System'); }
-      return new self();
+      return self::$current ??= new self();
     }
-    public function getManager(): CRM_Extension_Manager { return new CRM_Extension_Manager(); }
+    public static function replace(): void { self::$current = new self(); }
+    public function getManager(): CRM_Extension_Manager { return $this->manager ??= new CRM_Extension_Manager(); }
   }
   // org.example.dep requires org.example.deep, which the fixture never names.
   class CRM_Extension_Manager {
@@ -91,9 +94,13 @@ namespace {
       array_map($visit, $keys);
       return array_values(array_unique($order));
     }
+    // Like core's _install(), every install replaces the extension system; a
+    // replaced manager installs without the mixins seeing it (templates lost).
     public function install(array $keys): void {
       if (count($keys) !== 1) { throw new RuntimeException('one extension per install()'); }
+      if ($this !== CRM_Extension_System::singleton()->getManager()) { throw new RuntimeException('install() through a replaced extension manager'); }
       if (!in_array($keys[0], CkProbe::$installed, TRUE)) { CkProbe::$installed[] = $keys[0]; }
+      CRM_Extension_System::replace();
     }
   }
 }

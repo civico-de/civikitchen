@@ -21,6 +21,11 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - `playwright-e2e` checks out the caller before its first step: the compose
   project name step ran in `working_directory` before that directory existed,
   so the job failed on every runner without a tree left from an earlier run.
+- The managed `tests/phpunit/ckHeadless.php` installs each extension through
+  the current extension manager. Through a manager cached before the first
+  install, an extension's template directory could stay unregistered on a
+  fresh test database, and Smarty failed with "Unable to load
+  'file:<ext>/<name>.tpl'".
 
 ## [1.47.0] - 2026-10-18
 
