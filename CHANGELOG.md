@@ -14,6 +14,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.47.0] - 2026-10-18
+
 ### Added
 
 - The managed `tests/e2e/lib.sh` takes `cv_scr --user=<name> <file>`, which
@@ -2171,7 +2173,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.46.0...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.47.0...HEAD
+[1.47.0]: https://github.com/civico-de/civikitchen/compare/v1.46.0...v1.47.0
 [1.46.0]: https://github.com/civico-de/civikitchen/compare/v1.45.0...v1.46.0
 [1.45.0]: https://github.com/civico-de/civikitchen/compare/v1.44.0...v1.45.0
 [1.44.0]: https://github.com/civico-de/civikitchen/compare/v1.43.0...v1.44.0
