@@ -52,7 +52,7 @@ $subscribers = [
 
 $count = 0;
 foreach ($subscribers as $i => [$first, $last]) {
-  $cid = ck_seed_individual($first, $last, ck_seed_email($first, $last, 'example-netzwerk.de'));
+  $cid = ck_seed_individual($first, $last, ck_seed_email($first, $last, 'netzwerk.example.de'));
   // Everyone gets the monthly newsletter; every second contact the project
   // updates; every fifth the press list.
   ck_seed_group_contact($cid, 'nl_monatlich');

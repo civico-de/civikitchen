@@ -70,7 +70,7 @@ $people = [
 $statuses = ['Registered', 'Registered', 'Attended', 'Registered', 'Cancelled'];
 $participants = 0;
 foreach ($people as $i => [$first, $last, $street, $plz, $city]) {
-  $cid = ck_seed_individual($first, $last, ck_seed_email($first, $last, 'example-bildungswerk.de'), [$street, $plz, $city]);
+  $cid = ck_seed_individual($first, $last, ck_seed_email($first, $last, 'bildungswerk.example.de'), [$street, $plz, $city]);
   // Each person attends 1-3 events; past events get Attended/Cancelled mix,
   // upcoming events get Registered.
   $n = 1 + ($i % 3);

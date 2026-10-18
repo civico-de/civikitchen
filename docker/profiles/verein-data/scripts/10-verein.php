@@ -76,7 +76,7 @@ $members = [
 
 $created = 0;
 foreach ($members as $i => [$first, $last, $street, $plz, $city, $type, $groups]) {
-  $cid = ck_seed_individual($first, $last, ck_seed_email($first, $last, 'example-verein.de'), [$street, $plz, $city]);
+  $cid = ck_seed_individual($first, $last, ck_seed_email($first, $last, 'verein.example.de'), [$street, $plz, $city]);
 
   // Join dates spread over the past years (deterministic, index-based).
   $joined = date('Y-m-d', strtotime('-' . (3 + $i * 2) . ' months'));

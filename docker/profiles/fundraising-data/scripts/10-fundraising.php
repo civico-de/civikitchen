@@ -67,7 +67,7 @@ $amounts = [25.00, 50.00, 100.00, 250.00, 75.00, 500.00];
 $donorIds = [];
 $contribs = 0;
 foreach ($donors as $i => [$first, $last, $street, $plz, $city]) {
-  $cid = ck_seed_individual($first, $last, ck_seed_email($first, $last, 'example-spenden.de'), [$street, $plz, $city]);
+  $cid = ck_seed_individual($first, $last, ck_seed_email($first, $last, 'spenden.example.de'), [$street, $plz, $city]);
   $donorIds[] = $cid;
 
   // 1-4 donations over the past 14 months; every third donor gives to a
