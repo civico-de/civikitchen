@@ -139,7 +139,7 @@ help: ## Show this help
 doctor: ## Report every missing host prerequisite in one pass
 	bash scripts/doctor.sh
 
-test: test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario test-provision test-core-patches test-ckcoretest test-ck-headless test-ck-headless-phpstan test-phpstan-bootstrap test-ckcommon-git test-missing-tool test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-sibling-vendor test-database-matrix test-demo-basic-auth test-release-retag test-release-move-major-tag test-release-publish-flags test-release-steps test-ci-gates-step test-release-script test-vendored-paths test-ckeslint test-ckcoverage test-doctor test-tool-locks test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-changelog test-extension-docs ## Run every fast test suite (no Docker)
+test: test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario test-provision test-core-patches test-ckcoretest test-ck-headless test-ck-headless-phpstan test-phpstan-bootstrap test-ckcommon-git test-missing-tool test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-sibling-vendor test-sibling-build test-database-matrix test-demo-basic-auth test-release-retag test-release-move-major-tag test-release-publish-flags test-release-steps test-ci-gates-step test-release-script test-vendored-paths test-ckeslint test-ckcoverage test-doctor test-tool-locks test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-changelog test-extension-docs ## Run every fast test suite (no Docker)
 
 test-shared-php-coverage: $(PHPUNIT) $(SCENARIO_YAML_STAMP) ## Shared PHP unit tests and measured line-coverage floor
 	if command -v phpdbg >/dev/null 2>&1; then \
@@ -335,6 +335,9 @@ test-sibling-checkout: ## Sibling clones land in one directory per extension key
 
 test-sibling-vendor: ## Siblings with runtime packages get vendor/ built before the mount
 	bash tests/parity/test-sibling-vendor.sh
+
+test-sibling-build: $(SCENARIO_YAML_STAMP) ## Siblings declaring policy.dist.build get built before the mount
+	bash tests/parity/test-sibling-build.sh
 
 test-database-matrix: ## Supported database images gate standalone promotion
 	bash tests/parity/test-database-matrix.sh

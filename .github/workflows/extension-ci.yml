@@ -206,7 +206,8 @@ on:
           extensions implementing a sibling's interfaces. Enabled LEFT TO
           RIGHT in list order before this extension, so a sibling another
           sibling requires comes first. A sibling whose composer.lock carries
-          runtime packages gets `composer install --no-dev` first; a private
+          runtime packages gets `composer install --no-dev` first, and one
+          declaring policy.dist.build its build (on node_version); a private
           sibling or package needs the composer_app_* secrets. Empty mounts nothing.
         type: string
         default: ''
@@ -817,7 +818,14 @@ jobs:
           persist-credentials: false
           repository: civico-de/civikitchen
           ref: ${{ job.workflow_sha }}
-          sparse-checkout: .github/actions
+          # toolbelt/ and packages/ hold the reader of the siblings' policy.dist.build.
+          sparse-checkout: |
+            .github/actions
+            toolbelt/bin
+            toolbelt/lib
+            toolbelt/ckconform/bin
+            toolbelt/ckconform/src
+            packages
           path: .civikitchen-siblings/ci
 
       - name: Private dependencies
@@ -825,6 +833,7 @@ jobs:
         if: ${{ inputs.composer_install || inputs.sibling_repo != '' || (inputs.policy_defaults || vars.CK_POLICY_DEFAULTS) != '' }}
         uses: ./.civikitchen-siblings/ci/.github/actions/private-deps
         with:
+          node_version: ${{ inputs.node_version }}
           sibling_repo: ${{ inputs.sibling_repo }}
           composer_install: ${{ inputs.composer_install }}
           policy_defaults: ${{ inputs.policy_defaults || vars.CK_POLICY_DEFAULTS }}
@@ -1027,7 +1036,14 @@ jobs:
           persist-credentials: false
           repository: civico-de/civikitchen
           ref: ${{ job.workflow_sha }}
-          sparse-checkout: .github/actions
+          # toolbelt/ and packages/ hold the reader of the siblings' policy.dist.build.
+          sparse-checkout: |
+            .github/actions
+            toolbelt/bin
+            toolbelt/lib
+            toolbelt/ckconform/bin
+            toolbelt/ckconform/src
+            packages
           path: .civikitchen-siblings/ci
 
       - name: Private dependencies
@@ -1035,6 +1051,7 @@ jobs:
         if: ${{ inputs.composer_install || inputs.sibling_repo != '' }}
         uses: ./.civikitchen-siblings/ci/.github/actions/private-deps
         with:
+          node_version: ${{ inputs.node_version }}
           sibling_repo: ${{ inputs.sibling_repo }}
           composer_install: ${{ inputs.composer_install }}
           composer_app_repositories: ${{ inputs.composer_app_repositories }}
@@ -1217,7 +1234,14 @@ jobs:
           persist-credentials: false
           repository: civico-de/civikitchen
           ref: ${{ job.workflow_sha }}
-          sparse-checkout: .github/actions
+          # toolbelt/ and packages/ hold the reader of the siblings' policy.dist.build.
+          sparse-checkout: |
+            .github/actions
+            toolbelt/bin
+            toolbelt/lib
+            toolbelt/ckconform/bin
+            toolbelt/ckconform/src
+            packages
           path: .civikitchen-siblings/ci
 
       - name: Private dependencies
@@ -1225,6 +1249,7 @@ jobs:
         if: ${{ inputs.composer_install || inputs.sibling_repo != '' }}
         uses: ./.civikitchen-siblings/ci/.github/actions/private-deps
         with:
+          node_version: ${{ inputs.node_version }}
           sibling_repo: ${{ inputs.sibling_repo }}
           composer_install: ${{ inputs.composer_install }}
           composer_app_repositories: ${{ inputs.composer_app_repositories }}
@@ -1465,7 +1490,14 @@ jobs:
           persist-credentials: false
           repository: civico-de/civikitchen
           ref: ${{ job.workflow_sha }}
-          sparse-checkout: .github/actions
+          # toolbelt/ and packages/ hold the reader of the siblings' policy.dist.build.
+          sparse-checkout: |
+            .github/actions
+            toolbelt/bin
+            toolbelt/lib
+            toolbelt/ckconform/bin
+            toolbelt/ckconform/src
+            packages
           path: .civikitchen-siblings/ci
 
       # The suite loads it. Before any token is minted: the build runs dependency code.
@@ -1481,6 +1513,7 @@ jobs:
         if: ${{ inputs.composer_install || inputs.sibling_repo != '' }}
         uses: ./.civikitchen-siblings/ci/.github/actions/private-deps
         with:
+          node_version: ${{ inputs.node_version }}
           sibling_repo: ${{ inputs.sibling_repo }}
           composer_install: ${{ inputs.composer_install }}
           composer_app_repositories: ${{ inputs.composer_app_repositories }}
@@ -1598,7 +1631,14 @@ jobs:
           persist-credentials: false
           repository: civico-de/civikitchen
           ref: ${{ job.workflow_sha }}
-          sparse-checkout: .github/actions
+          # toolbelt/ and packages/ hold the reader of the siblings' policy.dist.build.
+          sparse-checkout: |
+            .github/actions
+            toolbelt/bin
+            toolbelt/lib
+            toolbelt/ckconform/bin
+            toolbelt/ckconform/src
+            packages
           path: .civikitchen-siblings/ci
 
       - name: Private dependencies
@@ -1606,6 +1646,7 @@ jobs:
         if: ${{ inputs.composer_install || inputs.sibling_repo != '' }}
         uses: ./.civikitchen-siblings/ci/.github/actions/private-deps
         with:
+          node_version: ${{ inputs.node_version }}
           sibling_repo: ${{ inputs.sibling_repo }}
           composer_install: ${{ inputs.composer_install }}
           composer_app_repositories: ${{ inputs.composer_app_repositories }}
@@ -1932,7 +1973,14 @@ jobs:
           persist-credentials: false
           repository: civico-de/civikitchen
           ref: ${{ job.workflow_sha }}
-          sparse-checkout: .github/actions
+          # toolbelt/ and packages/ hold the reader of the siblings' policy.dist.build.
+          sparse-checkout: |
+            .github/actions
+            toolbelt/bin
+            toolbelt/lib
+            toolbelt/ckconform/bin
+            toolbelt/ckconform/src
+            packages
           path: .civikitchen-siblings/ci
 
       # The suite loads it. Before any token is minted: the build runs dependency code.
@@ -1948,6 +1996,7 @@ jobs:
         if: ${{ inputs.composer_install || inputs.sibling_repo != '' }}
         uses: ./.civikitchen-siblings/ci/.github/actions/private-deps
         with:
+          node_version: ${{ inputs.node_version }}
           sibling_repo: ${{ inputs.sibling_repo }}
           composer_install: ${{ inputs.composer_install }}
           composer_app_repositories: ${{ inputs.composer_app_repositories }}
@@ -2075,7 +2124,14 @@ jobs:
           persist-credentials: false
           repository: civico-de/civikitchen
           ref: ${{ job.workflow_sha }}
-          sparse-checkout: .github/actions
+          # toolbelt/ and packages/ hold the reader of the siblings' policy.dist.build.
+          sparse-checkout: |
+            .github/actions
+            toolbelt/bin
+            toolbelt/lib
+            toolbelt/ckconform/bin
+            toolbelt/ckconform/src
+            packages
           path: .civikitchen-siblings/ci
 
       - name: Private dependencies
@@ -2083,6 +2139,7 @@ jobs:
         if: ${{ inputs.composer_install || inputs.sibling_repo != '' }}
         uses: ./.civikitchen-siblings/ci/.github/actions/private-deps
         with:
+          node_version: ${{ inputs.node_version }}
           sibling_repo: ${{ inputs.sibling_repo }}
           composer_install: ${{ inputs.composer_install }}
           composer_app_repositories: ${{ inputs.composer_app_repositories }}

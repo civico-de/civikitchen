@@ -1,11 +1,12 @@
 name: CiviKitchen private dependencies
 description: >-
-  Sibling extension checkouts, the organisation policy defaults and the runner
-  composer install — everything a stack boot needs before it starts. Writes
-  the compose override that mounts and enables the siblings (output
-  `sibling_override`); layer it with a second -f on `up`.
+  Sibling extension checkouts with their vendor/ and declared release builds,
+  the organisation policy defaults and the runner composer install —
+  everything a stack boot needs before it starts. Writes the compose override
+  that mounts and enables the siblings (output `sibling_override`); layer it
+  with a second -f on `up`.
 
-# Every job that boots a stack needs the same five steps, so they live here
+# Every job that boots a stack needs the same steps, so they live here
 # rather than once per job. A reusable workflow reaches its own repository by
 # checking it out at `ref: ${{ job.workflow_sha }}` — `uses: ./…` alone
 # resolves against the CALLING repository.
@@ -33,6 +34,11 @@ inputs:
       The extension's directory inside the repository. Composite steps do not
       inherit the calling job's defaults.run.working-directory.
     default: '.'
+  node_version:
+    description: >-
+      Node a sibling's declared release build runs its binaries on. Required
+      only when a sibling declares policy.dist.build.
+    default: ''
   ext_key:
     description: >-
       This extension's key — the last entry of the enable list. Empty writes
@@ -142,6 +148,37 @@ runs:
           composer config -g github-oauth.github.com "$CK_COMPOSER_TOKEN"
         fi
         ${{ github.action_path }}/install-sibling-vendor.sh
+
+    # A sibling's policy.dist.build output is not in git, yet its PHP and its
+    # types load it. Built like the release does, before the read-only mount.
+    - name: Read the siblings' declared release builds
+      id: sibling-builds
+      if: ${{ inputs.sibling_repo != '' }}
+      shell: bash
+      env:
+        CK_SIBLING_DIRS: ${{ steps.siblings.outputs.paths }}
+        CK_NODE_VERSION: ${{ inputs.node_version }}
+      run: ${{ github.action_path }}/build-siblings.sh plan
+
+    - name: Set up Node for the sibling builds
+      if: ${{ steps.sibling-builds.outputs.dirs != '' }}
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: ${{ inputs.node_version }}
+
+    # Replaces a Bun the job set up earlier; a later Bun step sets its own pin again.
+    - name: Set up Bun for the sibling builds
+      if: ${{ steps.sibling-builds.outputs.dirs != '' }}
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      with:
+        bun-version-file: ${{ steps.sibling-builds.outputs.bun_version_file }}
+
+    - name: Build the siblings' declared release output
+      if: ${{ steps.sibling-builds.outputs.dirs != '' }}
+      shell: bash
+      env:
+        CK_SIBLING_BUILD_DIRS: ${{ steps.sibling-builds.outputs.dirs }}
+      run: ${{ github.action_path }}/build-siblings.sh build
 
     # The organisation's default civikitchen.yaml, next to the sibling for the
     # same two reasons (dot-prefixed: invisible to the extension scanner and

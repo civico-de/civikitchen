@@ -1027,7 +1027,7 @@ private. Two opt-in inputs and one optional pair of secrets cover that:
 | Input / secret | What it adds |
 |---|---|
 | `composer_install` | `composer install --no-interaction --no-progress` on the runner, before the stack boots. |
-| `sibling_repo` | Comma- or newline-separated owner/repo list of further extensions, each optionally pinned as owner/repo@ref. Each is checked out to `.civikitchen-siblings/<key>`, bind-mounted read-only and enabled, left to right, before this extension. |
+| `sibling_repo` | Comma- or newline-separated owner/repo list of further extensions, each optionally pinned as owner/repo@ref. Each is checked out to `.civikitchen-siblings/<key>`, gets its vendor/ and its declared release build, and is bind-mounted read-only and enabled, left to right, before this extension. |
 | `composer_app_repositories` | Comma- or newline-separated repository names within the caller's owner. Required with the App secrets; scopes the token to exactly these repos. |
 | `composer_app_id`, `composer_app_private_key` (secrets) | A GitHub App with contents: read on the private dependency repos. The workflow mints a short-lived token from it for the composer install and the sibling checkout. |
 
@@ -1056,9 +1056,14 @@ consumer red and old runs stop reproducing; pin a tag and bump it
 deliberately. Two entries declaring the same key fail the run, as do the keys
 ci and policy, which the workflow uses for its own checkouts.
 
-Each sibling is mounted as is, with no composer install, so a sibling that
-keeps its vendor/ out of git is not supported yet. The checkouts are not
-treated as your code, and no .gitignore entry is needed.
+A sibling whose committed composer.lock lists runtime packages gets
+`composer install --no-dev` before the mount. A sibling that declares
+`policy.dist.build` in its civikitchen.yaml is built the way its release
+builds it: `bun install --frozen-lockfile`, then `bun run build`, on the Bun
+its package.json pins and on node_version. Every declared output must exist
+afterwards, and siblings that build must pin the same Bun. A failed build
+fails the job. A sibling without a declaration is mounted as checked out. The
+checkouts are not treated as your code, and no .gitignore entry is needed.
 
 playwright-e2e.yml takes the same input for a single repo. That workflow never
 boots the stack itself; it passes the checkout to your own prepare, test and
