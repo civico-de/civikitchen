@@ -40,7 +40,7 @@ function ck_sibling_build_gaps(array $job): array
         if (str_starts_with($uses, 'actions/checkout@') && ($step['with']['path'] ?? '') === '.civikitchen-siblings/ci') {
             $sparse = preg_split('/\s+/', trim((string) ($step['with']['sparse-checkout'] ?? '')), -1, PREG_SPLIT_NO_EMPTY) ?: [];
         }
-        if (str_contains($uses, '/private-deps') && !isset($step['with']['node_version'])) {
+        if (str_contains($uses, '/private-deps') && trim((string) ($step['with']['node_version'] ?? '')) === '') {
             $gaps[] = 'runs the private-dependency steps without node_version';
         }
     }
