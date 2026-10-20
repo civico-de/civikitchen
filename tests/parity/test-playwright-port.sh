@@ -72,8 +72,8 @@ override_at=$(jq --arg name "$override_step" '[.[].name] | index($name)' <<<"$st
 own_url=$(jq -c '[.[] | select((.env // {}) | has("CIVICRM_BASE_URL")) | .name]' <<<"$steps")
 [ "$own_url" = "[]" ] || fail "steps that set their own CIVICRM_BASE_URL: $own_url"
 
-# Every compose call of the start step carries the override, a sibling one after it;
-# vendor/ is installed as the runner user before the stack starts.
+# Every compose call of the start step carries the override, a sibling one after it,
+# and the seed-store mount last; vendor/ is installed as the runner user before the stack starts.
 mkdir "$work/bin"
 cat > "$work/bin/docker" <<'SH'
 #!/bin/sh
@@ -83,16 +83,22 @@ chmod +x "$work/bin/docker"
 php "$root/tests/parity/workflow-step.php" "$workflow" playwright 'Start CiviCRM stack' > "$work/start.sh"
 start_calls() {
   : > "$work/docker.log"
-  PATH="$work/bin:$PATH" DOCKER_LOG="$work/docker.log" CK_COMPOSE_FILE=compose.ci.yml \
+  PATH="$work/bin:$PATH" DOCKER_LOG="$work/docker.log" CK_COMPOSE_FILE=compose.ci.yml RUNNER_TEMP="$work" \
     CK_PW_OVERRIDE="$override" CK_SIBLING_OVERRIDE="$1" \
     bash --noprofile --norc -eo pipefail "$work/start.sh" || fail "the start step failed"
   cat "$work/docker.log"
 }
 for sibling in '' sibling.yml; do
-  files="-f compose.ci.yml -f $override${sibling:+ -f $sibling}"
+  files="-f compose.ci.yml -f $override${sibling:+ -f $sibling} -f $work/ck-seed-override.yml"
   calls=$(start_calls "$sibling")
   expected="compose $files down -v --remove-orphans"$'\n'"compose $files run --rm --no-deps -T -u $(id -u):$(id -g) -e HOME=/tmp --entrypoint sh app -c exec ck internal composer-install /var/www/html/ext/*/"$'\n'"compose $files up -d --wait --quiet-pull"
   [ "$calls" = "$expected" ] || fail "with sibling override '$sibling', the start step runs:"$'\n'"$calls"
 done
+
+# The seed override mounts the cached snapshot store, writable by the image's web user.
+grep -qx "      - $work/ck-seed-store:/var/lib/civikitchen/snapshots" "$work/ck-seed-override.yml" \
+  || fail "the seed override does not mount $work/ck-seed-store: $(cat "$work/ck-seed-override.yml")"
+[ "$(stat -c %a "$work/ck-seed-store" 2>/dev/null || stat -f %Lp "$work/ck-seed-store")" = 777 ] \
+  || fail "the seed store is not writable by every user"
 
 echo "playwright port suite OK"
