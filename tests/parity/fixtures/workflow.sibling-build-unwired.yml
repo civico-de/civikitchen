@@ -1,0 +1,24 @@
+# Fixture for the sibling-wiring gate: `narrow` checks civikitchen out without
+# the policy reader the sibling builds need and passes no node_version.
+name: Fixture
+on: workflow_call
+
+jobs:
+  narrow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          repository: civico-de/civikitchen
+          ref: ${{ job.workflow_sha }}
+          sparse-checkout: .github/actions
+          path: .civikitchen-siblings/ci
+      - id: deps
+        uses: ./.civikitchen-siblings/ci/.github/actions/private-deps
+        with:
+          sibling_repo: ${{ inputs.sibling_repo }}
+      - name: Start CiviCRM stack
+        env:
+          CK_SIBLING_OVERRIDE: ${{ steps.deps.outputs.sibling_override }}
+        run: docker compose -f a.yml -f "$CK_SIBLING_OVERRIDE" up -d --wait

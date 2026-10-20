@@ -19,6 +19,38 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/workflow-jobs.php';
 
+/** The paths the action's sibling-build steps read from its own checkout. */
+const CK_SIBLING_BUILD_PATHS = ['toolbelt/bin', 'toolbelt/lib', 'toolbelt/ckconform/bin', 'toolbelt/ckconform/src', 'packages'];
+
+/**
+ * What a private-deps job lacks for the siblings' declared builds: the policy
+ * reader in its civikitchen checkout and the Node the build runs on.
+ *
+ * @return list<string>
+ */
+function ck_sibling_build_gaps(array $job): array
+{
+    $gaps = [];
+    $sparse = null;
+    foreach ($job['steps'] ?? [] as $step) {
+        if (!is_array($step)) {
+            continue;
+        }
+        $uses = (string) ($step['uses'] ?? '');
+        if (str_starts_with($uses, 'actions/checkout@') && ($step['with']['path'] ?? '') === '.civikitchen-siblings/ci') {
+            $sparse = preg_split('/\s+/', trim((string) ($step['with']['sparse-checkout'] ?? '')), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        }
+        if (str_contains($uses, '/private-deps') && !isset($step['with']['node_version'])) {
+            $gaps[] = 'runs the private-dependency steps without node_version';
+        }
+    }
+    if ($sparse !== null && $sparse !== [] && array_diff(CK_SIBLING_BUILD_PATHS, $sparse) !== []) {
+        $gaps[] = 'checks civikitchen out without ' . implode(', ', array_diff(CK_SIBLING_BUILD_PATHS, $sparse));
+    }
+
+    return $gaps;
+}
+
 $files = array_slice($argv, 1);
 if ($files === []) {
     fwrite(STDERR, "usage: sibling-wiring.php <workflow.yml> ...\n");
@@ -36,6 +68,12 @@ foreach ($files as $file) {
             if (str_contains($uses, '/private-deps')) {
                 $usesPrivateDeps = true;
                 break;
+            }
+        }
+
+        if ($usesPrivateDeps) {
+            foreach (ck_sibling_build_gaps($definition) as $gap) {
+                $problems[] = "$file: job '$job' $gap";
             }
         }
 
