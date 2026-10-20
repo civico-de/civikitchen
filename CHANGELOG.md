@@ -14,6 +14,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.48.0] - 2026-10-20
+
 ### Added
 
 - Seed snapshots: the selected profiles with a `snapshot` block in
@@ -2229,7 +2231,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.47.2...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.48.0...HEAD
+[1.48.0]: https://github.com/civico-de/civikitchen/compare/v1.47.2...v1.48.0
 [1.47.2]: https://github.com/civico-de/civikitchen/compare/v1.47.1...v1.47.2
 [1.47.1]: https://github.com/civico-de/civikitchen/compare/v1.47.0...v1.47.1
 [1.47.0]: https://github.com/civico-de/civikitchen/compare/v1.46.0...v1.47.0
