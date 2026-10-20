@@ -14,6 +14,14 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Fixed
+
+- `extension-docs` builds the site with system fonts. A web font swapping in
+  after the theme decided which code blocks scroll widened a block without
+  giving it `tabindex`, so keyboard users could not scroll it and the axe
+  `scrollable-region-focusable` check failed whenever the font loaded late.
+  The site no longer requests Google Fonts.
+
 ## [1.47.1] - 2026-10-18
 
 ### Fixed

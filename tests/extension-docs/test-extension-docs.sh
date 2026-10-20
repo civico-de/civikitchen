@@ -19,6 +19,7 @@ GITHUB_REPOSITORY=acme/greeter build "$fixture" "$work/site" en de >/dev/null 2>
   || fail "the fixture does not build"
 site=$work/site
 grep -q '<html lang="en"' "$site/index.html" || fail "the root is not English"
+grep -q 'fonts.googleapis' "$site/index.html" && fail "the site loads a web font"
 grep -q '<html lang="de"' "$site/de/index.html" || fail "de/ is not German"
 grep -q 'Installieren' "$site/de/setup/index.html" || fail "de/ does not use setup.de.md"
 grep -q 'Use it' "$site/de/usage/index.html" || fail "a page without translation does not fall back"

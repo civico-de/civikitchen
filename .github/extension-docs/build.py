@@ -149,6 +149,9 @@ def main():
                 "nav": nav(pages, lang, source),
                 "theme": {
                     "language": lang.split("_")[0],
+                    # A web font swapping in late widens code blocks after the theme decided which scroll,
+                    # leaving them without tabindex; system fonts never swap.
+                    "font": False,
                     "features": ["content.code.copy", "navigation.footer", "navigation.top", "search.highlight", "toc.follow"],
                     "palette": [
                         {"media": "(prefers-color-scheme: light)", "scheme": "default", "primary": "indigo", "accent": "indigo",
