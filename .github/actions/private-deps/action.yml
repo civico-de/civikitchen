@@ -134,23 +134,8 @@ runs:
         CK_SIBLING_TOKEN: ${{ steps.app.outputs.token || github.token }}
       run: ${{ github.action_path }}/checkout-siblings.sh
 
-    # A sibling that loads its own vendor/ gets it built here, on the runner
-    # and with the same read token, before the read-only mount.
-    - name: Composer install in the siblings that ship runtime packages
-      if: ${{ inputs.sibling_repo != '' }}
-      shell: bash
-      env:
-        CK_SIBLING_DIRS: ${{ steps.siblings.outputs.paths }}
-        CK_COMPOSER_TOKEN: ${{ steps.app.outputs.token || github.token }}
-      run: |
-        set -euo pipefail
-        if [ -n "${CK_COMPOSER_TOKEN:-}" ]; then
-          composer config -g github-oauth.github.com "$CK_COMPOSER_TOKEN"
-        fi
-        ${{ github.action_path }}/install-sibling-vendor.sh
-
-    # A sibling's policy.dist.build output is not in git, yet its PHP and its
-    # types load it. Built like the release does, before the read-only mount.
+    # policy.dist.build output is not in git, yet the sibling's PHP and types load it.
+    # Built before any step writes the token to disk: the build runs dependency code.
     - name: Read the siblings' declared release builds
       id: sibling-builds
       if: ${{ inputs.sibling_repo != '' }}
@@ -165,6 +150,8 @@ runs:
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
         node-version: ${{ inputs.node_version }}
+        # Auto-caching keys on the workspace root's package.json, not the sibling's.
+        package-manager-cache: false
 
     # Replaces a Bun the job set up earlier; a later Bun step sets its own pin again.
     - name: Set up Bun for the sibling builds
@@ -179,6 +166,21 @@ runs:
       env:
         CK_SIBLING_BUILD_DIRS: ${{ steps.sibling-builds.outputs.dirs }}
       run: ${{ github.action_path }}/build-siblings.sh build
+
+    # A sibling that loads its own vendor/ gets it built here, on the runner
+    # and with the same read token, before the read-only mount.
+    - name: Composer install in the siblings that ship runtime packages
+      if: ${{ inputs.sibling_repo != '' }}
+      shell: bash
+      env:
+        CK_SIBLING_DIRS: ${{ steps.siblings.outputs.paths }}
+        CK_COMPOSER_TOKEN: ${{ steps.app.outputs.token || github.token }}
+      run: |
+        set -euo pipefail
+        if [ -n "${CK_COMPOSER_TOKEN:-}" ]; then
+          composer config -g github-oauth.github.com "$CK_COMPOSER_TOKEN"
+        fi
+        ${{ github.action_path }}/install-sibling-vendor.sh
 
     # The organisation's default civikitchen.yaml, next to the sibling for the
     # same two reasons (dot-prefixed: invisible to the extension scanner and

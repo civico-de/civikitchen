@@ -88,10 +88,33 @@ grep -q 'must pin the same version' "$work/out" || fail "pin mismatch not named;
 if CK_SIBLING_DIRS=".civikitchen-siblings/built" run plan; then
   fail "a declared build without node_version must fail the plan"
 fi
+grep -q 'node_version is required' "$work/out" || fail "missing node_version not named; got: $(cat "$work/out")"
 /bin/rm "$sibs/built/bun.lock"
 if CK_SIBLING_DIRS=".civikitchen-siblings/built" CK_NODE_VERSION=24 run plan; then
   fail "a declared Bun build without bun.lock must fail the plan"
 fi
 grep -q 'needs a committed bun.lock' "$work/out" || fail "missing bun.lock not named; got: $(cat "$work/out")"
+
+# A civikitchen.yaml this civikitchen cannot read fails, naming the sibling,
+# whether or not it declares a build.
+printf 'version: 1\npolicy:\n  future_key: true\n' > "$sibs/plain/civikitchen.yaml"
+if CK_SIBLING_DIRS=".civikitchen-siblings/plain" CK_NODE_VERSION=24 run plan; then
+  fail "an unreadable civikitchen.yaml must fail the plan"
+fi
+grep -q 'sibling .civikitchen-siblings/plain: its civikitchen.yaml could not be read by this civikitchen version' "$work/out" \
+  || fail "unreadable civikitchen.yaml not named; got: $(cat "$work/out")"
+
+# The build runs dependency code, so it comes before any step that writes the token.
+# shellcheck disable=SC2016  # the $vars belong to PHP, not the shell.
+php -r '
+  require $argv[1] . "/packages/civikitchen-scenario-schema/vendor/autoload.php";
+  $build = $token = null;
+  foreach (Symfony\Component\Yaml\Yaml::parseFile($argv[1] . "/.github/actions/private-deps/action.yml")["runs"]["steps"] as $i => $step) {
+    $run = (string) ($step["run"] ?? "");
+    if ($build === null && str_contains($run, "build-siblings.sh build")) $build = $i;
+    if ($token === null && str_contains($run, "github-oauth")) $token = $i;
+  }
+  exit($build !== null && $token !== null && $build < $token ? 0 : 1);
+' "$root" || fail "the sibling build must run before the step that writes the composer token"
 
 echo "sibling build: ok"

@@ -14,6 +14,11 @@ ci_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 ckconform="$ci_root/toolbelt/bin/ckconform"
 ck="$ci_root/toolbelt/bin/ck"
 
+unreadable() {
+  echo "sibling $1: its $2 could not be read by this civikitchen version (the reason is above)" >&2
+  exit 1
+}
+
 plan() {
   local dirs="" pin="" first="" dir tool sibling_pin parser_ready=""
   for dir in ${CK_SIBLING_DIRS:-}; do
@@ -25,7 +30,7 @@ plan() {
         --working-dir="$ci_root/packages/civikitchen-scenario-schema"
       parser_ready=1
     fi
-    tool=$(cd "$dir" && php "$ckconform" --policy dist_build_tool)
+    tool=$(cd "$dir" && php "$ckconform" --policy dist_build_tool) || unreadable "$dir" civikitchen.yaml
     case "$tool" in
       '')
         echo "sibling $dir declares no release build"
@@ -37,7 +42,7 @@ plan() {
     # Refuses an unsafe output path, an unpinned Bun or a missing bun.lock up front.
     (cd "$dir" && php "$ckconform" --dist-paths > /dev/null) \
       || { echo "sibling $dir: its policy.dist.build cannot be built as declared" >&2; exit 1; }
-    sibling_pin=$(php "$ck" internal json-field "$dir/package.json" packageManager)
+    sibling_pin=$(php "$ck" internal json-field "$dir/package.json" packageManager) || unreadable "$dir" package.json
     # One job installs one Bun, so every building sibling has to pin the same.
     if [ -z "$first" ]; then
       first=$dir

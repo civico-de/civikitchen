@@ -22,7 +22,9 @@ except that a break the consumers are adjusted for ships as a minor, marked
   `schema-parity`, `core-upgrade`, and `playwright-e2e.yml`): `bun install
   --frozen-lockfile` and `bun run build` on the Bun it pins and on
   `node_version`. A failed build or a missing declared output fails the job;
-  building siblings must pin the same Bun.
+  building siblings must pin the same Bun. The build runs before the
+  private-dependency token is written to disk, and a sibling's
+  civikitchen.yaml has to validate against the calling civikitchen version.
 
 ### Fixed
 

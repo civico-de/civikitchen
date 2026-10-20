@@ -1062,8 +1062,11 @@ A sibling whose committed composer.lock lists runtime packages gets
 builds it: `bun install --frozen-lockfile`, then `bun run build`, on the Bun
 its package.json pins and on node_version. Every declared output must exist
 afterwards, and siblings that build must pin the same Bun. A failed build
-fails the job. A sibling without a declaration is mounted as checked out. The
-checkouts are not treated as your code, and no .gitignore entry is needed.
+fails the job. A sibling without a declaration is mounted as checked out.
+A sibling's civikitchen.yaml is read by the civikitchen version your workflow
+pins, so it must validate against that version; a key only a newer version
+knows fails the job. The checkouts are not treated as your code, and no
+.gitignore entry is needed.
 
 playwright-e2e.yml takes the same input for a single repo. That workflow never
 boots the stack itself; it passes the checkout to your own prepare, test and
