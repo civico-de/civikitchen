@@ -955,6 +955,7 @@ ck_apply_profile() {
             CK_AUTHX_HEADER_CRED="${authx_policy}" \
             CK_DEFER_API_USERS=1 \
             CK_SEED_FRESH="${CK_SEED_FRESH:-0}" \
+            CK_SEED_SNAPSHOTS="${CK_SEED_SNAPSHOTS:-0}" \
             CK_SEED_PROFILES="$(printf '%s\n' "${resolved[@]}")" \
             CK_SEED_EXTENSION_DIRS="$(ck_mounted_extension_dirs)" \
             CK_SEED_SIZE="${CK_SEED_SIZE:-}" \

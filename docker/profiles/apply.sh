@@ -308,9 +308,10 @@ export CK_SEED_TODAY CK_SEED_SIZE
 # The selected profiles that have a `snapshot` block are generated once and
 # stored as one snapshot; later fresh databases restore it with shifted dates
 # at the first of them and skip every profile it holds. The restore replaces
-# the whole database, so only on one not provisioned yet (CK_SEED_FRESH=1).
+# the whole database, so only on one not provisioned yet (CK_SEED_FRESH=1),
+# and only on an image with a snapshot store (CK_SEED_SNAPSHOTS=1).
 SNAPSHOT=apply
-if [ "${UF}" = Standalone ] && [ "${CK_SEED_FRESH:-0}" = 1 ]; then
+if [ "${CK_SEED_SNAPSHOTS:-0}" = 1 ] && [ "${CK_SEED_FRESH:-0}" = 1 ]; then
     SNAPSHOT=generate
     status=0
     "${CK_PROFILE_CLI}" seed restore "${PROFILE_DIR}" || status=$?
@@ -320,8 +321,8 @@ if [ "${UF}" = Standalone ] && [ "${CK_SEED_FRESH:-0}" = 1 ]; then
         *) echo "  ERROR: seed snapshot restore failed" >&2; exit 1 ;;
     esac
 elif "${CK_PROFILE_CLI}" internal profile-has-snapshot "${JSON}"; then
-    if [ "${UF}" != Standalone ]; then
-        echo "==> [${PROFILE_NAME}] snapshot: restored on the standalone image only; running the profile on ${UF}"
+    if [ "${CK_SEED_SNAPSHOTS:-0}" != 1 ]; then
+        echo "==> [${PROFILE_NAME}] snapshot: restored on the standalone image only; running the profile on this image"
     else
         echo "==> [${PROFILE_NAME}] snapshot: this database was provisioned before; applying the profile, nothing restored or stored"
     fi

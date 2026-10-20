@@ -191,9 +191,11 @@ ARG CIVICRM_VERSION
 COPY --from=download --chown=www-data:www-data /tmp/civicrm/civicrm-standalone /var/www/html
 COPY --from=download /tmp/core-patches.log /tmp/civicrm-source.log /usr/local/share/civikitchen/
 # /var/lib/civikitchen/snapshots: the seed snapshot store; mount a host
-# directory there to keep snapshots across stacks.
+# directory there to keep snapshots across stacks. CK_SEED_SNAPSHOTS marks the
+# image that has the store, zstd and private/ (docker/profiles/apply.sh).
 RUN chown www-data:www-data /var/www \
     && install -d -o www-data -g www-data /var/lib/civikitchen/snapshots
+ENV CK_SEED_SNAPSHOTS=1
 LABEL org.opencontainers.image.version="${CIVICRM_VERSION}"
 
 # Add our vhost extras (e.g. the bare-/ → /civicrm/login redirect) via the

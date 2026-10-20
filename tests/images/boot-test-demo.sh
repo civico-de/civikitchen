@@ -122,6 +122,11 @@ if [ -n "${PROFILE}" ]; then
         while IFS= read -r included; do
             [ -n "${included}" ] || continue
             check "included profile ${included} applied (${prof})" "grep -qF '==> [${included}] profile applied' '${LOGFILE}'"
+            # The demo image has no snapshot store: a snapshot profile runs its scripts.
+            if docker exec "${APP}" jq -e '.snapshot' "/opt/civikitchen/docker/profiles/${included}/profile.json" >/dev/null 2>&1; then
+                check "snapshot profile ${included} ran its scripts (${prof})" \
+                    "grep -qF '==> [${included}] snapshot: restored on the standalone image only' '${LOGFILE}'"
+            fi
         done < <(docker exec "${APP}" jq -r '.include[]?' \
             "/opt/civikitchen/docker/profiles/${prof}/profile.json" 2>/dev/null || true)
         while IFS=$'\t' read -r git_key git_version; do
