@@ -1,6 +1,6 @@
 {
   "name": "@civico-de/civicrm-profile-schema",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "JSON Schema (draft 2020-12) for the civikitchen CiviCRM profile format: extensions (dependencies), authx, API users, and content (declarative config + seed, plus optional imperative scripts). The single source of truth any tool validates these profiles against.",
   "license": "AGPL-3.0-or-later",
   "files": [

@@ -78,14 +78,47 @@ final class ProfileData
         if ($problems !== []) {
             throw new RuntimeException(implode("\n", $problems));
         }
+        return $this->resolve($file, $this->load($file)['scripts'] ?? []);
+    }
+
+    /**
+     * The profile's `snapshot` block with its defaults, scripts resolved like
+     * `scripts`, or null for a profile without one.
+     *
+     * @return array{calendar: string, sizes: list<string>, after_restore: list<string>}|null
+     */
+    public function snapshot(string $file): ?array
+    {
+        $snapshot = $this->load($file)['snapshot'] ?? null;
+        if (!is_array($snapshot)) {
+            return null;
+        }
+        $problems = $this->problems($file);
+        if ($problems !== []) {
+            throw new RuntimeException(implode("\n", $problems));
+        }
+        $sizes = $snapshot['sizes'] ?? ['demo'];
+        return [
+            'calendar' => is_string($snapshot['calendar'] ?? null) ? $snapshot['calendar'] : 'year',
+            'sizes' => array_values(array_map('strval', is_array($sizes) ? $sizes : [])),
+            'after_restore' => $this->resolve($file, is_array($snapshot['after_restore'] ?? null) ? $snapshot['after_restore'] : []),
+        ];
+    }
+
+    /**
+     * @param array<mixed> $scripts
+     * @return list<string>
+     */
+    private function resolve(string $file, array $scripts): array
+    {
         $directory = (string) realpath(dirname($file));
-        return array_map(static fn(mixed $script): string => (string) realpath($directory . '/' . $script),
-            $this->load($file)['scripts'] ?? []);
+        return array_values(array_map(static fn(mixed $script): string => (string) realpath($directory . '/' . (string) $script), $scripts));
     }
 
     /**
      * What keeps a schema-valid profile from applying: a retired seeds/ directory
-     * or a `scripts` entry that is no file inside the profile directory.
+     * or a `scripts` or `snapshot.after_restore` entry that is no file inside the
+     * profile directory.
      *
      * @return list<string>
      */
@@ -99,7 +132,10 @@ final class ProfileData
         if (is_dir($directory . '/seeds')) {
             $problems[] = "{$directory}/seeds: the seeds/ directory is no longer run; name its PHP files in the profile's \"scripts\" list";
         }
-        foreach ($this->load($file)['scripts'] ?? [] as $script) {
+        $profile = $this->load($file);
+        $snapshot = is_array($profile['snapshot'] ?? null) ? $profile['snapshot'] : [];
+        $listed = [...($profile['scripts'] ?? []), ...($snapshot['after_restore'] ?? [])];
+        foreach ($listed as $script) {
             $path = is_string($script) && !str_starts_with($script, '/') ? realpath($directory . '/' . $script) : false;
             if ($path === false || !is_file($path) || !str_starts_with($path, $directory . '/')) {
                 $problems[] = "{$directory}: script " . json_encode($script) . ' is no file inside the profile directory';

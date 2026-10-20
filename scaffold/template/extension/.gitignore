@@ -16,6 +16,8 @@ node_modules/
 
 # Docker secrets
 .docker/.env
+# Seed snapshots the dev stack stores (.docker/docker-compose.yml)
+.docker/snapshots/
 
 # OS / IDE
 .DS_Store

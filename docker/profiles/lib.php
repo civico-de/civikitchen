@@ -13,7 +13,8 @@ use Civi\Api4\GroupContact;
 
 /**
  * Create an Individual with email and optional address; returns the contact id.
- * $address = [street, postal code, city] (German address, location type Home).
+ * $address = [street, postal code, city] (German address, location type Home);
+ * country_id:name takes the ISO code.
  */
 function ck_seed_individual(string $first, string $last, string $email, array $address = []): int {
   $contact = Contact::create(FALSE)
@@ -33,7 +34,7 @@ function ck_seed_individual(string $first, string $last, string $email, array $a
       ->addValue('street_address', $street)
       ->addValue('postal_code', $plz)
       ->addValue('city', $city)
-      ->addValue('country_id:name', 'Germany')
+      ->addValue('country_id:name', 'DE')
       ->execute();
   }
   return $contact['id'];
@@ -61,7 +62,7 @@ function ck_seed_org(string $name, ?string $email = NULL, array $address = []): 
       ->addValue('street_address', $street)
       ->addValue('postal_code', $plz)
       ->addValue('city', $city)
-      ->addValue('country_id:name', 'Germany')
+      ->addValue('country_id:name', 'DE')
       ->execute();
   }
   return $contact['id'];

@@ -100,13 +100,14 @@ FROM php:${PHP_VERSION}-apache-bookworm
 #   install-dev-tools.sh (NPM_VERSION), which keeps npm's own bundled
 #   dependency tree out of the image scan.
 # - jq: the profile driver (CIVIKITCHEN_PROFILE) parses profile.json with it
+# - zstd: compresses and loads seed snapshots (`ck seed`)
 # apt-get upgrade: security updates come from Debian at build time; the base
 # image ships none. The daily rebuild runs without cache, so they land.
 RUN apt-get update && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends \
         ca-certificates curl git unzip zip jq \
         libfreetype-dev libicu-dev libjpeg62-turbo-dev libpng-dev libwebp-dev \
-        libzip-dev imagemagick libmagickwand-dev mariadb-client \
+        libzip-dev imagemagick libmagickwand-dev mariadb-client zstd \
     && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && apt-get clean \
@@ -189,7 +190,10 @@ RUN --mount=type=secret,id=composer_auth,env=COMPOSER_AUTH CIVIX_VERSION="${CIVI
 ARG CIVICRM_VERSION
 COPY --from=download --chown=www-data:www-data /tmp/civicrm/civicrm-standalone /var/www/html
 COPY --from=download /tmp/core-patches.log /tmp/civicrm-source.log /usr/local/share/civikitchen/
-RUN chown www-data:www-data /var/www
+# /var/lib/civikitchen/snapshots: the seed snapshot store; mount a host
+# directory there to keep snapshots across stacks.
+RUN chown www-data:www-data /var/www \
+    && install -d -o www-data -g www-data /var/lib/civikitchen/snapshots
 LABEL org.opencontainers.image.version="${CIVICRM_VERSION}"
 
 # Add our vhost extras (e.g. the bare-/ → /civicrm/login redirect) via the

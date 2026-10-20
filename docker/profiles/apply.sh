@@ -8,8 +8,8 @@
 # exactly once per container.
 #
 # Entirely driven by profile.json, applied as dependencies -> config -> seed ->
-# scripts, so every profile shares this one script; a profile may ship its own
-# apply.sh to override it. The `deps` phase fetches and enables dependencies,
+# scripts (or a seed snapshot restore in their place), so every profile shares
+# this one script; a profile may ship its own apply.sh to override it. The `deps` phase fetches and enables dependencies,
 # `content` applies config, seed, scripts and API users; `all` runs both. Each dependency in profile.json names one of three sources:
 #   "repo": <git url>     cloned at "version" into the site's ext dir
 #   "registry": true      cv ext:download (packaged release incl. built assets)
@@ -298,23 +298,61 @@ if ! cv ev --user=admin 'echo "ok";' >/dev/null 2>&1; then
     exit 1
 fi
 
-echo "==> [${PROFILE_NAME}] asserting config, creating seed records"
-# config converges on every apply; seed rows are created once, matched by their
-# anchor. A missing prerequisite (component, financial type, group) fails here.
-CK_PROFILE_JSON="${JSON}" cv scr --user=admin "$(dirname "$0")/apply-content.php"
+# Generators date every record relative to CK_SEED_TODAY and size it by
+# CK_SEED_SIZE (docs/seed-snapshots.md); set for every profile, so a script
+# draws the same data with or without a snapshot.
+CK_SEED_TODAY="$("${CK_PROFILE_CLI}" seed today)"
+CK_SEED_SIZE="${CK_SEED_SIZE:-demo}"
+export CK_SEED_TODAY CK_SEED_SIZE
 
-# Scripts are PHP run with a booted CiviCRM (cv scr) after the declarative part,
-# in profile order, as the admin CMS user — extensions like CiviSEPA re-check
-# permissions in internal API calls. A failed script aborts the apply so the
-# caller writes no provisioning marker and the next boot retries the profile.
-while IFS= read -r script; do
-    [ -n "${script}" ] || continue
-    echo "==> [${PROFILE_NAME}] script $(basename "${script}")"
-    if ! cv scr --user=admin "${script}"; then
-        echo "  ERROR: profile script failed: ${script}" >&2
-        exit 1
+# The selected profiles that have a `snapshot` block are generated once and
+# stored as one snapshot; later fresh databases restore it with shifted dates
+# at the first of them and skip every profile it holds. The restore replaces
+# the whole database, so only on one not provisioned yet (CK_SEED_FRESH=1).
+SNAPSHOT=apply
+if [ "${UF}" = Standalone ] && [ "${CK_SEED_FRESH:-0}" = 1 ]; then
+    SNAPSHOT=generate
+    status=0
+    "${CK_PROFILE_CLI}" seed restore "${PROFILE_DIR}" || status=$?
+    case "${status}" in
+        0) SNAPSHOT=restored; echo "==> [${PROFILE_NAME}] content restored from the seed snapshot" ;;
+        3) ;;
+        *) echo "  ERROR: seed snapshot restore failed" >&2; exit 1 ;;
+    esac
+elif "${CK_PROFILE_CLI}" internal profile-has-snapshot "${JSON}"; then
+    if [ "${UF}" != Standalone ]; then
+        echo "==> [${PROFILE_NAME}] snapshot: restored on the standalone image only; running the profile on ${UF}"
+    else
+        echo "==> [${PROFILE_NAME}] snapshot: this database was provisioned before; applying the profile, nothing restored or stored"
     fi
-done <<<"${SCRIPTS}"
+fi
+
+if [ "${SNAPSHOT}" != restored ]; then
+    echo "==> [${PROFILE_NAME}] asserting config, creating seed records"
+    # config converges on every apply; seed rows are created once, matched by their
+    # anchor. A missing prerequisite (component, financial type, group) fails here.
+    CK_PROFILE_JSON="${JSON}" cv scr --user=admin "$(dirname "$0")/apply-content.php"
+
+    # Scripts are PHP run with a booted CiviCRM (cv scr) after the declarative part,
+    # in profile order, as the admin CMS user — extensions like CiviSEPA re-check
+    # permissions in internal API calls. A failed script aborts the apply so the
+    # caller writes no provisioning marker and the next boot retries the profile.
+    while IFS= read -r script; do
+        [ -n "${script}" ] || continue
+        echo "==> [${PROFILE_NAME}] script $(basename "${script}")"
+        if ! cv scr --user=admin "${script}"; then
+            echo "  ERROR: profile script failed: ${script}" >&2
+            exit 1
+        fi
+    done <<<"${SCRIPTS}"
+fi
+
+# Stores the set after its last snapshot profile. The site is complete without
+# it; a failed save only means the next fresh boot generates again.
+if [ "${SNAPSHOT}" = generate ]; then
+    "${CK_PROFILE_CLI}" seed save "${PROFILE_DIR}" ||
+        echo "  WARNING: seed snapshot not stored; the next fresh boot generates it again" >&2
+fi
 
 if "${CK_PROFILE_CLI}" internal profile-api-users-declared "${JSON}"; then
     echo "==> [${PROFILE_NAME}] preparing API users + AuthX"

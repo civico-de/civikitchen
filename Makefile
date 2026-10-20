@@ -223,10 +223,11 @@ test-missing-tool: ## A tool missing from PATH is named, not a proc_open warning
 test-composer-deps: ## ckdeps ignore patterns: core-provided classes only
 	php tests/toolbelt/test-composer-deps.php
 
-test-profiles: ## Profile schema, external resolution, credentials modes and file permissions
+test-profiles: ## Profile schema, external resolution, credentials modes, file permissions and seed helpers
 	php tests/profiles/test-credentials.php
 	php tests/profiles/test-validator.php
 	php -d zend.assertions=1 -d assert.exception=1 tests/profiles/test-profile-data.php
+	php tests/profiles/test-seed-lib.php
 	bash tests/profiles/test-external-profiles.sh
 	bash tests/profiles/test-profile-clone.sh
 	bash tests/profiles/test-profile-composer.sh

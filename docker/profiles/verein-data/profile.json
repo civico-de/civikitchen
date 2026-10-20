@@ -5,5 +5,6 @@
     "settings": {"defaultCurrency": "EUR"},
     "components": ["CiviContribute", "CiviMember"]
   },
+  "snapshot": {"calendar": "year", "sizes": ["demo"]},
   "scripts": ["scripts/10-verein.php"]
 }

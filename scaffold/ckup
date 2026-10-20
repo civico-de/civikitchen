@@ -90,6 +90,10 @@ else
 fi
 
 cd "$dir/.docker"
+# The seed snapshot store the compose file mounts. Created here, before Docker
+# would create it as root, and open to the image's web user, who writes it.
+mkdir -p snapshots
+chmod 0777 snapshots
 # As the calling user, with the image's PHP and composer: vendor/ lands in the
 # host checkout and must belong to its owner, not to the image's web user.
 docker compose run --rm --no-deps -T -u "$(id -u):$(id -g)" -e HOME=/tmp \

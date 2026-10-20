@@ -1,14 +1,13 @@
 <?php
 // Seed the core Verein world: the association itself, member groups, German
 // member contacts (email + address), membership types (Voll-/Förder-/Ehren-
-// mitgliedschaft), memberships, and last year's membership-fee contributions.
+// mitgliedschaft), memberships, and last calendar year's membership fees.
 // Runs via `cv scr` with CiviCRM booted. Idempotent: skips entirely when the
 // Verein org already exists (the apply re-runs if an earlier first boot died
 // before the provisioning marker was written).
 
-require_once __DIR__ . '/../../lib.php';
+require_once __DIR__ . '/../../seed-lib.php';
 
-use Civi\Api4\Contribution;
 use Civi\Api4\Membership;
 use Civi\Api4\MembershipType;
 
@@ -17,6 +16,8 @@ if (ck_seed_org_exists('Musterverein e.V.')) {
   return;
 }
 
+$today = ck_seed_today();
+$rng = ck_seed_rng();
 $vereinId = ck_seed_org('Musterverein e.V.', 'kontakt@musterverein.example.de', ['Vereinsweg 1', '10115', 'Berlin']);
 echo "created Musterverein e.V. (contact {$vereinId})\n";
 
@@ -79,27 +80,19 @@ foreach ($members as $i => [$first, $last, $street, $plz, $city, $type, $groups]
   $cid = ck_seed_individual($first, $last, ck_seed_email($first, $last, 'verein.example.de'), [$street, $plz, $city]);
 
   // Join dates spread over the past years (deterministic, index-based).
-  $joined = date('Y-m-d', strtotime('-' . (3 + $i * 2) . ' months'));
+  $joined = $today->modify('-' . (3 + $i * 2) . ' months')->format('Y-m-d');
   Membership::create(FALSE)
     ->addValue('contact_id', $cid)
     ->addValue('membership_type_id:name', $type)
     ->addValue('join_date', $joined)
-    ->addValue('start_date', date('Y-m-d', strtotime('-2 months')))
+    ->addValue('start_date', $today->modify('-2 months')->format('Y-m-d'))
     ->execute();
 
-  // Last year's membership fee as a completed contribution (gives CiviBanking
-  // something realistic to reconcile against).
+  // Last calendar year's membership fee (gives CiviBanking something
+  // realistic to reconcile against).
   $fee = ['Vollmitgliedschaft' => 120.00, 'Fördermitgliedschaft' => 60.00, 'Ehrenmitgliedschaft' => 0.00][$type];
   if ($fee > 0) {
-    Contribution::create(FALSE)
-      ->addValue('contact_id', $cid)
-      ->addValue('financial_type_id:name', 'Member Dues')
-      ->addValue('total_amount', $fee)
-      ->addValue('currency', 'EUR')
-      ->addValue('receive_date', date('Y-m-d', strtotime('-' . (1 + $i % 11) . ' months')))
-      ->addValue('contribution_status_id:name', 'Completed')
-      ->addValue('source', 'Mitgliedsbeitrag')
-      ->execute();
+    ck_seed_contribution($cid, $fee, ck_seed_date_in($rng, 'year', 1), 'Completed', 'Member Dues', ['source' => 'Mitgliedsbeitrag']);
   }
 
   foreach ($groups as $g) {

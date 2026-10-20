@@ -23,6 +23,7 @@ nav = [
   { "Images" = [
     { "Images and demos" = "images.md" },
     { "Configuration" = "configuration.md" },
+    { "Seed snapshots" = "seed-snapshots.md" },
   ] },
   { "Project" = [
     { "Releases" = "releases.md" },
@@ -51,6 +52,7 @@ nav = [
     "adr/0015-php-shell-typescript-boundaries.md",
     "adr/0016-core-bugs-are-patched-into-the-standalone-image.md",
     "adr/0017-php-quality-tools-consolidate-on-mago.md",
+    "adr/0018-seed-data-is-generated-once-and-restored.md",
   ] },
 ]
 

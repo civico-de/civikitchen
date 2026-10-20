@@ -31,6 +31,13 @@ final class ExtensionInspector
         return $xml instanceof SimpleXMLElement ? trim((string) $xml['key']) : '';
     }
 
+    public function version(string $infoFile): string
+    {
+        libxml_use_internal_errors(true);
+        $xml = is_file($infoFile) ? simplexml_load_file($infoFile) : false;
+        return $xml instanceof SimpleXMLElement ? trim((string) $xml->version) : '';
+    }
+
     /** @return list<string> */
     public function requirements(string $infoFile): array
     {

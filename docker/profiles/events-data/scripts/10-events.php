@@ -3,9 +3,10 @@
 // participants in varied statuses (Registered / Attended / Cancelled), so the
 // event dashboards, participant searches, and reports all have data. Runs via
 // `cv scr` with CiviCRM booted. Idempotent: skips entirely when the host org
-// already exists.
+// already exists. Dates are relative to the generation day; titles carry no
+// year, because a restore moves every event by the days since then.
 
-require_once __DIR__ . '/../../lib.php';
+require_once __DIR__ . '/../../seed-lib.php';
 
 use Civi\Api4\Event;
 use Civi\Api4\Participant;
@@ -15,13 +16,14 @@ if (ck_seed_org_exists('Bildungswerk Musterstadt e.V.')) {
   return;
 }
 
+$today = ck_seed_today();
 $orgId = ck_seed_org('Bildungswerk Musterstadt e.V.', 'veranstaltungen@bildungswerk.example.de', ['Seminarstraße 14', '69117', 'Heidelberg']);
 echo "created Bildungswerk Musterstadt e.V. (contact {$orgId})\n";
 
 // [title, event type, start offset, duration days, max participants, public]
 $events = [
-  ['Fachkonferenz Engagement 2026', 'Conference', '+6 weeks', 2, 120, TRUE],
-  ['Sommerfest 2026', 'Fundraiser', '+3 months', 1, 200, TRUE],
+  ['Fachkonferenz Engagement', 'Conference', '+6 weeks', 2, 120, TRUE],
+  ['Sommerfest', 'Fundraiser', '+3 months', 1, 200, TRUE],
   ['Workshop Öffentlichkeitsarbeit', 'Workshop', '+2 weeks', 1, 25, TRUE],
   ['Workshop Fördermittel', 'Workshop', '-6 weeks', 1, 25, TRUE],
   ['Online-Seminar Datenschutz', 'Meeting', '-3 months', 1, 80, TRUE],
@@ -29,12 +31,12 @@ $events = [
 ];
 $eventIds = [];
 foreach ($events as [$title, $type, $start, $days, $max, $public]) {
-  $startDate = date('Y-m-d 10:00:00', strtotime($start));
+  $startDate = $today->modify($start)->format('Y-m-d 10:00:00');
   $e = Event::create(FALSE)
     ->addValue('title', $title)
     ->addValue('event_type_id:name', $type)
     ->addValue('start_date', $startDate)
-    ->addValue('end_date', date('Y-m-d 17:00:00', strtotime($start . " +{$days} days")))
+    ->addValue('end_date', $today->modify("{$start} +{$days} days")->format('Y-m-d 17:00:00'))
     ->addValue('max_participants', $max)
     ->addValue('is_public', $public)
     ->addValue('is_active', TRUE)
@@ -83,7 +85,7 @@ foreach ($people as $i => [$first, $last, $street, $plz, $city]) {
       ->addValue('contact_id', $cid)
       ->addValue('status_id:name', $status)
       ->addValue('role_id:name', 'Attendee')
-      ->addValue('register_date', date('Y-m-d', strtotime('-' . (1 + $i % 8) . ' weeks')))
+      ->addValue('register_date', $today->modify('-' . (1 + $i % 8) . ' weeks')->format('Y-m-d'))
       ->execute();
     $participants++;
   }

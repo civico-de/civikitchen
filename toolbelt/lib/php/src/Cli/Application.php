@@ -123,6 +123,9 @@ final class Application
         if (in_array($command, ['test', 'phpunit'], true)) {
             return (new PhpUnitCommand($this->checkoutRoot, $this->runner))->run($arguments);
         }
+        if ($command === 'seed') {
+            return (new SeedCommand($this->checkoutRoot, $this->runner))->run($arguments);
+        }
         if ($command === 'ci') {
             return (new CiCommand($this->runner))->run($arguments);
         }
@@ -166,6 +169,7 @@ ck — CiviKitchen extension-development toolbelt
   ck migrate              move a repo off retired CiviKitchen tools
   ck release [args]       extension release artifact
   ck profile [args]       validate/list runtime profiles
+  ck seed [args]          restore seed data from snapshots, store, status
   ck config [args]        validate civikitchen.yaml
   ck scenario [args]      validate/render a reproducible scenario
   ck civix [args]         civix scaffold drift

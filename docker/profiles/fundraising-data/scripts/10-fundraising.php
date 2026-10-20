@@ -1,14 +1,17 @@
 <?php
-// Seed the fundraising world: the NGO itself, two campaigns, donors with a
-// year of varied contribution history, pledges with installment schedules,
-// and recurring donors. Runs via `cv scr` with CiviCRM booted. Idempotent:
-// skips entirely when the NGO org already exists.
+// Seed the fundraising world: the NGO itself, two campaigns, donors giving
+// this and last calendar year, pledges with installment schedules, and
+// recurring donors. Runs via `cv scr` with CiviCRM booted. Idempotent: skips
+// entirely when the NGO org already exists.
 
-require_once __DIR__ . '/../../lib.php';
+require_once __DIR__ . '/../../seed-lib.php';
 
 use Civi\Api4\Campaign;
-use Civi\Api4\Contribution;
 use Civi\Api4\ContributionRecur;
+
+$today = ck_seed_today();
+$rng = ck_seed_rng();
+$day = static fn(string $offset): string => $today->modify($offset)->format('Y-m-d');
 
 if (ck_seed_org_exists('Spendenwerk Musterstadt e.V.')) {
   echo "fundraising already seeded, skipping\n";
@@ -19,7 +22,7 @@ $orgId = ck_seed_org('Spendenwerk Musterstadt e.V.', 'spenden@spendenwerk.exampl
 echo "created Spendenwerk Musterstadt e.V. (contact {$orgId})\n";
 
 $campaigns = [
-  ['jahresend2026', 'Jahresendkampagne 2026', 'Year-end appeal', '-2 months', '+1 month'],
+  ['jahresend', 'Jahresendkampagne ' . $today->format('Y'), 'Year-end appeal', '-2 months', '+1 month'],
   ['vereinsheim', 'Neues Vereinsheim', 'Capital campaign for the new clubhouse', '-8 months', '+10 months'],
 ];
 $campaignIds = [];
@@ -30,8 +33,8 @@ foreach ($campaigns as [$name, $title, $desc, $start, $end]) {
     ->addValue('description', $desc)
     ->addValue('campaign_type_id:name', 'Direct Mail')
     ->addValue('status_id:name', 'In Progress')
-    ->addValue('start_date', date('Y-m-d', strtotime($start)))
-    ->addValue('end_date', date('Y-m-d', strtotime($end)))
+    ->addValue('start_date', $day($start))
+    ->addValue('end_date', $day($end))
     ->addValue('is_active', TRUE)
     ->execute()->first();
   $campaignIds[$name] = $c['id'];
@@ -64,28 +67,23 @@ $donors = [
 ];
 
 $amounts = [25.00, 50.00, 100.00, 250.00, 75.00, 500.00];
+$statuses = [5 => 'Pending', 9 => 'Refunded', 11 => 'Partially paid', 13 => 'Cancelled', 16 => 'Failed'];
 $donorIds = [];
 $contribs = 0;
 foreach ($donors as $i => [$first, $last, $street, $plz, $city]) {
   $cid = ck_seed_individual($first, $last, ck_seed_email($first, $last, 'spenden.example.de'), [$street, $plz, $city]);
   $donorIds[] = $cid;
 
-  // 1-4 donations over the past 14 months; every third donor gives to a
-  // campaign; amounts cycle so reports/charts have spread.
+  // 1-4 donations, alternating between this and last calendar year; every
+  // third donor gives to a campaign; one donor per status besides Completed.
   $n = 1 + ($i % 4);
   for ($d = 0; $d < $n; $d++) {
-    $create = Contribution::create(FALSE)
-      ->addValue('contact_id', $cid)
-      ->addValue('financial_type_id:name', 'Donation')
-      ->addValue('total_amount', $amounts[($i + $d) % count($amounts)])
-      ->addValue('currency', 'EUR')
-      ->addValue('receive_date', date('Y-m-d', strtotime('-' . (1 + (($i * 3 + $d * 5) % 14)) . ' months')))
-      ->addValue('contribution_status_id:name', 'Completed')
-      ->addValue('source', 'Spende');
+    $status = $d === 0 ? ($statuses[$i] ?? 'Completed') : 'Completed';
+    $values = ['source' => 'Spende'];
     if ($i % 3 === 0) {
-      $create->addValue('campaign_id', $campaignIds[$d % 2 === 0 ? 'jahresend2026' : 'vereinsheim']);
+      $values['campaign_id'] = $campaignIds[$d % 2 === 0 ? 'jahresend' : 'vereinsheim'];
     }
-    $create->execute();
+    ck_seed_contribution($cid, $amounts[($i + $d) % count($amounts)], ck_seed_date_in($rng, 'year', ($i + $d) % 2), $status, 'Donation', $values);
     $contribs++;
   }
 
@@ -95,7 +93,7 @@ foreach ($donors as $i => [$first, $last, $street, $plz, $city]) {
 }
 echo 'created ' . count($donorIds) . " donors with {$contribs} contributions\n";
 
-// Recurring donors: an active monthly ContributionRecur plus this month's
+// Recurring donors: an active monthly ContributionRecur plus last week's
 // installment, so the recurring-contributions screens have live data.
 $recur = 0;
 foreach (array_slice($donorIds, 0, 6) as $cid) {
@@ -105,20 +103,12 @@ foreach (array_slice($donorIds, 0, 6) as $cid) {
     ->addValue('currency', 'EUR')
     ->addValue('frequency_unit', 'month')
     ->addValue('frequency_interval', 1)
-    ->addValue('start_date', date('Y-m-d', strtotime('-6 months')))
+    ->addValue('start_date', $day('-6 months'))
     ->addValue('contribution_status_id:name', 'In Progress')
     ->addValue('financial_type_id:name', 'Donation')
     ->execute()->first();
-  Contribution::create(FALSE)
-    ->addValue('contact_id', $cid)
-    ->addValue('contribution_recur_id', $r['id'])
-    ->addValue('financial_type_id:name', 'Donation')
-    ->addValue('total_amount', 15.00)
-    ->addValue('currency', 'EUR')
-    ->addValue('receive_date', date('Y-m-d', strtotime('-1 week')))
-    ->addValue('contribution_status_id:name', 'Completed')
-    ->addValue('source', 'Dauerspende')
-    ->execute();
+  ck_seed_contribution($cid, 15.00, ck_seed_time($rng, $today->modify('-7 days')), 'Completed', 'Donation',
+    ['contribution_recur_id' => $r['id'], 'source' => 'Dauerspende']);
   ck_seed_group_contact($cid, 'dauerspender');
   $recur++;
 }
@@ -137,8 +127,8 @@ foreach (array_slice($donorIds, 6, 4) as $cid) {
     'frequency_unit' => 'month',
     'frequency_interval' => 1,
     'frequency_day' => 1,
-    'start_date' => date('Y-m-d', strtotime('-2 months')),
-    'create_date' => date('Y-m-d', strtotime('-2 months')),
+    'start_date' => $day('-2 months'),
+    'create_date' => $day('-2 months'),
     'financial_type_id' => 1,
     'status_id' => 'In Progress',
     'check_permissions' => 0,

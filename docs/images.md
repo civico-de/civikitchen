@@ -182,6 +182,10 @@ extensions, then config, seed, scripts and API users, so seed data can use the
 extension under development. init.d hooks run last. An apply.sh in the root or
 profile replaces the driver.
 
+A profile with a `snapshot` block generates its data once and restores it on
+later fresh boots of the standalone image, with dates moved to today. The four
+data profiles below have one. See [Seed snapshots](seed-snapshots.md).
+
 A missing prerequisite, such as membership types without CiviMember or an
 unknown setting, fails the apply before anything is written and lists every
 problem. The

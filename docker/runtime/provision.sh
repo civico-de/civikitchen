@@ -947,11 +947,19 @@ ck_apply_profile() {
         # deterministically rather than relying on runuser's preserve-env. Empty
         # when unset -> the script's `?:` falls back to $HOME/api-credentials.txt
         # (no change for profiles that don't set it).
+        # CK_SEED_*: what a seed snapshot is keyed on and may restore over
+        # (docker/profiles/apply.sh, docs/seed-snapshots.md).
         ck_as_web env \
             CK_CREDENTIALS_FILE="${CK_CREDENTIALS_FILE:-}" \
             CK_CREDENTIALS_OUTPUT="${CK_CREDENTIALS_OUTPUT:-file}" \
             CK_AUTHX_HEADER_CRED="${authx_policy}" \
             CK_DEFER_API_USERS=1 \
+            CK_SEED_FRESH="${CK_SEED_FRESH:-0}" \
+            CK_SEED_PROFILES="$(printf '%s\n' "${resolved[@]}")" \
+            CK_SEED_EXTENSION_DIRS="$(ck_mounted_extension_dirs)" \
+            CK_SEED_SIZE="${CK_SEED_SIZE:-}" \
+            CK_SEED_TODAY="${CK_SEED_TODAY:-}" \
+            CK_SEED_STORE="${CK_SEED_STORE:-}" \
             bash "${apply}" "${dir}" "${phase_arg[@]}"
     done
     [[ "${phase}" == content ]] || return 0
@@ -1066,6 +1074,11 @@ ck_post_install_provision() {
     # (downloaded extensions, l10n files, credentials); init.d hooks run once per database.
     local seeded
     seeded="$(ck_as_web cv ev "echo \\Civi::settings()->get('${CK_PROVISIONED_SETTING}') ? 'yes' : 'no';")"
+    # A seed snapshot restore replaces the whole database: only on a fresh one.
+    CK_SEED_FRESH=0
+    [[ "${seeded}" == "yes" ]] || CK_SEED_FRESH=1
+    # One generation day for every profile of this boot, also across midnight.
+    CK_SEED_TODAY="${CK_SEED_TODAY:-$(date +%F)}"
     ck_no_phone_home
     ck_locales
     ck_apply_profile deps

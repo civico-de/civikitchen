@@ -61,6 +61,9 @@ services:
       - ./profiles:/civikitchen-profiles:ro
       # Hooks for the stack's environment, run after the profile. See init.d/README.md.
       - ./init.d:/civikitchen-init.d:ro
+      # Seed snapshots of a profile with a `snapshot` block (civikitchen's
+      # docs/seed-snapshots.md); kept across `down -v`, so a re-provision restores.
+      - ./snapshots:/var/lib/civikitchen/snapshots
 
   db:
     image: mariadb:11.4

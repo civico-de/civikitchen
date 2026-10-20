@@ -126,6 +126,9 @@ final class InternalRuntimeCommand implements Command
                 }
                 return 0;
             }
+            if ($operation === 'profile-has-snapshot' && count($arguments) === 1) {
+                return $profiles->snapshot($arguments[0]) === null ? 1 : 0;
+            }
             if ($operation === 'profile-scripts' && count($arguments) === 1) {
                 foreach ($profiles->scripts($arguments[0]) as $script) {
                     echo $script, "\n";

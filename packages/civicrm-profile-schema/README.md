@@ -55,6 +55,12 @@ A profile applies in this order: `dependencies` → `config` → `seed` →
   Deleted records count as existing.
 - **`scripts`** are PHP files run via `cv scr` in list order, for volume or
   complex data that declarative JSON can't express.
+- **`snapshot`** (optional) marks the result of `config`, `seed` and
+  `scripts` as storable: `calendar` (`year`, `month` or `none`; default
+  `year`) is the coarsest calendar period the data relies on, `sizes` (default
+  `["demo"]`) the sizes the scripts can generate, and `after_restore` the
+  scripts inside the profile directory to run after the stored state is
+  restored.
 
 A missing prerequisite is an error, never a skip. Examples are membership types
 without CiviMember, an unknown financial type, setting, field or group, or a

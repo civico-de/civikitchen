@@ -32,6 +32,11 @@ class Runner
         return "ck: {$program} was not found on PATH ({$path})\n";
     }
 
+    public function available(string $program): bool
+    {
+        return $program !== '' && $this->unresolved([$program]) === null;
+    }
+
     /** @param non-empty-list<string> $command */
     /** @param array<string, string>|null $environment */
     public function passthrough(array $command, ?array $environment = null, ?string $workingDirectory = null): int
@@ -123,6 +128,43 @@ class Runner
             fclose($stream);
         }
         return ['status' => proc_close($process), 'stdout' => $stdout, 'stderr' => $stderr];
+    }
+
+    /**
+     * `producer | consumer`, the consumer's stdout into $outputFile or inherited.
+     * Fails when either side fails, like `set -o pipefail`.
+     *
+     * @param non-empty-list<string> $producer
+     * @param non-empty-list<string> $consumer
+     * @param array<string, string>|null $environment
+     */
+    public function pipe(array $producer, array $consumer, ?array $environment = null, ?string $outputFile = null): int
+    {
+        foreach ([$producer, $consumer] as $command) {
+            $missing = $this->unresolved($command);
+            if ($missing !== null) {
+                fwrite(STDERR, $missing);
+                return 2;
+            }
+        }
+        @fseek(STDOUT, 0, SEEK_END);
+        @fseek(STDERR, 0, SEEK_END);
+        $first = proc_open($producer, [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => STDERR], $firstPipes, null, $environment);
+        if (!is_resource($first)) {
+            fwrite(STDERR, 'ck: could not start ' . $producer[0] . "\n");
+            return 2;
+        }
+        $output = $outputFile === null ? STDOUT : ['file', $outputFile, 'w'];
+        $second = proc_open($consumer, [0 => $firstPipes[1], 1 => $output, 2 => STDERR], $secondPipes, null, $environment);
+        fclose($firstPipes[1]);
+        if (!is_resource($second)) {
+            proc_close($first);
+            fwrite(STDERR, 'ck: could not start ' . $consumer[0] . "\n");
+            return 2;
+        }
+        $consumerStatus = proc_close($second);
+        $producerStatus = proc_close($first);
+        return $producerStatus !== 0 ? $producerStatus : $consumerStatus;
     }
 
     /** @param non-empty-list<string> $command @param array<string, string>|null $environment */

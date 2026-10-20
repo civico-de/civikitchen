@@ -14,6 +14,39 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- Seed snapshots: the selected profiles with a `snapshot` block in
+  `profile.json` run their scripts once on the standalone image, and the
+  database is stored as one snapshot; every later fresh boot restores it with
+  its dates moved to today, in under a minute for a demo-size seed. `ck seed` restores, saves, shows the status of, rebuilds
+  and prunes snapshots. See [Seed snapshots](docs/seed-snapshots.md) and
+  [ADR-0018](docs/adr/0018-seed-data-is-generated-once-and-restored.md).
+- `profile-schema` 0.5.0: the optional `snapshot` object (`calendar`, `sizes`,
+  `after_restore`).
+- `docker/profiles/seed-lib.php` gives profile scripts the generation day
+  (`CK_SEED_TODAY`), a seeded RNG, period-safe dates and contributions booked
+  through Order and Payment in every status.
+- The standalone image ships `zstd` and the store directory
+  `/var/lib/civikitchen/snapshots`. The template dev stack mounts
+  `.docker/snapshots/` there (gitignored; `ckup` creates it), and the `ci` and
+  `playwright` jobs of the extension workflow cache it.
+
+### Changed
+
+- The bundled `verein-data`, `fundraising-data`, `events-data` and
+  `mailing-data` profiles are snapshot profiles. Their dates follow the
+  generation day, contributions go through Order and Payment (fundraising
+  adds one pending, refunded, partially paid, cancelled and failed gift), the
+  membership fees fall in the last calendar year, and event and campaign
+  titles carry no fixed year.
+
+### Fixed
+
+- `ck_seed_individual` and `ck_seed_org` in `docker/profiles/lib.php` give
+  addresses a country again: `country_id:name` takes the ISO code, and the
+  country name they passed was written as no country.
+
 ## [1.47.2] - 2026-10-20
 
 ### Fixed

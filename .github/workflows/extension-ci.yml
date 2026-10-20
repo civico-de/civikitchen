@@ -834,6 +834,17 @@ jobs:
           ext_key: ${{ needs.key.outputs.key }}
           working_directory: ${{ inputs.working_directory }}
 
+      # Seed snapshots (docs/seed-snapshots.md): a profile with a `snapshot`
+      # block generates its data on the first run and restores it from this
+      # cache on later ones. No `snapshot` block, nothing stored: a no-op.
+      - name: Restore seed snapshots
+        id: seed-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/ck-seed-store
+          key: ck-seed-ci-${{ inputs.working_directory }}-${{ needs.key.outputs.image }}-${{ github.run_id }}
+          restore-keys: ck-seed-ci-${{ inputs.working_directory }}-${{ needs.key.outputs.image }}-
+
       - name: Start CiviCRM stack
         id: stack
         env:
@@ -848,6 +859,12 @@ jobs:
           if [ -n "${CK_SIBLING_OVERRIDE:-}" ]; then
             compose+=(-f "$CK_SIBLING_OVERRIDE")
           fi
+          # The snapshot store, writable by the image's web user.
+          mkdir -p "$RUNNER_TEMP/ck-seed-store"
+          chmod 0777 "$RUNNER_TEMP/ck-seed-store"
+          seed_override="$RUNNER_TEMP/ck-seed-override.yml"
+          printf 'services:\n  app:\n    volumes:\n      - %s:/var/lib/civikitchen/snapshots\n' "$RUNNER_TEMP/ck-seed-store" > "$seed_override"
+          compose+=(-f "$seed_override")
           # Self-hosted runners keep the previous run's stack; without -v the
           # anonymous mariadb volume reattaches and the entrypoint skips install.
           docker compose "${compose[@]}" down -v --remove-orphans
@@ -856,6 +873,29 @@ jobs:
           docker compose "${compose[@]}" run --rm --no-deps -T -u "$(id -u):$(id -g)" -e HOME=/tmp \
             --entrypoint sh app -c 'exec ck internal composer-install /var/www/html/ext/*/'
           docker compose "${compose[@]}" up -d --wait --quiet-pull
+
+      # Only a boot that generated a snapshot stores one: a restored set adds
+      # nothing, and an expired one is replaced under the same key.
+      - name: Name the seed snapshot
+        id: seed-key
+        run: |
+          set -euo pipefail
+          app=(docker compose -f "$CK_COMPOSE_FILE" exec -T -u www-data app)
+          key=""
+          if "${app[@]}" ck seed --help >/dev/null 2>&1; then
+            key=$("${app[@]}" ck seed status --generated)
+            if [ -n "$key" ]; then "${app[@]}" ck seed prune; fi
+          else
+            echo "::notice::The stack's image predates seed snapshots; nothing to store."
+          fi
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+
+      - name: Save seed snapshots
+        if: ${{ steps.seed-key.outputs.key != '' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/ck-seed-store
+          key: ck-seed-ci-${{ inputs.working_directory }}-${{ needs.key.outputs.image }}-${{ steps.seed-key.outputs.key }}-${{ github.run_id }}
 
       # Every in-container gate via ck ci, the gate list developers run locally.
       # It writes its summary table in the container; the step appends it here.
@@ -2108,6 +2148,17 @@ jobs:
           # Read by the example config's `baseURL` and auth.setup.ts.
           echo "CIVICRM_BASE_URL=http://localhost:$port" >> "$GITHUB_ENV"
 
+      # Seed snapshots (docs/seed-snapshots.md): a profile with a `snapshot`
+      # block generates its data on the first run and restores it from this
+      # cache on later ones. No `snapshot` block, nothing stored: a no-op.
+      - name: Restore seed snapshots
+        id: seed-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/ck-seed-store
+          key: ck-seed-playwright-${{ inputs.working_directory }}-${{ matrix.image }}-${{ github.run_id }}
+          restore-keys: ck-seed-playwright-${{ inputs.working_directory }}-${{ matrix.image }}-
+
       - name: Start CiviCRM stack
         env:
           CK_SIBLING_OVERRIDE: ${{ steps.deps.outputs.sibling_override }}
@@ -2119,12 +2170,41 @@ jobs:
           if [ -n "${CK_SIBLING_OVERRIDE:-}" ]; then
             compose+=(-f "$CK_SIBLING_OVERRIDE")
           fi
+          # The snapshot store, writable by the image's web user.
+          mkdir -p "$RUNNER_TEMP/ck-seed-store"
+          chmod 0777 "$RUNNER_TEMP/ck-seed-store"
+          seed_override="$RUNNER_TEMP/ck-seed-override.yml"
+          printf 'services:\n  app:\n    volumes:\n      - %s:/var/lib/civikitchen/snapshots\n' "$RUNNER_TEMP/ck-seed-store" > "$seed_override"
+          compose+=(-f "$seed_override")
           docker compose "${compose[@]}" down -v --remove-orphans
           # vendor/ as the runner user, who owns the checkout; written by the stack
           # it would belong to the image's web user.
           docker compose "${compose[@]}" run --rm --no-deps -T -u "$(id -u):$(id -g)" -e HOME=/tmp \
             --entrypoint sh app -c 'exec ck internal composer-install /var/www/html/ext/*/'
           docker compose "${compose[@]}" up -d --wait --quiet-pull
+
+      # Only a boot that generated a snapshot stores one: a restored set adds
+      # nothing, and an expired one is replaced under the same key.
+      - name: Name the seed snapshot
+        id: seed-key
+        run: |
+          set -euo pipefail
+          app=(docker compose -f "$CK_COMPOSE_FILE" exec -T -u www-data app)
+          key=""
+          if "${app[@]}" ck seed --help >/dev/null 2>&1; then
+            key=$("${app[@]}" ck seed status --generated)
+            if [ -n "$key" ]; then "${app[@]}" ck seed prune; fi
+          else
+            echo "::notice::The stack's image predates seed snapshots; nothing to store."
+          fi
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+
+      - name: Save seed snapshots
+        if: ${{ steps.seed-key.outputs.key != '' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/ck-seed-store
+          key: ck-seed-playwright-${{ inputs.working_directory }}-${{ matrix.image }}-${{ steps.seed-key.outputs.key }}-${{ github.run_id }}
 
       # Same --ignore-scripts rule as the ci job: this job installs the
       # extension's own tree, and a browser test repo is exactly where an
