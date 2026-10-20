@@ -127,6 +127,10 @@ fi
 
 cd "${run_dir}"
 if [ "${e2e}" = 1 ]; then
+  # As the web user: files the tests make the site write (afform's ang/ cache) must stay writable for it.
+  if [ "$(id -u)" = 0 ]; then
+    exec runuser -u www-data -- "$(command -v phpunit)" --group e2e "$@"
+  fi
   exec phpunit --group e2e "$@"
 fi
 # Startup-only ini, as core's suite expects it: no sendmail in the image (mail() would fail

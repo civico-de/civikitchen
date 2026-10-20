@@ -14,6 +14,14 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Fixed
+
+- `ckcoretest --e2e` started as root (`exec -u root`, or a service with
+  `user: root`) runs the tests as `www-data`. Before, the first form a test
+  saved left the site's generated `public/ang` owned by root, and later saves
+  through the web site failed with only a PHP warning. A stack that already
+  has a root-owned `public/ang` needs to be recreated.
+
 ## [1.48.0] - 2026-10-20
 
 ### Added

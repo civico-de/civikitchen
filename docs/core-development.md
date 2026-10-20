@@ -28,7 +28,9 @@ buildkit/civibuild environment. That gap is accepted for the same reason.
 not the test database. They install the extensions they need into the site,
 so disable those afterwards with `cv ext:disable`. They log in as
 `ADMIN_USER`, which provisioning writes to `~/.cv.json` from
-`CIVIKITCHEN_DEMO_USER`.
+`CIVIKITCHEN_DEMO_USER`. They run as the web user `www-data`, also when
+started as root (`exec -u root` or `user: root`), so files the site writes
+during a test stay writable for it.
 
 Browser tests (`Civi\Test\MinkBase`) also need the compose stack's `browser`
 service, a headless Chrome on the app's network. Start it with

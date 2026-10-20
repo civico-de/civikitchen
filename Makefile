@@ -247,7 +247,7 @@ test-provision: ## provision.sh: <requires>, mounted extensions, core locales, t
 	bash tests/toolbelt/test-provision-site-port.sh
 	bash tests/toolbelt/test-test-db-boot.sh
 
-test-ckcoretest: ## ckcoretest --e2e runs only e2e tests against the dev site; headless runs keep the test-DB gate and get core's startup ini
+test-ckcoretest: ## ckcoretest --e2e runs only e2e tests against the dev site, as www-data; headless runs keep the test-DB gate and get core's startup ini
 	bash tests/toolbelt/test-ckcoretest.sh
 
 test-core-patches: ## Standalone core patches: applied once, contained ones skipped, stale or unlinked ones fail

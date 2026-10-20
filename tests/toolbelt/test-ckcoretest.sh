@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# ckcoretest --e2e runs only @group e2e against the dev site: no UnitTests UF and no
-# TEST_DB_DSN gate. Headless runs keep both and get core's startup ini. Fakes record the calls.
+# ckcoretest --e2e runs only @group e2e against the dev site, as www-data when started as root:
+# no UnitTests UF and no TEST_DB_DSN gate. Headless runs keep both and get core's startup ini.
+# Fakes record the calls.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -32,9 +33,22 @@ printf '#!/bin/sh\necho "www-data:x:33:33::%s/www:/bin/sh"\n' "$work" > "$work/b
 chmod +x "$work/bin/getent"
 export PATH="$work/bin:$PATH" PHPUNIT_LOG="$work/phpunit.log" PHP_LOG="$work/php.log" CK_CORE_DIR="$core"
 
+printf '#!/bin/sh\necho 1000\n' > "$work/bin/id"
+chmod +x "$work/bin/id"
 CIVICRM_UF=Standalone bash "$root/toolbelt/bin/ckcoretest" --e2e --ext afform/mock tests/phpunit/E2E >/dev/null
 [[ "$(cat "$work/phpunit.log")" == "dir=$core/ext/afform/mock uf=Standalone args=--group e2e tests/phpunit/E2E" ]] \
   || fail "--e2e must run @group e2e from the extension with the site's UF: $(cat "$work/phpunit.log")"
+
+# Started as root, --e2e drops to the web user.
+printf '#!/bin/sh\necho 0\n' > "$work/bin/id"
+printf '#!/usr/bin/env bash\necho "$*" > "$RUNUSER_LOG"\nshift 3\nexec "$@"\n' > "$work/bin/runuser"
+chmod +x "$work/bin/id" "$work/bin/runuser"
+CIVICRM_UF=Standalone RUNUSER_LOG="$work/runuser.log" bash "$root/toolbelt/bin/ckcoretest" --e2e tests/phpunit/E2E >/dev/null
+[[ "$(cat "$work/runuser.log" 2>/dev/null)" == "-u www-data -- $work/bin/phpunit --group e2e tests/phpunit/E2E" ]] \
+  || fail "--e2e as root must run phpunit as www-data: $(cat "$work/runuser.log" 2>/dev/null)"
+[[ "$(cat "$work/phpunit.log")" == "dir=$core uf=Standalone args=--group e2e tests/phpunit/E2E" ]] \
+  || fail "--e2e as root must keep the site's UF: $(cat "$work/phpunit.log")"
+/bin/rm -f "$work/bin/id" "$work/bin/runuser"
 
 /bin/rm -f "$work/phpunit.log"
 if bash "$root/toolbelt/bin/ckcoretest" --ext afform/mock >/dev/null 2>"$work/err"; then
