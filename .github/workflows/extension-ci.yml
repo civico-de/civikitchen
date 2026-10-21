@@ -730,7 +730,7 @@ jobs:
       # shebang away from needing a Node on PATH.
       - name: Set up Node
         if: ${{ inputs.npm_ci || inputs.js_tests || inputs.bun }}
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ inputs.node_version }}
           # The npm cache keys on package-lock.json and setup-node FAILS the
@@ -2149,7 +2149,7 @@ jobs:
           working_directory: ${{ inputs.working_directory }}
 
       - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           # Same cache reasoning as the ci job: no package-lock.json to key on
           # when the repo is on Bun, and setup-node fails the step over it.
