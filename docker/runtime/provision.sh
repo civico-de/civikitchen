@@ -284,11 +284,15 @@ ck_wire_test_db_boot() {
     # let a password containing quotes execute as shell.
     local site_json
     site_json="$(ck_json_member TEST_DB_DSN "${test_db_dsn}")"
-    # Civi\Test\EndToEndInterface: browser tests log in as ADMIN_USER (MinkBase::login)
+    # Civi\Test\EndToEndInterface names an admin and a demo user; the one demo user, an admin, serves as both
     if [[ -n "${CIVIKITCHEN_DEMO_USER:-}" ]]; then
-        site_json+=",
-      $(ck_json_member ADMIN_USER "${CIVIKITCHEN_DEMO_USER}"),
-      $(ck_json_member ADMIN_PASS "${CIVIKITCHEN_DEMO_PASS:-admin}")"
+        local role
+        for role in ADMIN DEMO; do
+            site_json+=",
+      $(ck_json_member "${role}_USER" "${CIVIKITCHEN_DEMO_USER}"),
+      $(ck_json_member "${role}_PASS" "${CIVIKITCHEN_DEMO_PASS:-admin}"),
+      $(ck_json_member "${role}_EMAIL" "${CIVIKITCHEN_DEMO_EMAIL:-admin@example.org}")"
+        done
     fi
     local cv_json
     cv_json=$(printf '{\n  "sites": {\n    "%s": {\n      %s\n    }\n  }\n}' "${CK_TEST_DB_CV_KEY}" "${site_json}")

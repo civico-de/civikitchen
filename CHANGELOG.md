@@ -14,6 +14,13 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Fixed
+
+- A new container's `~/.cv.json` also names the demo user as `DEMO_USER`,
+  `DEMO_PASS` and `DEMO_EMAIL`, and adds `ADMIN_EMAIL`, so end-to-end tests that
+  act as the demo user (afform's `MockPublicFormTest`, authx, `CliRunnerTest`)
+  find it.
+
 ## [1.49.0] - 2026-10-21
 
 ### Added

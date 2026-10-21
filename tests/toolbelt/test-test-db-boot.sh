@@ -134,10 +134,14 @@ site_key_in() {
   || fail "without a demo user ~/.cv.json must not name an ADMIN_USER"
 /bin/rm -f "$work/root/.cv.json" "$work/www/.cv.json"
 wire CIVIKITCHEN_DEMO_USER=admin CIVIKITCHEN_DEMO_PASS='s\e"cret'
-[[ "$(site_key_in "$work/www/.cv.json" ADMIN_USER)" == 'admin' \
-  && "$(site_key_in "$work/www/.cv.json" ADMIN_PASS)" == 's\e"cret' \
-  && "$(dsn_in "$work/www/.cv.json")" == 'mysql://u:p"w@db:3306/civicrm_test?new_link=true' ]] \
-  || fail "the demo user must reach ~/.cv.json as ADMIN_USER/ADMIN_PASS for browser tests"
+for role in ADMIN DEMO; do
+  [[ "$(site_key_in "$work/www/.cv.json" "${role}_USER")" == 'admin' \
+    && "$(site_key_in "$work/www/.cv.json" "${role}_PASS")" == 's\e"cret' \
+    && "$(site_key_in "$work/www/.cv.json" "${role}_EMAIL")" == 'admin@example.org' ]] \
+    || fail "the demo user must reach ~/.cv.json as ${role}_USER/_PASS/_EMAIL for browser tests"
+done
+[[ "$(dsn_in "$work/www/.cv.json")" == 'mysql://u:p"w@db:3306/civicrm_test?new_link=true' ]] \
+  || fail "the test DSN must stay beside the users in ~/.cv.json"
 
 echo '{"sites":{}}' > "$work/root/.cv.json"
 wire
