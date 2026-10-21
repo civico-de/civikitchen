@@ -35,6 +35,9 @@ except that a break the consumers are adjusted for ships as a minor, marked
   saved left the site's generated `public/ang` owned by root, and later saves
   through the web site failed with only a PHP warning. A stack that already
   has a root-owned `public/ang` needs to be recreated.
+- The `drupal11-demo` image builds again: civicrm-buildkit dropped
+  civisualize from its demo sites and its clone cache, and the `drupal11-demo`
+  site type follows. That image no longer ships the civisualize extension.
 
 ## [1.48.0] - 2026-10-20
 
