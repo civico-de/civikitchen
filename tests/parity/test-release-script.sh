@@ -72,7 +72,7 @@ expect_fail 2 usage 1.2.3 --force
 # Happy path first: everything below must be the one thing that breaks it.
 release 1.2.3 || { cat "${work}/out" >&2; fail "dry run on a clean repo"; }
 grep -q 'dry run: would tag' "${work}/out" || fail "dry run did not announce the tag"
-grep -q 'full Build Dev Images run 111 is green' "${work}/out" || fail "image gate not reported"
+grep -q 'Build Dev Images run 111 (schedule) is green' "${work}/out" || fail "image gate not reported"
 grep -q -- "-R owner/repo" "${work}/gh.args" || { cat "${work}/gh.args" >&2; fail "gh was not pointed at owner/repo"; }
 [ -z "$(git tag -l v1.2.3)" ] || fail "the dry run created a tag"
 
@@ -100,32 +100,34 @@ expect_fail 1 'run 222 for .* concluded failure' 1.2.3
 runs "2024-01-01T10:00:00Z 333 schedule in_progress  ${image_sha}"
 expect_fail 1 'run 333 for .* is in_progress' 1.2.3
 : > "${work}/runs"
-expect_fail 1 "no full Build Dev Images run for image commit ${image_sha}" 1.2.3
+expect_fail 1 "no Build Dev Images run for image commit ${image_sha}" 1.2.3
 
-# A push builds only the standalone flavors: its green run is not a full one.
-runs "2024-01-03T10:00:00Z 777 push completed success ${image_sha}"
-expect_fail 1 "no full Build Dev Images run for image commit ${image_sha}" 1.2.3
+# A push builds every image that gates a release: its run counts like any other.
+runs "${green}" "2024-01-03T10:00:00Z 777 push completed success ${image_sha}"
+release 1.2.3 || { cat "${work}/out" >&2; fail "a green push run did not count"; }
+grep -q 'run 777 (push) is green' "${work}/out" || { cat "${work}/out" >&2; fail "push run not selected"; }
 runs "${green}" "2024-01-03T10:00:00Z 777 push in_progress  ${image_sha}"
-release 1.2.3 || { cat "${work}/out" >&2; fail "a running push run hid the full run"; }
-grep -q 'run 111 is green' "${work}/out" || fail "push run selected over the full run"
+expect_fail 1 'run 777 for .* is in_progress' 1.2.3
+runs "${green}" "2024-01-03T10:00:00Z 777 push completed failure ${image_sha}"
+expect_fail 1 'run 777 for .* concluded failure' 1.2.3
 
 # A run on a commit outside image commit..HEAD does not count.
 runs "2024-01-01T10:00:00Z 555 schedule completed success 0000000000000000000000000000000000000000"
-expect_fail 1 "no full Build Dev Images run for image commit ${image_sha}" 1.2.3
+expect_fail 1 "no Build Dev Images run for image commit ${image_sha}" 1.2.3
 
 # A run builds its head: a run on a later commit covers the image commit.
 git commit -q --allow-empty -m later
 git push -q origin main
 runs "2024-01-01T10:00:00Z 666 schedule completed success $(git rev-parse HEAD)"
 release 1.2.3 || { cat "${work}/out" >&2; fail "run on a descendant of the image commit"; }
-grep -q 'run 666 is green' "${work}/out" || fail "descendant run not selected"
+grep -q 'run 666 (schedule) is green' "${work}/out" || fail "descendant run not selected"
 
 # A rerun that failed must beat the older green run, and the reverse must pass.
 runs "${green}" "${red}"
 expect_fail 1 'run 222 for .* concluded failure' 1.2.3
 runs "${red}" "2024-01-03T10:00:00Z 444 workflow_dispatch completed success ${image_sha}"
 release 1.2.3 || { cat "${work}/out" >&2; fail "newest green run after a red one" ; }
-grep -q 'run 444 is green' "${work}/out" || fail "wrong run selected"
+grep -q 'run 444 (workflow_dispatch) is green' "${work}/out" || fail "wrong run selected"
 
 runs "${green}"
 release 1.2.3 --apply || { cat "${work}/out" >&2; fail "--apply"; }

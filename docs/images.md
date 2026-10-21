@@ -279,12 +279,17 @@ them and the replacement.
 
 All images rebuild daily against the current CiviCRM stable from
 [latest.civicrm.org](https://latest.civicrm.org/stable.php). A push touching
-the image inputs rebuilds only the standalone flavors; the others follow with
-the next daily run or a manual dispatch.
+the image inputs rebuilds standalone and standalone-demo (*Build Dev Images*);
+the CMS flavors and their demos rebuild daily or on a manual dispatch of
+*Build CMS Images*.
 
 Images are tested, then promoted
-([ADR-0014](adr/0014-images-are-tested-then-promoted.md)): a release that
-breaks the build or boot tests never reaches the stable tags. The daily run
+([ADR-0014](adr/0014-images-are-tested-then-promoted.md)): a build that
+fails the boot tests or the vulnerability scan (trivy, fixable HIGH and
+CRITICAL findings) never reaches the stable tags. Promotion publishes the
+digest the scan passed; the tests pull the candidate tag, so re-running a
+failed run's jobs after a later run rebuilt the same commit tests that newer
+build. Start a fresh run instead. The daily run
 skips the layer cache, so Debian security updates arrive within a day.
 
 The moving tags track current CiviCRM, for local development and the canary

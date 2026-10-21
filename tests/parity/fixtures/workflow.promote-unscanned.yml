@@ -1,0 +1,110 @@
+# Fixture for promote-scanned.php: promote-scanned is the one healthy job;
+# every other promote job is one way around the scan gate.
+name: fixture
+on: workflow_dispatch
+jobs:
+  merge-a:
+    uses: ./.github/workflows/merge-manifest.yml
+    with:
+      tags: '["a"]'
+  merge-b:
+    uses: ./.github/workflows/merge-manifest.yml
+    with:
+      tags: '["b"]'
+  scan-a:
+    needs: merge-a
+    uses: ./.github/workflows/scan-images.yml
+    with:
+      tags: '["a"]'
+  scan-b:
+    needs: merge-b
+    uses: ./.github/workflows/scan-images.yml
+    with:
+      tags: '["b"]'
+  scan-unrelated:
+    needs: merge-a
+    uses: ./.github/workflows/scan-images.yml
+    with:
+      tags: '["unrelated"]'
+  test-a:
+    needs: merge-a
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo test
+  promote-scanned:
+    needs: [test-a, scan-a]
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        tag: [a]
+    steps:
+      - env:
+          DIGEST: ${{ fromJSON(needs.scan-a.outputs.digests)[matrix.tag] }}
+        run: promote-digest.sh a
+  promote-unscanned:
+    needs: test-a
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo promote
+  promote-other-family:
+    needs: [test-a, scan-b]
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        tag: [a]
+    steps:
+      - env:
+          DIGEST: ${{ fromJSON(needs.scan-b.outputs.digests)[matrix.tag] }}
+        run: promote-digest.sh a
+  promote-unrelated-scan:
+    needs: [test-a, scan-unrelated]
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        tag: [a]
+    steps:
+      - env:
+          DIGEST: ${{ fromJSON(needs.scan-unrelated.outputs.digests)[matrix.tag] }}
+        run: promote-digest.sh a
+  promote-always:
+    needs: [test-a, scan-a]
+    if: always()
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        tag: [a]
+    steps:
+      - env:
+          DIGEST: ${{ fromJSON(needs.scan-a.outputs.digests)[matrix.tag] }}
+        run: promote-digest.sh a
+  promote-not-cancelled:
+    needs: [test-a, scan-a]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        tag: [a]
+    steps:
+      - env:
+          DIGEST: ${{ fromJSON(needs.scan-a.outputs.digests)[matrix.tag] }}
+        run: promote-digest.sh a
+  promote-candidate-tag:
+    needs: [test-a, scan-a]
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        tag: [a]
+    steps:
+      - env:
+          IMG: ghcr.io/owner/civikitchen:${{ matrix.tag }}
+        run: docker buildx imagetools create -t "$IMG" "$IMG-$GITHUB_SHA"
+  promote-wider-matrix:
+    needs: [test-a, scan-a]
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        tag: [a, c]
+    steps:
+      - env:
+          DIGEST: ${{ fromJSON(needs.scan-a.outputs.digests)[matrix.tag] }}
+        run: promote-digest.sh a

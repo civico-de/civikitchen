@@ -14,10 +14,6 @@ on:
       - 'tests/ckcreate/e2e-ckcreate.sh'
       - 'tests/e2e/**'
       - 'examples/standalone/docker-compose.yml'
-      - 'examples/drupal10/docker-compose.yml'
-      - 'examples/drupal11/docker-compose.yml'
-      - 'examples/wordpress/docker-compose.yml'
-      - 'examples/joomla/docker-compose.yml'
       - 'examples/scenario/**'
       - 'playwright.config.ts'
       - 'package.json'
@@ -25,6 +21,8 @@ on:
       - '.dockerignore'
       - '.github/workflows/build-dev-images.yml'
       - '.github/workflows/merge-manifest.yml'
+      - '.github/workflows/build-demo-images.yml'
+      - '.github/workflows/scan-images.yml'
       - '.github/scripts/**'
       # Changes the scan verdict directly, so it must re-run the scan jobs.
       - 'trivyignore.yaml'
@@ -48,12 +46,16 @@ on:
         required: false
         default: ''
 
-# The moving tags (:standalone, :drupal10, …) are last-writer-wins, and the
-# writer is whichever run finishes promote last — not whichever commit is
+# The images that gate a release: standalone (every listed CiviCRM minor) and
+# standalone-demo. The CMS flavors build in build-cms-images.yml, with their own
+# concurrency group, so neither pipeline cancels or fails the other.
+#
+# The moving tags (:standalone, :standalone-demo, …) are last-writer-wins, and
+# the writer is whichever run finishes promote last — not whichever commit is
 # newer. Two pushes in quick succession therefore leave the live images built
 # from the OLDER commit, and the next release refuses with "image drift".
 # A newer push or dispatch cancels the running one, so the last commit wins. A
-# run cancelled mid-promote leaves split tags until the next full run.
+# run cancelled mid-promote leaves split tags until the next run.
 # A daily run cancels nothing, so it never discards a release candidate.
 concurrency:
   group: build-dev-images
@@ -71,7 +73,7 @@ jobs:
     # Single source of truth for the CiviCRM version every image bakes.
     # latest.civicrm.org/stable.php returns the current stable (e.g. 6.15.1);
     # every image pins an exact version — standalone installs the matching
-    # release tarball, buildkit/demo civibuild it.
+    # release tarball, the demo civibuilds it.
     runs-on: ubuntu-24.04
     outputs:
       stable: ${{ steps.resolve.outputs.stable }}
@@ -298,7 +300,7 @@ jobs:
     # families CiviCRM recommends. This gates promotion: Dependabot may propose
     # a new sidecar tag, but the default moves only after install, provisioning,
     # locale rendering, and the isolated headless DB all pass here.
-    # A push checks the baseline only; the full runs a release needs cover all.
+    # Every run checks all of them: any run can carry a release.
     needs: [resolve-civicrm, smoke-test-standalone]
     runs-on: ubuntu-24.04
     permissions:
@@ -307,7 +309,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        database: ${{ fromJSON(github.event_name == 'push' && '["mariadb:11.4"]' || '["mariadb:11.4","mariadb:10.11","mariadb:12.2","mysql:8.0"]') }}
+        database: ["mariadb:11.4", "mariadb:10.11", "mariadb:12.2", "mysql:8.0"]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -383,10 +385,10 @@ jobs:
           bash tests/ckcreate/e2e-ckcreate.sh "$IMG"
 
   promote-standalone:
-    # Stable tags only move once the candidate passed smoke + e2e.
-    # `imagetools create` from an existing manifest list copies it intact,
-    # so the promoted tag stays multi-arch.
-    needs: [resolve-civicrm, smoke-test-standalone, e2e-test-standalone, database-compat-standalone, scenario-test-standalone, scaffold-test-standalone]
+    # Stable tags only move once the candidate passed the tests and the scan,
+    # and onto the digest the scan passed. `imagetools create` from a manifest
+    # list copies it intact, so the promoted tag stays multi-arch.
+    needs: [resolve-civicrm, smoke-test-standalone, e2e-test-standalone, database-compat-standalone, scenario-test-standalone, scaffold-test-standalone, scan-standalone]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -404,610 +406,57 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Checkout (for the promote script)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       # The consumer contract is the MINOR tag (:standalone-6.17); the exact
       # tag (:standalone-6.17.0) is new with the tarball-based image and
       # freezes a patch release for whoever needs that.
-      - name: Promote tested candidate to stable tags
-        run: |
-          v="${{ matrix.version }}"
-          docker buildx imagetools create \
-            -t ${{ env.IMAGE_PREFIX }}:standalone-${{ matrix.version }} \
-            -t "${{ env.IMAGE_PREFIX }}:standalone-${v%.*}" \
-            ${{ env.IMAGE_PREFIX }}:standalone-${{ matrix.version }}-${{ github.sha }}
+      - name: Promote the scanned candidate to stable tags
+        env:
+          VERSION: ${{ matrix.version }}
+          DIGEST: ${{ fromJSON(needs.scan-standalone.outputs.digests)[matrix.version] }}
+        run: .github/scripts/promote-digest.sh "standalone-${VERSION}" "standalone-${VERSION%.*}"
 
       - name: Alias :standalone and :standalone-latest onto the current stable
         if: matrix.version == needs.resolve-civicrm.outputs.stable
-        run: |
-          docker buildx imagetools create \
-            -t ${{ env.IMAGE_PREFIX }}:standalone \
-            -t ${{ env.IMAGE_PREFIX }}:standalone-latest \
-            ${{ env.IMAGE_PREFIX }}:standalone-${{ matrix.version }}-${{ github.sha }}
+        env:
+          DIGEST: ${{ fromJSON(needs.scan-standalone.outputs.digests)[matrix.version] }}
+        run: .github/scripts/promote-digest.sh standalone standalone-latest
 
-  build-buildkit:
+  standalone-demo:
     needs: resolve-civicrm
-    # Daily and on dispatch only: a push builds the standalone flavors, and
-    # release.sh requires a full run before tagging.
-    if: github.event_name != 'push'
-    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
-
-    # Buildkit-backed CMS dev images. They all share docker/buildkit; the only
-    # difference is DEFAULT_SITE_TYPE, which sets the civibuild site type the
-    # entrypoint creates on first run.
-    strategy:
-      matrix:
-        variant:
-          - { name: drupal10,  site_type: drupal10-demo }
-          - { name: drupal11,  site_type: drupal11-demo }
-          - { name: wordpress, site_type: wp-demo }
-          - { name: joomla,    site_type: joomla-demo }
-        php: ['8.3']
-        platform:
-          - linux/arm64
-          - linux/amd64
-        include:
-          - platform: linux/arm64
-            runner: ubuntu-24.04-arm
-            suffix: arm64
-          - platform: linux/amd64
-            runner: ubuntu-24.04
-            suffix: amd64
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-
-      - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Test-then-promote: only sha-suffixed candidate tags here; the stable
-      # tags (:drupal10, :drupal11, :wordpress, :joomla, :*-php8.3) are
-      # created by promote-buildkit after the smoke tests pass.
-      - name: Build and push ${{ matrix.variant.name }} candidate image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          # Authenticated GitHub dist downloads for composer; see the Dockerfile.
-          secrets: |
-            composer_auth={"github-oauth":{"github.com":"${{ github.token }}"}}
-          file: docker/buildkit/Dockerfile
-          target: final
-          platforms: ${{ matrix.platform }}
-          push: true
-          tags: |
-            ${{ env.IMAGE_PREFIX }}:${{ matrix.variant.name }}-${{ github.sha }}-${{ matrix.suffix }}
-          build-args: |
-            PHP_VERSION=${{ matrix.php }}
-            DEFAULT_SITE_TYPE=${{ matrix.variant.site_type }}
-            CIVICRM_VERSION=${{ needs.resolve-civicrm.outputs.stable }}
-            CIVICRM_BUILD_VERSION=${{ needs.resolve-civicrm.outputs.minor }}
-          cache-from: type=gha,scope=buildkit-${{ matrix.php }}-${{ matrix.suffix }}
-          cache-to: type=gha,mode=max,scope=buildkit-${{ matrix.php }}-${{ matrix.suffix }},ignore-error=true
-          no-cache: ${{ github.event_name == 'schedule' }}
-
-  merge-buildkit:
-    needs: build-buildkit
-    permissions:
-      contents: read
-      packages: write
-    uses: ./.github/workflows/merge-manifest.yml
+    uses: ./.github/workflows/build-demo-images.yml
     with:
-      tags: '["drupal10", "drupal11", "wordpress", "joomla"]'
+      variants: '[{"name": "standalone-demo", "site_type": "standalone-demo"}]'
+      # The combined-profile leg: a comma list applies in order; shared
+      # apiUser names ("readonly") must upsert, not duplicate.
+      smoke: >-
+        [{"tag": "standalone-demo", "profile": ""},
+         {"tag": "standalone-demo", "profile": "verein"},
+         {"tag": "standalone-demo", "profile": "fundraising"},
+         {"tag": "standalone-demo", "profile": "events"},
+         {"tag": "standalone-demo", "profile": "mailing"},
+         {"tag": "standalone-demo", "profile": "verein,mailing"}]
+      civicrm_version: ${{ needs.resolve-civicrm.outputs.stable }}
+      civicrm_build_version: ${{ needs.resolve-civicrm.outputs.minor }}
 
-  smoke-test-buildkit:
-    needs: merge-buildkit
-    runs-on: ${{ matrix.runner }}
+  # Trivy over this run's standalone candidates, beside the tests; promote
+  # waits for it (scan-images.yml). The demo scans inside build-demo-images.yml.
+  scan-standalone:
+    needs: [resolve-civicrm, merge-standalone]
     permissions:
       contents: read
       packages: read
-
-    strategy:
-      matrix:
-        variant: [drupal10, drupal11, wordpress, joomla]
-        platform: [linux/arm64, linux/amd64]
-        include:
-          - platform: linux/arm64
-            runner: ubuntu-24.04-arm
-          - platform: linux/amd64
-            runner: ubuntu-24.04
-
-    steps:
-      - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Checkout (for the test scripts)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Functional test of bundled dev tools
-        env:
-          IMG: ${{ env.IMAGE_PREFIX }}:${{ matrix.variant }}-${{ github.sha }}
-          PLATFORM: ${{ matrix.platform }}
-        run: .github/scripts/run-dev-tools-test.sh
-
-      - name: Boot test (real first-boot path against an external DB)
-        env:
-          IMG: ${{ env.IMAGE_PREFIX }}:${{ matrix.variant }}-${{ github.sha }}
-          VARIANT: ${{ matrix.variant }}
-        run: .github/scripts/buildkit-boot-test.sh
-
-  e2e-test-buildkit:
-    # Runs each CMS example compose stack with the candidate image and exercises
-    # it in real Chromium. This complements boot-test.sh's cv/API assertions by
-    # catching browser-visible Apache/SITE_URL/asset failures.
-    needs: smoke-test-buildkit
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: read
-
-    strategy:
-      matrix:
-        variant:
-          - { name: drupal10,  compose: examples/drupal10/docker-compose.yml,  path: "/civicrm" }
-          - { name: drupal11,  compose: examples/drupal11/docker-compose.yml,  path: "/civicrm" }
-          - { name: wordpress, compose: examples/wordpress/docker-compose.yml, path: "/wp-admin/admin.php?page=CiviCRM" }
-          - { name: joomla,    compose: examples/joomla/docker-compose.yml,   path: "/administrator/index.php?option=com_civicrm" }
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Boot the example stack
-        env:
-          IMAGE: ${{ env.IMAGE_PREFIX }}:${{ matrix.variant.name }}-${{ github.sha }}
-        run: |
-          docker compose -f ${{ matrix.variant.compose }} up -d --pull always
-
-      - name: Wait for the app healthcheck
-        env:
-          COMPOSE_FILE: ${{ matrix.variant.compose }}
-        run: .github/scripts/wait-compose-healthy.sh
-
-      - name: Verify CiviCRM responds
-        # cv works on every flavor including Joomla (the buildkit image ships the
-        # joomla-cli-bootstrap.php settings.d shim), so no Joomla DB-direct case.
-        run: |
-          docker compose -f ${{ matrix.variant.compose }} exec -T \
-            -u buildkit \
-            -w /home/buildkit/buildkit/build/site/web \
-            app \
-            bash -lc 'export PATH=/home/buildkit/buildkit/bin:$PATH; cv api4 Domain.get +s version'
-
-      # Same major the images ship (docker/*/Dockerfile). A browser job on a
-      # different Node than the image serves tests something nobody runs.
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-          cache: 'npm'
-
-      - name: Install Playwright + Chromium
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
-
-      - name: Run Playwright e2e
-        env:
-          CIVIKITCHEN_E2E_TARGET: ${{ matrix.variant.name }}
-          CIVICRM_BASE_URL: http://localhost:8080
-          CIVICRM_E2E_PATH: ${{ matrix.variant.path }}
-        run: npx playwright test
-
-      - name: Upload Playwright report on failure
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: playwright-report-buildkit-${{ matrix.variant.name }}
-          path: playwright-report/
-          retention-days: 7
-
-      - name: App container logs on failure
-        if: failure()
-        run: docker compose -f ${{ matrix.variant.compose }} logs app
-
-      - name: Tear down
-        if: always()
-        run: docker compose -f ${{ matrix.variant.compose }} down -v
-
-  scenario-test-buildkit:
-    # Exercise the generated extension/profile contract on every CMS family;
-    # this is distinct from the fixed example stacks above.
-    needs: smoke-test-buildkit
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: read
-    strategy:
-      matrix:
-        variant: [drupal10, drupal11, wordpress, joomla]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Install scenario YAML parser
-        run: composer install --no-interaction --no-progress --working-dir=packages/civikitchen-scenario-schema
-      - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Boot generated scenario
-        env:
-          IMG: ${{ env.IMAGE_PREFIX }}:${{ matrix.variant }}-${{ github.sha }}
-        run: bash tests/scenario/boot-scenario.sh "$IMG"
-
-  promote-buildkit:
-    # Stable tags only move once the candidate passed smoke + e2e.
-    needs: [e2e-test-buildkit, scenario-test-buildkit]
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: write
-
-    strategy:
-      matrix:
-        variant: [drupal10, drupal11, wordpress, joomla]
-        php: ['8.3']
-
-    steps:
-      - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Promote tested candidate to stable tags
-        run: |
-          docker buildx imagetools create -t ${{ env.IMAGE_PREFIX }}:${{ matrix.variant }} \
-            ${{ env.IMAGE_PREFIX }}:${{ matrix.variant }}-${{ github.sha }}
-          docker buildx imagetools create -t ${{ env.IMAGE_PREFIX }}:${{ matrix.variant }}-php${{ matrix.php }} \
-            ${{ env.IMAGE_PREFIX }}:${{ matrix.variant }}-${{ github.sha }}
-
-  build-demo:
-    needs: resolve-civicrm
-    # Daily and on dispatch only: a push builds the standalone flavors, and
-    # release.sh requires a full run before tagging.
-    if: github.event_name != 'push'
-    runs-on: ${{ matrix.runner }}
-    permissions:
-      contents: read
-      packages: write
-
-    # Single-container demo images (embedded MariaDB, baked demo data) from the
-    # same docker/buildkit/Dockerfile `demo` target. Profiles (e.g. verein) are
-    # no longer baked into a separate image — they apply at first boot via
-    # CIVIKITCHEN_PROFILE, so there is exactly one demo image per supported
-    # demo flavor.
-    #
-    # joomla-demo has the same profile support as the others: the bake finishes
-    # civibuild's deliberately-incomplete joomla-demo install (it leaves the
-    # Joomla component registration as a commented-out "#fixme" and enables only
-    # civi_contribute) by registering CiviCRM's Joomla plugins and enabling the
-    # standard component extensions. The one difference is that authx's
-    # password/basic-auth flow doesn't work on Joomla, so its profile boot test
-    # exercises the api_key credential only.
-    #
-    # drupal11-demo uses a site type civibuild doesn't ship: CiviKitchen
-    # vendors it in docker/buildkit/site-types/drupal11-demo/ (drupal10-demo's
-    # recipe with the Drupal 11.4 adaptations documented there); bake.sh
-    # installs it into the buildkit clone before `civibuild create`.
-    strategy:
-      matrix:
-        variant:
-          - { name: standalone-demo, site_type: standalone-demo }
-          - { name: drupal10-demo,   site_type: drupal10-demo }
-          - { name: drupal11-demo,   site_type: drupal11-demo }
-          - { name: wordpress-demo,  site_type: wp-demo }
-          - { name: joomla-demo,     site_type: joomla-demo }
-        platform:
-          - linux/arm64
-          - linux/amd64
-        include:
-          - platform: linux/arm64
-            runner: ubuntu-24.04-arm
-            suffix: arm64
-          - platform: linux/amd64
-            runner: ubuntu-24.04
-            suffix: amd64
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-
-      - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Test-then-promote: only sha-suffixed candidate tags here; the stable
-      # demo tags are created by promote-demo after the smoke tests pass.
-      - name: Build and push ${{ matrix.variant.name }} demo candidate image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          # Authenticated GitHub dist downloads for composer; see the Dockerfile.
-          secrets: |
-            composer_auth={"github-oauth":{"github.com":"${{ github.token }}"}}
-          file: docker/buildkit/Dockerfile
-          target: demo
-          platforms: ${{ matrix.platform }}
-          push: true
-          tags: |
-            ${{ env.IMAGE_PREFIX }}:${{ matrix.variant.name }}-${{ github.sha }}-${{ matrix.suffix }}
-          build-args: |
-            DEFAULT_SITE_TYPE=${{ matrix.variant.site_type }}
-            CIVICRM_VERSION=${{ needs.resolve-civicrm.outputs.stable }}
-            CIVICRM_BUILD_VERSION=${{ needs.resolve-civicrm.outputs.minor }}
-          cache-from: type=gha,scope=demo-${{ matrix.variant.name }}-${{ matrix.suffix }}
-          cache-to: type=gha,mode=max,scope=demo-${{ matrix.variant.name }}-${{ matrix.suffix }},ignore-error=true
-          no-cache: ${{ github.event_name == 'schedule' }}
-
-  merge-demo:
-    needs: build-demo
-    permissions:
-      contents: read
-      packages: write
-    uses: ./.github/workflows/merge-manifest.yml
+    uses: ./.github/workflows/scan-images.yml
     with:
-      tags: '["standalone-demo", "drupal10-demo", "drupal11-demo", "wordpress-demo", "joomla-demo"]'
-
-  smoke-test-demo:
-    needs: merge-demo
-    runs-on: ${{ matrix.runner }}
-    permissions:
-      contents: read
-      packages: read
-
-    # The profile legs exercise the runtime profile path on every flavor:
-    # first boot installs the profile extensions, seeds demo data, and
-    # creates API users (via each CMS's native PHP APIs — no drush/wp-cli).
-    strategy:
-      matrix:
-        variant:
-          - { tag: standalone-demo, profile: '' }
-          - { tag: standalone-demo, profile: verein }
-          - { tag: standalone-demo, profile: fundraising }
-          - { tag: standalone-demo, profile: events }
-          - { tag: standalone-demo, profile: mailing }
-          # Combined-profile leg: comma list applies in order; shared apiUser
-          # names ("readonly") must upsert, not duplicate (one leg is enough —
-          # the combining logic is CMS-independent).
-          - { tag: standalone-demo, profile: 'verein,mailing' }
-          - { tag: drupal10-demo,   profile: '' }
-          - { tag: drupal10-demo,   profile: verein }
-          - { tag: drupal10-demo,   profile: fundraising }
-          - { tag: drupal10-demo,   profile: events }
-          - { tag: drupal10-demo,   profile: mailing }
-          - { tag: drupal11-demo,   profile: '' }
-          - { tag: drupal11-demo,   profile: verein }
-          - { tag: drupal11-demo,   profile: fundraising }
-          - { tag: drupal11-demo,   profile: events }
-          - { tag: drupal11-demo,   profile: mailing }
-          - { tag: wordpress-demo,  profile: '' }
-          - { tag: wordpress-demo,  profile: verein }
-          - { tag: wordpress-demo,  profile: fundraising }
-          - { tag: wordpress-demo,  profile: events }
-          - { tag: wordpress-demo,  profile: mailing }
-          - { tag: joomla-demo,     profile: '' }
-          - { tag: joomla-demo,     profile: verein }
-          - { tag: joomla-demo,     profile: fundraising }
-          - { tag: joomla-demo,     profile: events }
-          - { tag: joomla-demo,     profile: mailing }
-        platform: [linux/arm64, linux/amd64]
-        include:
-          - platform: linux/arm64
-            runner: ubuntu-24.04-arm
-          - platform: linux/amd64
-            runner: ubuntu-24.04
-
-    steps:
-      - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Checkout (for the test script)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Boot test (single-container demo)
-        run: |
-          IMG=${{ env.IMAGE_PREFIX }}:${{ matrix.variant.tag }}-${{ github.sha }}
-          docker pull "$IMG"
-          bash tests/images/boot-test-demo.sh "$IMG" ${{ matrix.variant.profile }}
-
-  promote-demo:
-    # Stable demo tags only move once the candidates passed the smoke tests
-    # (including the runtime profile legs on all tested demo flavors).
-    needs: smoke-test-demo
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: write
-
-    strategy:
-      matrix:
-        tag: [standalone-demo, drupal10-demo, drupal11-demo, wordpress-demo, joomla-demo]
-
-    steps:
-      - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Promote tested candidate to stable tag
-        run: |
-          docker buildx imagetools create -t ${{ env.IMAGE_PREFIX }}:${{ matrix.tag }} \
-            ${{ env.IMAGE_PREFIX }}:${{ matrix.tag }}-${{ github.sha }}
-
-  # --- Image vulnerability scan (trivy) -------------------------------------
-  #
-  # What is IN the images, as opposed to what the extension workflow's
-  # osv-scanner job covers (an extension's own lockfiles): the Debian base, the
-  # PHP packages, CiviCRM's vendored composer tree, the node bits the dev tools
-  # bring. Nobody writes those into a lockfile in this repo, so nothing else
-  # here would ever notice a base-image CVE — and these images are what eleven
-  # repos boot their CI on and what developers run locally.
-  #
-  # A matrix needs a JSON array and workflow expressions have no way to append
-  # to one, so the tag list is assembled here — same shape as resolve-civicrm.
-  # The candidate tags, not the stable ones: they are already pushed at this
-  # point, and `imagetools create` copies a manifest list intact, so the digest
-  # promote publishes is bit-for-bit the digest scanned here.
-  scan-image-list:
-    needs: resolve-civicrm
-    runs-on: ubuntu-24.04
-    outputs:
-      images: ${{ steps.list.outputs.images }}
-    steps:
-      - name: Checkout (for the assemble script)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Assemble the candidate tag list
-        id: list
-        env:
-          STANDALONE_VERSIONS: ${{ needs.resolve-civicrm.outputs.standalone_versions }}
-          SHA: ${{ github.sha }}
-          EVENT: ${{ github.event_name }}
-        run: .github/scripts/assemble-scan-list.sh
-
-  scan-images:
-    # Reports, does not gate: the promote jobs do not wait for this one. A CVE
-    # in the Debian base is fixed by an upstream rebuild, not by holding back an
-    # image whose predecessor has the same CVE — blocking promotion would just
-    # freeze the fleet on an older image with strictly more of them. Making it a
-    # gate is one line (add this job to promote-*'s `needs`), and should stay a
-    # deliberate decision rather than a side effect.
-    needs: [scan-image-list, merge-standalone, merge-buildkit, merge-demo]
-    # On push the CMS and demo merges are skipped, which would skip this job too.
-    if: ${{ !cancelled() && needs.scan-image-list.result == 'success' && needs.merge-standalone.result == 'success' }}
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: read
-
-    strategy:
-      # One flavor's CVE must not hide the report for the other nine. Platform
-      # is a real dimension, not a formality: the published manifests carry
-      # amd64 AND arm64, whose base/OS layers resolve packages independently —
-      # scanning one arch says nothing about a CVE that only ships in the
-      # other's build of the same library.
-      fail-fast: false
-      matrix:
-        image: ${{ fromJSON(needs.scan-image-list.outputs.images) }}
-        platform: [linux/amd64, linux/arm64]
-
-    steps:
-      - name: Checkout (for trivyignore.yaml)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Version, architecture selection and the release checksums live in the
-      # shared installer — the image and extension security jobs execute the
-      # same verified binary contract instead of carrying independent pins.
-      - name: Install trivy
-        run: .github/scripts/install-trivy.sh
-
-      # The scan target is the DIGEST, resolved from the registry — the point of
-      # the whole job. Scanning a tag re-resolves it at scan time and scanning
-      # the Dockerfile grades an intention; only the digest is the artifact a
-      # developer or a CI run actually pulls.
-      - name: Resolve the published digest
-        id: digest
-        env:
-          IMAGE: ${{ matrix.image }}
-        run: .github/scripts/resolve-image-digest.sh
-
-      # The gate, and the only run whose exit code matters:
-      #   --ignore-unfixed  nothing upstream has patched yet is not something a
-      #                     rebuild here can fix; a gate that cannot be met
-      #                     teaches people to ignore it.
-      #   --severity HIGH,CRITICAL  the rest belongs in the report below.
-      #   --scanners vuln   this job is about CVEs. Trivy's secret scanner is on
-      #                     by default and would block on findings
-      #                     --ignore-unfixed cannot apply to; secret scanning is
-      #                     a separate concern with a separate answer
-      #                     (docs/extension-standards.md).
-      # --image-src remote: the image is in the registry, not in this runner's
-      # docker daemon, and the default source order would try three local
-      # backends first.
-      #
-      # Central exceptions go in trivyignore.yaml in the repository root, named
-      # explicitly because trivy auto-loads only the plain .trivyignore — the
-      # YAML format is still flagged experimental upstream. It buys per-entry
-      # `paths` scoping and a real `expired_at` (an expired entry is pruned, so
-      # the finding comes back and the gate goes red). See the file itself.
-      - name: Scan the published image (gate)
-        env:
-          IMAGE_REF: ${{ steps.digest.outputs.ref }}
-          PLATFORM: ${{ matrix.platform }}
-        run: .github/scripts/trivy-scan-gate.sh
-
-      # The same image without any of the filters, exit code 0, into the job
-      # summary. The gate above answers "is there anything to do?"; this answers
-      # "what is actually in there" — including the unfixed and the low-severity
-      # findings a policy deliberately does not block on, which is the part you
-      # want when triaging one that starts to matter. Runs even when the gate
-      # went red (that is when it is most useful), and skips the database
-      # download the gate just did.
-      - name: Full report into the job summary
-        if: ${{ !cancelled() && steps.digest.outcome == 'success' }}
-        env:
-          IMAGE_REF: ${{ steps.digest.outputs.ref }}
-          IMAGE: ${{ matrix.image }}
-          PLATFORM: ${{ matrix.platform }}
-        run: .github/scripts/trivy-report-summary.sh
+      prefix: standalone-
+      tags: ${{ needs.resolve-civicrm.outputs.standalone_versions }}
 
   monorepo-self-test:
     # The self-test runs the ck* tools baked into :standalone, so it waits for
@@ -1025,10 +474,10 @@ jobs:
     # over the needs chain, so any failed job anywhere in the pipeline
     # triggers this — push-triggered runs are excluded (those failures are
     # visible on the commit/PR already).
-    # scan-images is in the list even though it gates nothing: the daily cron
-    # is the run that finds a base-image CVE nobody pushed a commit for, and
-    # without this edge that finding would sit in a job summary nobody opens.
-    needs: [promote-standalone, promote-buildkit, promote-demo, scan-images, monorepo-self-test]
+    # The scans are listed although promote already waits for them: the daily
+    # cron is the run that finds a base-image CVE nobody pushed a commit for,
+    # and the edge makes that finding open an issue.
+    needs: [promote-standalone, standalone-demo, scan-standalone, monorepo-self-test]
     if: github.event_name == 'schedule' && failure()
     runs-on: ubuntu-24.04
     permissions:

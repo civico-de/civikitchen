@@ -6,7 +6,8 @@
 # digest. standalone and standalone-demo are mandatory; a CMS flavor that is
 # missing or drifted is a warning and stays out of digests.txt until a re-run
 # catches it up. A flavor this release already tagged is left as is.
-# $ALLOW_DRIFT=1 downgrades tree drift to a warning. Needs $GH_TOKEN.
+# A build commit that cannot be told counts as drift. $ALLOW_DRIFT=1 downgrades
+# drift to a warning and attaches. Needs $GH_TOKEN.
 set -euo pipefail
 
 # --paginate concatenates one JSON array per page; --jq '.[]' streams the
@@ -78,21 +79,25 @@ for flavor in standalone drupal10 drupal11 wordpress joomla \
   fi
 
   # Provenance: which commit was this digest built from, and do its docker/ +
-  # toolbelt/ trees match the release?
+  # toolbelt/ + packages/ trees match the release? An unknown answer counts as
+  # a mismatch.
   candidate=$(candidate_of "${flavor}")
   build_sha="${candidate##*-}"
+  problem=''
   if [ -z "${candidate}" ]; then
-    echo "::warning::cannot tell which commit :${flavor} was built from (candidate tag already pruned)"
+    problem="cannot tell which commit :${flavor} was built from (candidate tag already pruned)"
   elif ! git cat-file -e "${build_sha}^{commit}" 2>/dev/null; then
-    echo "::warning::build commit ${build_sha} of :${flavor} is not in this checkout"
+    problem="build commit ${build_sha} of :${flavor} is not in this checkout"
   elif [ "$(image_tree_of "${build_sha}")" != "${RELEASE_TREE}" ]; then
-    message=":${flavor} was built from ${build_sha:0:12}, whose docker/ or toolbelt/ tree differs from ${TAG}"
-    if [ "${mandatory}" = 1 ]; then
-      drift+=("${message}")
-    elif [ "${ALLOW_DRIFT}" = 1 ]; then
-      echo "::warning::${message}; attached anyway (allow_image_drift)"
+    problem=":${flavor} was built from ${build_sha:0:12}, whose image trees differ from ${TAG}"
+  fi
+  if [ -n "${problem}" ]; then
+    if [ "${ALLOW_DRIFT}" = 1 ]; then
+      echo "::warning::${problem}; attached anyway (allow_image_drift)"
+    elif [ "${mandatory}" = 1 ]; then
+      drift+=("${problem}")
     else
-      echo "::warning::${message}; its release tags follow on a re-run once 'Build CMS Images' promotes a matching image"
+      echo "::warning::${problem}; its release tags follow on a re-run once 'Build CMS Images' promotes a matching image"
       continue
     fi
   fi
@@ -109,12 +114,8 @@ done
 
 if [ ${#drift[@]} -gt 0 ]; then
   printf 'image drift: %s\n' "${drift[@]}" >&2
-  if [ "${ALLOW_DRIFT}" = 1 ]; then
-    echo "::warning::releasing anyway (allow_image_drift)"
-  else
-    echo "Wait for a 'Build Dev Images' run (push, daily or dispatched) to promote this commit, or re-run this workflow with allow_image_drift." >&2
-    exit 1
-  fi
+  echo "Wait for a 'Build Dev Images' run (push, daily or dispatched) to promote this commit, or re-run this workflow with allow_image_drift." >&2
+  exit 1
 fi
 if [ ${#fatal[@]} -gt 0 ]; then
   printf 'FATAL: %s\n' "${fatal[@]}" >&2

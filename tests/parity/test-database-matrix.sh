@@ -3,11 +3,9 @@ set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 workflow="$root/.github/workflows/build-dev-images.yml"
-# A push checks the baseline only; every other run covers the whole matrix.
-grep -qF "'push' && '[\"mariadb:11.4\"]'" "$workflow" \
-  || { echo "push database matrix is not the mariadb:11.4 baseline" >&2; exit 1; }
-grep -qF "'[\"mariadb:11.4\",\"mariadb:10.11\",\"mariadb:12.2\",\"mysql:8.0\"]'" "$workflow" \
-  || { echo "full database matrix misses an image" >&2; exit 1; }
+# Any run, a push included, can carry a release: every one covers the whole matrix.
+grep -qF 'database: ["mariadb:11.4", "mariadb:10.11", "mariadb:12.2", "mysql:8.0"]' "$workflow" \
+  || { echo "database matrix is not the full list on every run" >&2; exit 1; }
 grep -Eq 'needs: \[.*database-compat-standalone.*\]' "$workflow" \
   || { echo "standalone promotion is not gated by database compatibility" >&2; exit 1; }
 grep -Eq 'needs: \[.*scenario-test-standalone.*\]' "$workflow" \

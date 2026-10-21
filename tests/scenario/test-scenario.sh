@@ -218,12 +218,13 @@ fi
 # The scenario smoke jobs execute the host-side YAML renderer before starting
 # a container. A clean GitHub runner therefore needs the locked parser just as
 # a fresh local checkout does; cached vendor trees must never make CI green.
-for job in scenario-test-standalone scenario-test-buildkit; do
+for leg in build-dev-images:scenario-test-standalone build-cms-images:scenario-test-buildkit; do
+  job=${leg#*:}
   steps=$(awk -v job="$job" '
     $0 == "  " job ":" { inside=1; next }
     inside && /^  [a-zA-Z0-9_-]+:/ { exit }
     inside { print }
-  ' "$root/.github/workflows/build-dev-images.yml")
+  ' "$root/.github/workflows/${leg%%:*}.yml")
   grep -Fq 'composer install --no-interaction --no-progress --working-dir=packages/civikitchen-scenario-schema' <<<"$steps" \
     || { echo "$job does not install the locked scenario YAML parser" >&2; exit 1; }
 done

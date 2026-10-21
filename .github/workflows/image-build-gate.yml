@@ -1,6 +1,7 @@
-# Do all image families still BUILD? On pull requests only — the pipeline
-# (build-dev-images.yml) builds standalone on push and the CMS flavors daily,
-# so without this a broken COPY or Dockerfile lands on main untried.
+# Do all image families still BUILD? On pull requests only — the pipelines
+# build standalone on push (build-dev-images.yml) and the CMS flavors daily
+# (build-cms-images.yml), so without this a broken COPY or Dockerfile lands on
+# main untried.
 #
 # Deliberately less than the pipeline: one representative CMS, one arch, no
 # push, no smoke tests. Both buildkit targets are still built because they have
@@ -16,6 +17,8 @@ on:
       - '.dockerignore'
       - '.github/workflows/image-build-gate.yml'
       - '.github/workflows/build-dev-images.yml'
+      - '.github/workflows/build-cms-images.yml'
+      - '.github/workflows/build-demo-images.yml'
       - '.github/workflows/merge-manifest.yml'
 
 # A force-push to the PR obsoletes the running build; ~20 cold minutes are

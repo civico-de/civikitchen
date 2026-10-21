@@ -28,6 +28,22 @@ except that a break the consumers are adjusted for ships as a minor, marked
   private-dependency token is written to disk, and a sibling's
   civikitchen.yaml has to validate against the calling civikitchen version.
 
+### Changed
+
+- Only the standalone and standalone-demo images gate a release. The CMS
+  flavors (drupal10, drupal11, wordpress, joomla and their `-demo` images)
+  build in their own daily workflow, and a release attaches their `-v1` and
+  `-vX.Y.Z` tags only to an image built from the release's trees. A CMS
+  flavor's release tags can therefore lag behind a release until a re-run
+  of that release catches it up
+  ([Catching up a CMS flavor](docs/releases.md#catching-up-a-cms-flavor)).
+- The `-v1` image tags (`:v1`, `:standalone-v1`, …) move only when the
+  release is the newest v1.x.y, as the git `v1` tag does; releasing an older
+  patch attaches its patch tags only.
+- The moving image tags (`:standalone`, `:drupal10`, `:*-demo`, …) move only
+  after the trivy gate passed on the candidate digest. A fixable HIGH or
+  CRITICAL finding keeps them on the last image that passed.
+
 ### Fixed
 
 - `ckcoretest --e2e` started as root (`exec -u root`, or a service with

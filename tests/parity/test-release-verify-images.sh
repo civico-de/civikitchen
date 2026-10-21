@@ -50,7 +50,8 @@ versions() {
     jq -s . > "${work}/versions"
 }
 # Every flavor promoted from <sha>, except the ones given as <flavor>=<sha>
-# (built elsewhere) or <flavor>= (never promoted).
+# (built elsewhere), <flavor>=pruned (candidate tag gone) or <flavor>= (never
+# promoted).
 live() {
   local sha="$1" f entry override
   shift
@@ -59,7 +60,9 @@ live() {
     entry="sha256:${f}-new=${f},${f}-latest-${sha}"
     for override in "$@"; do
       [ "${override%%=*}" = "${f}" ] || continue
-      if [ -n "${override#*=}" ]; then
+      if [ "${override#*=}" = pruned ]; then
+        entry="sha256:${f}-new=${f}"
+      elif [ -n "${override#*=}" ]; then
         entry="sha256:${f}-new=${f},${f}-latest-${override#*=}"
       else
         entry=''
@@ -105,6 +108,28 @@ versions "${v[@]}"
 run || { cat "${work}/out" >&2; fail "a missing joomla-demo blocked the release"; }
 grep -q '::warning::no published image behind :joomla-demo' "${work}/out" || { cat "${work}/out" >&2; fail "missing joomla-demo not warned"; }
 [[ " $(attached)" != *" joomla-demo "* ]] || fail "missing joomla-demo attached"
+
+# A build commit that cannot be told counts as drift: candidate tag pruned, or
+# a commit this checkout does not have.
+unknown=0123456789abcdef0123456789abcdef01234567
+for why in pruned "${unknown}"; do
+  mapfile -t v < <(live "${rel}" "wordpress=${why}")
+  versions "${v[@]}"
+  run || { cat "${work}/out" >&2; fail "unknown provenance of wordpress (${why}) blocked the release"; }
+  grep -q '::warning::.*:wordpress.*its release tags follow' "${work}/out" || { cat "${work}/out" >&2; fail "unknown wordpress provenance (${why}) not warned"; }
+  [[ " $(attached)" != *" wordpress "* ]] || fail "wordpress of unknown provenance (${why}) attached"
+  for f in standalone standalone-demo; do
+    mapfile -t v < <(live "${rel}" "${f}=${why}")
+    versions "${v[@]}"
+    expect_fail "image drift: .*:${f}"
+  done
+  # allow_image_drift attaches both as before.
+  mapfile -t v < <(live "${rel}" "wordpress=${why}" "standalone=${why}")
+  versions "${v[@]}"
+  ALLOW_DRIFT=1 run || { cat "${work}/out" >&2; fail "allow_image_drift with unknown provenance (${why})"; }
+  [[ " $(attached)" == *" wordpress "* && " $(attached)" == *" standalone "* ]] \
+    || fail "allow_image_drift left out a flavor of unknown provenance (${why}): $(attached)"
+done
 
 # standalone and standalone-demo are mandatory.
 for f in standalone standalone-demo; do

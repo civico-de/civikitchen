@@ -22,7 +22,7 @@ A release is a git tag on this repo plus the image tags that go with it.
 | `v1` (git) | **moving** | the newest v1.x.y commit |
 | `:v1.4.2`, `:v1` | image | the standalone dev image, which the template's compose stacks use |
 | `:standalone-v1.4.2`, `:standalone-v1` | image | the same digest, spelled with its flavor |
-| `:drupal10-v1`, `:wordpress-v1`, `:joomla-demo-v1`, … | image | every other published flavor, with and without the patch level |
+| `:drupal10-v1`, `:wordpress-v1`, `:joomla-demo-v1`, … | image | every other published flavor, with and without the patch level, once it has [caught up](#catching-up-a-cms-flavor) |
 | `:standalone`, `:drupal10`, `:*-demo`, … | image | the **moving edge**: whatever last passed test-then-promote |
 
 The moving tags stay as they are and follow the daily rebuild. The
@@ -53,32 +53,39 @@ pinned: v1, main or a SHA.
 
 A release builds nothing. The release workflow attaches the release tags to
 the digest each moving tag points at, so a released image has already passed
-test-then-promote.
+its tests and vulnerability scan before promotion.
 
-It follows that a release can only ship image content that is already live. If
-the release commit touches docker/, toolbelt/ or packages/, wait for a full
-*Build Dev Images* run to promote it first; a push builds only the standalone
-flavors. Start one with:
+It follows that a release can only ship image content that is already live.
+Only standalone and standalone-demo gate a release. *Build Dev Images* builds
+them on every push to the image paths, daily and on dispatch:
 
 ```bash
 gh workflow run build-dev-images.yml
 ```
 
-A new push or dispatch cancels the run in progress, so start it after your last
-push. A run cancelled while promoting leaves some tags on the older commit
-until the next full run.
+A new push or dispatch cancels the run in progress, so the last commit wins. A
+run cancelled while promoting leaves some tags on the older commit until the
+next run.
 
-The release workflow checks this: it compares those trees between the commit
-each live image was built from and the release commit, and fails on a
-mismatch. If the difference cannot affect the image, such as a comment-only
-change, re-run the release from the Actions tab with **allow_image_drift**.
+The CMS flavors (drupal10, drupal11, wordpress, joomla and their demos) build
+in *Build CMS Images*, daily and on dispatch, in their own concurrency group.
+They never block a release: their tags catch up later.
+
+The release workflow compares the docker/, toolbelt/ and packages/ trees of
+the commit each live image was built from with the release commit's. A build
+commit it cannot determine counts as a mismatch. A mismatch on standalone or
+standalone-demo fails the release. A CMS flavor with a mismatch or without a
+live image gets a warning and no release tags. If the
+difference cannot affect the image, such as a comment-only change, re-run the
+release from the Actions tab with **allow_image_drift**.
 
 Between releases, :v1 keeps the CiviCRM the last release blessed while
 :standalone moves on. A CiviCRM refresh reaches the fleet only through a patch
 release, which costs one tag push, so cut them liberally.
 
-Published vX.Y.Z image tags never move to a different digest. Re-running a
-release is idempotent; a changed release needs a new patch version.
+Published vX.Y.Z image tags never move to a different digest. A re-run leaves
+every flavor this release already tagged as it is, so it is idempotent; a
+changed release needs a new patch version.
 
 ## Cutting a release
 
@@ -93,9 +100,9 @@ That section becomes the GitHub release body.
 
 The release script runs the gates the tag push would hit, before the tag
 exists: you are on a clean main in sync with origin, the tag is free locally
-and on origin, the changelog and ckinit tests pass, and a full (daily or
-dispatched) *Build Dev Images* run succeeded at or after the newest commit
-touching the image paths. Without APPLY it only reports.
+and on origin, the changelog and ckinit tests pass, and the newest *Build Dev
+Images* run at or after the newest commit touching the image paths succeeded.
+The run the push started counts. Without APPLY it only reports.
 
 ```bash
 git switch main && git pull
@@ -106,7 +113,9 @@ make release VERSION=1.0.1 APPLY=1    # tag and push
 The tag push then
 
 1. verifies the live image digests as described above,
-2. attaches the release tags (v1.0.1, v1 and the per-flavor spellings),
+2. attaches the release tags (v1.0.1 and the per-flavor spellings, and v1 if
+   v1.0.1 is the newest v1.x.y) to standalone, standalone-demo and every CMS
+   flavor whose live image matches,
 3. moves the git v1 tag, but only if v1.0.1 is the newest v1.x.y,
 4. creates the GitHub release from the changelog section.
 
@@ -120,6 +129,20 @@ gh api repos/<owner>/<repo>/actions/runs/<id> --jq .referenced_workflows
 
 To test a release, push a commit, or run the tools locally against
 `ghcr.io/civico-de/civikitchen:v1`.
+
+### Catching up a CMS flavor
+
+A CMS flavor the release left out is named in a warning of its Release run,
+and its `-v1` and `-vX.Y.Z` tags stay where they were. Once *Build CMS Images*
+has promoted an image of that flavor from the release's trees, re-run the
+release: Actions, *Release*, Run workflow, with the tag `vX.Y.Z`. The run
+attaches the caught-up flavor's tags and leaves the flavors already tagged,
+the git tag and the GitHub release as they are. If main has changed those
+trees since the tag, no new image matches, and the flavor catches up with the
+next release instead. The flavor's `-v1` tag moves only if the release is the
+newest v1.x.y, like the git v1 tag. A re-run of an older release attaches only
+the patch tag. Release runs queue rather than overlap, and each reads origin's tags right
+before it decides which release is the newest.
 
 ### Versioning rules
 

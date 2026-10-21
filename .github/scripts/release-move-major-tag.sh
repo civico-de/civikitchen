@@ -6,8 +6,7 @@ set -euo pipefail
 
 : "${RELEASE_PUSH_TOKEN:?RELEASE_PUSH_TOKEN is empty: the release App token was not minted}"
 
-newest=$(git tag -l "${MAJOR}.*" \
-  | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+newest=$("$(dirname "$0")/release-newest-tag.sh")
 if [ "${newest}" != "${TAG}" ]; then
   echo "${newest} is newer than ${TAG}; leaving ${MAJOR} where it is"
   exit 0

@@ -28,6 +28,12 @@ on:
         type: boolean
         default: false
 
+# One release at a time, none cancelled: the moving major tags follow the
+# newest release, which a run can only tell once the previous one is done.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 permissions:
   contents: read
 

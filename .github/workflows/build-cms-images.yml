@@ -1,0 +1,384 @@
+# The CMS flavors: drupal10, drupal11, wordpress, joomla and their -demo
+# images. They do not gate a release (docs/releases.md): build-dev-images.yml
+# builds the standalone images a release needs, and a release attaches a CMS
+# flavor's tags only once this workflow has promoted a matching image.
+#
+# Daily and on dispatch, no push trigger: a broken COPY or Dockerfile is caught
+# on the pull request by image-build-gate.yml.
+name: Build CMS Images
+
+on:
+  schedule:
+    # With build-dev-images.yml, an hour before the GHCR cleanup cron. The
+    # daily build runs uncached so a fixed Debian package lands a day later.
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+# Own group: a push or dispatch of build-dev-images.yml never cancels a CMS
+# build, and vice versa. Last-writer-wins on the moving tags as there.
+concurrency:
+  group: build-cms-images
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/civikitchen
+
+jobs:
+  resolve-civicrm:
+    # The same resolution as build-dev-images.yml; only stable and minor are
+    # read here.
+    runs-on: ubuntu-24.04
+    outputs:
+      stable: ${{ steps.resolve.outputs.stable }}
+      minor: ${{ steps.resolve.outputs.minor }}
+    steps:
+      - name: Checkout (for the resolve script)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve current CiviCRM stable
+        id: resolve
+        run: .github/scripts/resolve-civicrm-stable.sh
+
+  build-buildkit:
+    needs: resolve-civicrm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+
+    # Buildkit-backed CMS dev images. They all share docker/buildkit; the only
+    # difference is DEFAULT_SITE_TYPE, which sets the civibuild site type the
+    # entrypoint creates on first run.
+    strategy:
+      matrix:
+        variant:
+          - { name: drupal10,  site_type: drupal10-demo }
+          - { name: drupal11,  site_type: drupal11-demo }
+          - { name: wordpress, site_type: wp-demo }
+          - { name: joomla,    site_type: joomla-demo }
+        php: ['8.3']
+        platform:
+          - linux/arm64
+          - linux/amd64
+        include:
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            suffix: arm64
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+            suffix: amd64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Test-then-promote: only sha-suffixed candidate tags here; the stable
+      # tags (:drupal10, :drupal11, :wordpress, :joomla, :*-php8.3) are
+      # created by promote-buildkit after the smoke tests pass.
+      - name: Build and push ${{ matrix.variant.name }} candidate image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          # Authenticated GitHub dist downloads for composer; see the Dockerfile.
+          secrets: |
+            composer_auth={"github-oauth":{"github.com":"${{ github.token }}"}}
+          file: docker/buildkit/Dockerfile
+          target: final
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}:${{ matrix.variant.name }}-${{ github.sha }}-${{ matrix.suffix }}
+          build-args: |
+            PHP_VERSION=${{ matrix.php }}
+            DEFAULT_SITE_TYPE=${{ matrix.variant.site_type }}
+            CIVICRM_VERSION=${{ needs.resolve-civicrm.outputs.stable }}
+            CIVICRM_BUILD_VERSION=${{ needs.resolve-civicrm.outputs.minor }}
+          cache-from: type=gha,scope=buildkit-${{ matrix.php }}-${{ matrix.suffix }}
+          cache-to: type=gha,mode=max,scope=buildkit-${{ matrix.php }}-${{ matrix.suffix }},ignore-error=true
+          no-cache: ${{ github.event_name == 'schedule' }}
+
+  merge-buildkit:
+    needs: build-buildkit
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/merge-manifest.yml
+    with:
+      tags: '["drupal10", "drupal11", "wordpress", "joomla"]'
+
+  smoke-test-buildkit:
+    needs: merge-buildkit
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: read
+
+    strategy:
+      matrix:
+        variant: [drupal10, drupal11, wordpress, joomla]
+        platform: [linux/arm64, linux/amd64]
+        include:
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout (for the test scripts)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Functional test of bundled dev tools
+        env:
+          IMG: ${{ env.IMAGE_PREFIX }}:${{ matrix.variant }}-${{ github.sha }}
+          PLATFORM: ${{ matrix.platform }}
+        run: .github/scripts/run-dev-tools-test.sh
+
+      - name: Boot test (real first-boot path against an external DB)
+        env:
+          IMG: ${{ env.IMAGE_PREFIX }}:${{ matrix.variant }}-${{ github.sha }}
+          VARIANT: ${{ matrix.variant }}
+        run: .github/scripts/buildkit-boot-test.sh
+
+  e2e-test-buildkit:
+    # Runs each CMS example compose stack with the candidate image and exercises
+    # it in real Chromium. This complements boot-test.sh's cv/API assertions by
+    # catching browser-visible Apache/SITE_URL/asset failures.
+    needs: smoke-test-buildkit
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+
+    strategy:
+      matrix:
+        variant:
+          - { name: drupal10,  compose: examples/drupal10/docker-compose.yml,  path: "/civicrm" }
+          - { name: drupal11,  compose: examples/drupal11/docker-compose.yml,  path: "/civicrm" }
+          - { name: wordpress, compose: examples/wordpress/docker-compose.yml, path: "/wp-admin/admin.php?page=CiviCRM" }
+          - { name: joomla,    compose: examples/joomla/docker-compose.yml,   path: "/administrator/index.php?option=com_civicrm" }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Boot the example stack
+        env:
+          IMAGE: ${{ env.IMAGE_PREFIX }}:${{ matrix.variant.name }}-${{ github.sha }}
+        run: |
+          docker compose -f ${{ matrix.variant.compose }} up -d --pull always
+
+      - name: Wait for the app healthcheck
+        env:
+          COMPOSE_FILE: ${{ matrix.variant.compose }}
+        run: .github/scripts/wait-compose-healthy.sh
+
+      - name: Verify CiviCRM responds
+        # cv works on every flavor including Joomla (the buildkit image ships the
+        # joomla-cli-bootstrap.php settings.d shim), so no Joomla DB-direct case.
+        run: |
+          docker compose -f ${{ matrix.variant.compose }} exec -T \
+            -u buildkit \
+            -w /home/buildkit/buildkit/build/site/web \
+            app \
+            bash -lc 'export PATH=/home/buildkit/buildkit/bin:$PATH; cv api4 Domain.get +s version'
+
+      # Same major the images ship (docker/*/Dockerfile). A browser job on a
+      # different Node than the image serves tests something nobody runs.
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install Playwright + Chromium
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run Playwright e2e
+        env:
+          CIVIKITCHEN_E2E_TARGET: ${{ matrix.variant.name }}
+          CIVICRM_BASE_URL: http://localhost:8080
+          CIVICRM_E2E_PATH: ${{ matrix.variant.path }}
+        run: npx playwright test
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report-buildkit-${{ matrix.variant.name }}
+          path: playwright-report/
+          retention-days: 7
+
+      - name: App container logs on failure
+        if: failure()
+        run: docker compose -f ${{ matrix.variant.compose }} logs app
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f ${{ matrix.variant.compose }} down -v
+
+  scenario-test-buildkit:
+    # Exercise the generated extension/profile contract on every CMS family;
+    # this is distinct from the fixed example stacks above.
+    needs: smoke-test-buildkit
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      matrix:
+        variant: [drupal10, drupal11, wordpress, joomla]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install scenario YAML parser
+        run: composer install --no-interaction --no-progress --working-dir=packages/civikitchen-scenario-schema
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Boot generated scenario
+        env:
+          IMG: ${{ env.IMAGE_PREFIX }}:${{ matrix.variant }}-${{ github.sha }}
+        run: bash tests/scenario/boot-scenario.sh "$IMG"
+
+  promote-buildkit:
+    # Stable tags only move once the candidate passed the tests and the scan,
+    # onto the scanned digest.
+    needs: [e2e-test-buildkit, scenario-test-buildkit, scan-buildkit]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        variant: [drupal10, drupal11, wordpress, joomla]
+        php: ['8.3']
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout (for the promote script)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Promote the scanned candidate to stable tags
+        env:
+          VARIANT: ${{ matrix.variant }}
+          PHP: ${{ matrix.php }}
+          DIGEST: ${{ fromJSON(needs.scan-buildkit.outputs.digests)[matrix.variant] }}
+        run: .github/scripts/promote-digest.sh "$VARIANT" "$VARIANT-php$PHP"
+
+  scan-buildkit:
+    needs: merge-buildkit
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/scan-images.yml
+    with:
+      tags: '["drupal10", "drupal11", "wordpress", "joomla"]'
+
+  cms-demo:
+    needs: resolve-civicrm
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-demo-images.yml
+    with:
+      variants: >-
+        [{"name": "drupal10-demo",  "site_type": "drupal10-demo"},
+         {"name": "drupal11-demo",  "site_type": "drupal11-demo"},
+         {"name": "wordpress-demo", "site_type": "wp-demo"},
+         {"name": "joomla-demo",    "site_type": "joomla-demo"}]
+      smoke: >-
+        [{"tag": "drupal10-demo",  "profile": ""},
+         {"tag": "drupal10-demo",  "profile": "verein"},
+         {"tag": "drupal10-demo",  "profile": "fundraising"},
+         {"tag": "drupal10-demo",  "profile": "events"},
+         {"tag": "drupal10-demo",  "profile": "mailing"},
+         {"tag": "drupal11-demo",  "profile": ""},
+         {"tag": "drupal11-demo",  "profile": "verein"},
+         {"tag": "drupal11-demo",  "profile": "fundraising"},
+         {"tag": "drupal11-demo",  "profile": "events"},
+         {"tag": "drupal11-demo",  "profile": "mailing"},
+         {"tag": "wordpress-demo", "profile": ""},
+         {"tag": "wordpress-demo", "profile": "verein"},
+         {"tag": "wordpress-demo", "profile": "fundraising"},
+         {"tag": "wordpress-demo", "profile": "events"},
+         {"tag": "wordpress-demo", "profile": "mailing"},
+         {"tag": "joomla-demo",    "profile": ""},
+         {"tag": "joomla-demo",    "profile": "verein"},
+         {"tag": "joomla-demo",    "profile": "fundraising"},
+         {"tag": "joomla-demo",    "profile": "events"},
+         {"tag": "joomla-demo",    "profile": "mailing"}]
+      civicrm_version: ${{ needs.resolve-civicrm.outputs.stable }}
+      civicrm_build_version: ${{ needs.resolve-civicrm.outputs.minor }}
+
+  notify-scheduled-failure:
+    # As in build-dev-images.yml: test-then-promote keeps the last good tags,
+    # so a failing daily CMS build would otherwise go unnoticed.
+    needs: [promote-buildkit, scan-buildkit, cms-demo]
+    if: github.event_name == 'schedule' && failure()
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+
+    steps:
+      - name: Checkout (for the notify script)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Open or bump the scheduled-build-failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: .github/scripts/notify-scheduled-failure.sh

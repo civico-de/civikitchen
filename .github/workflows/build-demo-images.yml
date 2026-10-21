@@ -1,0 +1,202 @@
+# Build, test and promote single-container demo images (embedded MariaDB,
+# baked demo data) from the docker/buildkit/Dockerfile `demo` target, then scan
+# them. Called by build-dev-images.yml for standalone-demo and by
+# build-cms-images.yml for the CMS demo flavors, so the two pipelines share one
+# definition and cannot cancel each other.
+#
+# Profiles (e.g. verein) are not baked into a separate image — they apply at
+# first boot via CIVIKITCHEN_PROFILE, so there is exactly one demo image per
+# flavor. joomla-demo has the same profile support as the others: the bake
+# finishes civibuild's deliberately-incomplete joomla-demo install (it leaves
+# the Joomla component registration as a commented-out "#fixme" and enables
+# only civi_contribute) by registering CiviCRM's Joomla plugins and enabling
+# the standard component extensions. authx's password/basic-auth flow does not
+# work on Joomla, so its profile boot test exercises the api_key credential only.
+#
+# drupal11-demo uses a site type civibuild doesn't ship: CiviKitchen vendors it
+# in docker/buildkit/site-types/drupal11-demo/ (drupal10-demo's recipe with the
+# Drupal 11.4 adaptations documented there); bake.sh installs it into the
+# buildkit clone before `civibuild create`.
+name: Build demo images
+
+on:
+  workflow_call:
+    inputs:
+      variants:
+        description: >-
+          JSON array of {name, site_type}: the demo tag and the civibuild site
+          type it bakes.
+        required: true
+        type: string
+      smoke:
+        description: >-
+          JSON array of {tag, profile}: the boot-test legs, each run on both
+          platforms. An empty profile boots the plain demo.
+        required: true
+        type: string
+      civicrm_version:
+        description: The resolved CiviCRM stable (resolve-civicrm's `stable`).
+        required: true
+        type: string
+      civicrm_build_version:
+        description: Its minor (resolve-civicrm's `minor`).
+        required: true
+        type: string
+
+# A called workflow does not inherit `env`; derived again as in merge-manifest.yml.
+env:
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/civikitchen
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        variant: ${{ fromJSON(inputs.variants) }}
+        platform:
+          - linux/arm64
+          - linux/amd64
+        include:
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            suffix: arm64
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+            suffix: amd64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Test-then-promote: only sha-suffixed candidate tags here; the stable
+      # demo tags are created by promote after the smoke tests pass.
+      - name: Build and push ${{ matrix.variant.name }} demo candidate image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          # Authenticated GitHub dist downloads for composer; see the Dockerfile.
+          secrets: |
+            composer_auth={"github-oauth":{"github.com":"${{ github.token }}"}}
+          file: docker/buildkit/Dockerfile
+          target: demo
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}:${{ matrix.variant.name }}-${{ github.sha }}-${{ matrix.suffix }}
+          build-args: |
+            DEFAULT_SITE_TYPE=${{ matrix.variant.site_type }}
+            CIVICRM_VERSION=${{ inputs.civicrm_version }}
+            CIVICRM_BUILD_VERSION=${{ inputs.civicrm_build_version }}
+          cache-from: type=gha,scope=demo-${{ matrix.variant.name }}-${{ matrix.suffix }}
+          cache-to: type=gha,mode=max,scope=demo-${{ matrix.variant.name }}-${{ matrix.suffix }},ignore-error=true
+          no-cache: ${{ github.event_name == 'schedule' }}
+
+  merge:
+    needs: build
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/merge-manifest.yml
+    with:
+      tags: ${{ toJSON(fromJSON(inputs.variants).*.name) }}
+
+  # The profile legs exercise the runtime profile path on every flavor: first
+  # boot installs the profile extensions, seeds demo data, and creates API
+  # users (via each CMS's native PHP APIs — no drush/wp-cli).
+  smoke-test:
+    needs: merge
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: read
+
+    strategy:
+      matrix:
+        variant: ${{ fromJSON(inputs.smoke) }}
+        platform: [linux/arm64, linux/amd64]
+        include:
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout (for the test script)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Boot test (single-container demo)
+        env:
+          IMG: ${{ env.IMAGE_PREFIX }}:${{ matrix.variant.tag }}-${{ github.sha }}
+          PROFILE: ${{ matrix.variant.profile }}
+        run: |
+          docker pull "$IMG"
+          bash tests/images/boot-test-demo.sh "$IMG" ${PROFILE:+"$PROFILE"}
+
+  promote:
+    # Stable demo tags only move once the candidates passed the smoke tests
+    # (including the runtime profile legs) and the scan, onto the scanned digest.
+    needs: [smoke-test, scan]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        tag: ${{ fromJSON(inputs.variants).*.name }}
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout (for the promote script)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Promote the scanned candidate to its stable tag
+        env:
+          TAG: ${{ matrix.tag }}
+          DIGEST: ${{ fromJSON(needs.scan.outputs.digests)[matrix.tag] }}
+        run: .github/scripts/promote-digest.sh "$TAG"
+
+  scan:
+    needs: merge
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/scan-images.yml
+    with:
+      tags: ${{ toJSON(fromJSON(inputs.variants).*.name) }}

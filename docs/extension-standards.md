@@ -623,18 +623,20 @@ secrets:
 
 It scans the current checkout after the push, not Git history.
 
-### Images: `trivy` in `build-dev-images.yml`
+### Images: `trivy` in `scan-images.yml`
 
 The image scan runs on the pushed candidate digest, which is exactly what the
-promote jobs publish. The gate is
+promote jobs publish, and every promote job waits for it. The gate is
 `--ignore-unfixed --severity HIGH,CRITICAL --exit-code 1` with only the vuln
 scanner; unfixed findings do not block, because no rebuild here can clear
 them. A second, non-blocking run writes every finding into the job summary for
 triage.
 
-The scan does not hold the release, since a base-image CVE is fixed by an
-upstream rebuild. On the daily cron it feeds the failure notification, so a
-finding on an unchanged image still opens an issue.
+A failed gate holds the promotion: the moving tags stay on the last image
+that passed, and a release cannot pick up the new one. A finding that no
+rebuild clears yet goes into trivyignore.yaml with an expiry. On the daily
+cron the failure notification opens an issue, so a finding on an unchanged
+image is seen.
 
 Central exceptions go in trivyignore.yaml in the civikitchen repository root,
 passed with --ignorefile. Trivy enforces expired_at, and paths scopes an entry
