@@ -87,13 +87,13 @@ vulnerabilities:
   #
   # opt/civikitchen/toolbelt/oxlint/node_modules/@oxlint-tsgolint/*/tsgolint is a
   # prebuilt Go binary from npm; its stdlib version is whatever oxlint built
-  # with (1.26.8 in 7.0.2003), and nothing here can relink it. All three CVEs
-  # are denial-of-service paths in HTTP and TLS servers/clients. tsgolint is
-  # the type-aware linter behind ckeslint: it reads TypeScript sources the
-  # developer points it at, opens no listener and speaks no TLS/HTTP, so none
-  # of them is reachable. On expiry: `npm view oxlint-tsgolint version` — bump
-  # toolbelt/oxlint/package.json as soon as a release built with >= 1.26.9 is
-  # out and delete all three entries together.
+  # with (1.26.8 in 7.0.2003 and in 7.0.2004, the newest on 2026-10-21), and
+  # nothing here can relink it. All four CVEs sit in HTTP, TLS and certificate
+  # handling. tsgolint is the type-aware linter behind ckeslint: it reads
+  # TypeScript sources the developer points it at, opens no listener and speaks
+  # no TLS/HTTP, so none of them is reachable. On expiry: `npm view
+  # oxlint-tsgolint version` — bump toolbelt/oxlint/package.json as soon as a
+  # release built with >= 1.26.10 is out and delete all four entries together.
   # -------------------------------------------------------------------------
   - id: CVE-2026-78667
     paths:
@@ -117,6 +117,14 @@ vulnerabilities:
     statement: >-
       Go stdlib crypto/tls handshake denial of service in the prebuilt tsgolint binary — unreachable
       from a local linter that serves nothing; see the group note above.
+    expired_at: 2026-11-10
+
+  - id: CVE-2026-111943
+    paths:
+      - "opt/civikitchen/toolbelt/oxlint/node_modules/@oxlint-tsgolint/**"
+    statement: >-
+      Go stdlib crypto/x509 certificate handling in the prebuilt tsgolint binary — only reached when
+      verifying certificates, which a local linter without TLS never does; see the group note above.
     expired_at: 2026-11-10
 
   # -------------------------------------------------------------------------
