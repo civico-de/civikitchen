@@ -345,7 +345,7 @@ test-sibling-vendor: ## Siblings with runtime packages get vendor/ built before 
 test-sibling-build: $(SCENARIO_YAML_STAMP) ## Siblings declaring policy.dist.build get built before the mount
 	bash tests/parity/test-sibling-build.sh
 
-test-database-matrix: ## Supported database images gate standalone promotion
+test-database-matrix: $(SCENARIO_YAML_STAMP) ## Supported database images gate standalone promotion and bound policy.database
 	bash tests/parity/test-database-matrix.sh
 
 test-compose-config: ## Every shipped compose file passes `docker compose config`

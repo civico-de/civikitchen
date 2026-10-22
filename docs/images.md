@@ -324,11 +324,11 @@ version not published, see
 ### Database compatibility
 
 Before promotion the standalone candidate gets a real install, extension
-provisioning, locale rendering and a boot into the isolated test database. A
-push runs this against MariaDB 11.4 only. The daily and dispatched runs, which
-a release requires, add MariaDB 10.11 and 12.2 and MySQL 8.0. The template and
-the examples default to MariaDB 11.4; changing it requires passing the full
-matrix.
+provisioning, locale rendering and a boot into the isolated test database.
+Every run checks this against MariaDB 11.4, 10.11 and 12.2 and MySQL 8.0. The
+template and the examples default to MariaDB 11.4; changing that requires
+passing the full matrix. An extension repo picks another verified MariaDB with
+[`policy.database`](extension-standards.md#repository-policy-civikitchenyaml).
 
 ## Custom or older CiviCRM versions
 

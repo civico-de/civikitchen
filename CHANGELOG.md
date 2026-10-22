@@ -21,7 +21,21 @@ except that a break the consumers are adjusted for ships as a minor, marked
   others still build and promote. An unknown family or skipping all of them
   fails the run.
 
+- `policy.database` in civikitchen.yaml picks the database image of the
+  extension's stacks: `mariadb:10.11`, `mariadb:11.4` (the default) or
+  `mariadb:12.2`, the MariaDB versions the image build verifies. ckinit writes
+  it into the managed `.docker/docker-compose.ci.yml` and into a newly created
+  `.docker/docker-compose.yml`; run `ckinit --update` after setting it and
+  change an existing dev compose file by hand. The release smoke test runs on
+  it. A `scenario.database.image` that names another image is an error. On
+  GitLab, ckinit writes `CK_DB_IMAGE` into a new `.gitlab-ci.yml`, and `--check`
+  and `--update` stop while an existing one names another image.
+
 ### Fixed
+
+- ckinit reports an invalid civikitchen.yaml, at the repository root or in an
+  extension of a monorepo, as `ckinit: <reason>` with exit 2 instead of an
+  uncaught PHP exception.
 
 - A new container's `~/.cv.json` also names the demo user as `DEMO_USER`,
   `DEMO_PASS` and `DEMO_EMAIL`, and adds `ADMIN_EMAIL`, so end-to-end tests that

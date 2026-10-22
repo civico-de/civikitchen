@@ -22,6 +22,9 @@ final class Policy
 
     public const LEGACY_FILE = '.ckconform';
 
+    /** The stacks' database image when policy.database is absent. */
+    public const DEFAULT_DATABASE = 'mariadb:11.4';
+
     /**
      * Every normalized key a consumer may read, and its owner. Public YAML
      * property names are enforced by the JSON Schema before normalization.
@@ -63,6 +66,7 @@ final class Policy
         'ci' => "ckinit: 'gitlab' for a repository whose CI runs on GitLab",
         // read by the reusable workflows
         'civicrm' => 'extension-ci.yml + extension-release.yml + ckup: the CiviCRM minor whose :standalone-<minor> image the stacks run',
+        'database' => 'ckinit + extension-release.yml: the database image of the compose stacks and the release smoke test',
         // read by the image entrypoint (docker/runtime/provision.sh)
         'extension_source' => 'entrypoint: key@HTTPS-URL#sha256=digest for a dependency, one per source',
         'extension_release' => 'entrypoint + extension-release.yml: key repo tag asset sha256 for a dependency staged from a GitHub release',
@@ -182,7 +186,7 @@ final class Policy
         self::validateDocument($document);
         $policy = $document['policy'] ?? [];
         $out = [];
-        foreach (['license', 'copyright', 'hook_style', 'npm_license', 'max_unreleased_days', 'renovate_preset', 'ci', 'civicrm'] as $key) {
+        foreach (['license', 'copyright', 'hook_style', 'npm_license', 'max_unreleased_days', 'renovate_preset', 'ci', 'civicrm', 'database'] as $key) {
             if (array_key_exists($key, $policy)) $out[$key] = [(string) $policy[$key]];
         }
         if (isset($policy['coverage']['minimum'])) $out['min_coverage'] = [(string) $policy['coverage']['minimum']];
@@ -249,6 +253,13 @@ final class Policy
         $object = json_decode(json_encode($document, JSON_THROW_ON_ERROR), false, 512, JSON_THROW_ON_ERROR);
         $errors = (new \CkProfileSchemaValidator($schema))->validate($object);
         if ($errors !== []) throw new \RuntimeException(implode("\n", $errors));
+        // A patch, variant or digest pin of the same image is the same database.
+        $database = $document['policy']['database'] ?? null;
+        $scenarioDatabase = $document['scenario']['database']['image'] ?? null;
+        if (is_string($database) && is_string($scenarioDatabase)
+            && preg_match('/^' . preg_quote($database, '/') . '([.@-]|$)/', $scenarioDatabase) !== 1) {
+            throw new \RuntimeException("policy.database is {$database}, but scenario.database.image is {$scenarioDatabase}: name the same image in both");
+        }
     }
 
     /**

@@ -75,6 +75,13 @@ function ck_config_load(string $file): array {
       throw new RuntimeException('$.policy.extension_sources: invalid Composer version constraint for ' . $source['key'] . ': ' . $source['version'], 0, $e);
     }
   }
+  // A patch, variant or digest pin of the same image is the same database.
+  $database = $document['policy']['database'] ?? NULL;
+  $scenarioDatabase = $document['scenario']['database']['image'] ?? NULL;
+  if (is_string($database) && is_string($scenarioDatabase)
+    && preg_match('/^' . preg_quote($database, '/') . '([.@-]|$)/', $scenarioDatabase) !== 1) {
+    throw new RuntimeException("policy.database is {$database}, but scenario.database.image is {$scenarioDatabase}: name the same image in both");
+  }
   return $document;
 }
 

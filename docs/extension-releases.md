@@ -271,7 +271,7 @@ GitHub only.
 
 The archive is unzipped into a fresh CiviCRM in the standalone image and
 enabled with cv, with no source mount, so the site sees exactly what a user
-downloads. Missing requires entries from info.xml are downloaded and enabled
+downloads. The database is policy.database, MariaDB 11.4 without it. Missing requires entries from info.xml are downloaded and enabled
 first, from the registry or from a matching policy.extension_sources entry.
 
 It catches what green CI does not: a PHP file the exclude list swallowed, a

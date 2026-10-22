@@ -297,9 +297,9 @@ jobs:
           tool=$(php "$GITHUB_WORKSPACE"/.civikitchen-ci/toolbelt/bin/ckconform --policy dist_build_tool)
           echo "tool=$tool" >> "$GITHUB_OUTPUT"
 
-      # Read by the smoke stack's ${CIVIKITCHEN_IMAGE} on every compose call,
-      # not just `up` — an unset variable there resolves to an empty image.
-      - name: Resolve the smoke-test image
+      # Read by the smoke stack's ${CIVIKITCHEN_IMAGE} and ${CIVIKITCHEN_DB_IMAGE}
+      # on every compose call, not just `up` — an unset one resolves to an empty image.
+      - name: Resolve the smoke-test images
         env:
           CK_IMAGE_INPUT: ${{ inputs.image }}
         run: |
@@ -308,6 +308,10 @@ jobs:
           image=$("$GITHUB_WORKSPACE"/.civikitchen-ci/.github/scripts/stack-image.sh "$minor" "$CK_IMAGE_INPUT" ghcr.io/civico-de/civikitchen:v1)
           echo "smoke-test image: $image"
           echo "CIVIKITCHEN_IMAGE=$image" >> "$GITHUB_ENV"
+          # The fallback is Policy::DEFAULT_DATABASE (tests/parity/test-database-matrix.sh).
+          database=$(php "$GITHUB_WORKSPACE"/.civikitchen-ci/toolbelt/bin/ckconform --policy database)
+          echo "smoke-test database: ${database:-mariadb:11.4}"
+          echo "CIVIKITCHEN_DB_IMAGE=${database:-mariadb:11.4}" >> "$GITHUB_ENV"
 
       - name: Set up Node for the declared release build
         if: ${{ steps.dist-build.outputs.tool == 'bun' }}
@@ -542,7 +546,7 @@ jobs:
                 - ${CK_DEPS}:/ck-deps:ro
                 - ${CK_SIBLINGS}:/ck-siblings:ro
             db:
-              image: mariadb:11.4
+              image: ${CIVIKITCHEN_DB_IMAGE}
               environment:
                 MYSQL_ROOT_PASSWORD: root
                 MYSQL_DATABASE: civicrm

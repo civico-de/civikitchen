@@ -494,7 +494,7 @@ variables also override the defaults:
 | Variable | Default | Effect |
 |---|---|---|
 | `CK_IMAGE` | `ghcr.io/civico-de/civikitchen:v1` | the job image |
-| `CK_DB_IMAGE` | `mariadb:11.4` | keep it equal to the database of `.docker/docker-compose.ci.yml` |
+| `CK_DB_IMAGE` | `mariadb:11.4` | keep it equal to `policy.database`, the database of `.docker/docker-compose.ci.yml` |
 | `CK_LIFECYCLE` | `"1"` | `"0"` skips cklifecycle |
 | `CK_NPM_CI` | `"0"` | `"1"` installs node_modules before the gates |
 | `CK_JS_TESTS` | `"0"` | `"1"` also runs npm test |
@@ -781,6 +781,19 @@ standalone image, and passing their image input as well fails the run. The
 minor must be on the supported list in
 [images.md](images.md#tags-and-versions). GitLab picks its job image before
 the repository is read, so there CK_IMAGE still names it.
+
+A repo whose production server runs another MariaDB names it as
+`database: mariadb:10.11`. ckinit writes it into the managed
+.docker/docker-compose.ci.yml, and into .docker/docker-compose.yml when it
+creates that file; an existing dev compose file is the repo's own, so change
+its db image there by hand. The release smoke test runs on it too. Only the
+MariaDB versions the image build verifies against the current CiviCRM release
+are accepted ([images.md](images.md#database-compatibility)), and a
+scenario.database.image must name the same image, or a patch, variant or
+digest pin of it. GitLab runs CK_DB_IMAGE
+instead: ckinit writes it into a new .gitlab-ci.yml, and --check and --update
+stop while an existing one names another image. In a monorepo the key goes
+into each extension's civikitchen.yaml, like `civicrm`.
 
 Values shared across an organisation's repos can sit in one file of the same
 format, named by `CK_DEFAULT_CONFIG`; a repo's own file overrides it per key.

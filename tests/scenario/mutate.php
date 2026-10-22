@@ -42,6 +42,11 @@ switch ($mutation) {
     unset($path);
     $scenario['trust_external_profiles'] = FALSE;
     break;
+  case 'database':
+    $scenario['extension']['path'] = realpath(dirname($source) . '/' . $scenario['extension']['path']);
+    $scenario['database']['image'] = $argv[5] ?? $scenario['database']['image'];
+    $document['policy']['database'] = $value;
+    break;
   case 'untrusted-extension':
     $scenario['trust_external_extension'] = FALSE;
     break;

@@ -19,4 +19,33 @@ grep -q 'ck_test_db_canary' "$root/tests/images/boot-test-standalone.sh" \
 grep -q 'docker rm -fv' "$root/tests/images/boot-test-standalone.sh" \
   || { echo "database matrix leaks anonymous database volumes" >&2; exit 1; }
 
+schema="$root/packages/civikitchen-scenario-schema/scenario.schema.json"
+release="$root/.github/workflows/extension-release.yml"
+gitlab="$root/ci/gitlab/extension-ci.yml"
+php "$root/tests/parity/database-policy.php" "$schema" "$workflow" "$release" "$gitlab" \
+  || { echo "policy.database is not wired to the verified matrix and the release smoke test" >&2; exit 1; }
+
+# The checker is silent on success: each broken copy below must fail it.
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+expect_failure() {
+  local name=$1 needle=$2 out
+  if out=$(php "$root/tests/parity/database-policy.php" "$3" "$4" "$5" "$6" 2>&1); then
+    echo "database-policy checker passed the $name copy" >&2; exit 1
+  fi
+  grep -qF "$needle" <<<"$out" || { echo "database-policy checker did not report the $name copy (got: $out)" >&2; exit 1; }
+}
+sed 's|"enum": \["mariadb:10.11", |"enum": ["mariadb:10.6", "mariadb:10.11", |' "$schema" > "$work/schema.json"
+expect_failure unverified 'offers mariadb:10.6' "$work/schema.json" "$workflow" "$release" "$gitlab"
+sed 's|${database:-mariadb:11.4}|${database:-mariadb:10.11}|' "$release" > "$work/fallback.yml"
+expect_failure fallback 'fallback is mariadb:10.11' "$schema" "$workflow" "$work/fallback.yml" "$gitlab"
+sed 's|"CIVIKITCHEN_DB_IMAGE=${database:-mariadb:11.4}"|"CIVIKITCHEN_DB_IMAGE=$database"|' "$release" > "$work/unset.yml"
+expect_failure unset 'not exported as ${database:-<default>}' "$schema" "$workflow" "$work/unset.yml" "$gitlab"
+sed 's|^          database=$(php .*|          # database=$(php ckconform --policy database)|' "$release" > "$work/commented.yml"
+expect_failure commented 'no step reads database' "$schema" "$workflow" "$work/commented.yml" "$gitlab"
+sed 's|image: ${CIVIKITCHEN_DB_IMAGE}|image: mariadb:11.4|' "$release" > "$work/smoke.yml"
+expect_failure smoke "db image is 'mariadb:11.4'" "$schema" "$workflow" "$work/smoke.yml" "$gitlab"
+sed 's|CK_DB_IMAGE: mariadb:11.4|CK_DB_IMAGE: mariadb:10.11|' "$gitlab" > "$work/gitlab.yml"
+expect_failure gitlab "CK_DB_IMAGE defaults to 'mariadb:10.11'" "$schema" "$workflow" "$release" "$work/gitlab.yml"
+
 echo "database matrix parity OK"

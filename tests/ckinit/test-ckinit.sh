@@ -68,7 +68,7 @@ grep -q -- 'scaffold/ckx ck ci$' "$work/clean/.docker/docker-compose.yml" \
   || { echo "docker-compose.yml does not point at ck ci" >&2; exit 1; }
 grep -q -- '-w /var/www/html/ext/example_ext app ck ci$' "$work/clean/.docker/docker-compose.ci.yml" \
   || { echo "docker-compose.ci.yml does not point at ck ci" >&2; exit 1; }
-if grep -R -q '__EXTKEY__\|__EXTENSION_KEY__\|__SCENARIO_NAME__\|__VENDOR__\|__RENOVATE_PRESET__' "$work/clean"; then
+if grep -R -q '__EXTKEY__\|__EXTENSION_KEY__\|__SCENARIO_NAME__\|__VENDOR__\|__RENOVATE_PRESET__\|__DB_IMAGE__' "$work/clean"; then
   echo "placeholder remained after rendering" >&2
   exit 1
 fi
@@ -91,6 +91,38 @@ if CK_DEFAULT_CONFIG="$work/missing" "$root/scaffold/ckinit.php" "$work/orgprese
   echo "an unreadable CK_DEFAULT_CONFIG must fail" >&2
   exit 1
 fi
+
+# policy.database renders into both stacks; without it they keep the default.
+for compose in docker-compose.ci.yml docker-compose.yml; do
+  grep -qx '    image: mariadb:11.4' "$work/clean/.docker/$compose" \
+    || { echo "$compose does not default to mariadb:11.4" >&2; exit 1; }
+done
+grep -qx '    image: mariadb:11.4' "$work/clean/civikitchen.yaml" \
+  || { echo "the seeded scenario does not default to mariadb:11.4" >&2; exit 1; }
+make_extension "$work/database"
+printf '%s\n' 'version: 1' 'policy:' '  database: mariadb:10.11' > "$work/database/civikitchen.yaml"
+"$root/scaffold/ckinit.php" --update "$work/database" >/dev/null
+for compose in docker-compose.ci.yml docker-compose.yml; do
+  grep -qx '    image: mariadb:10.11' "$work/database/.docker/$compose" \
+    || { echo "$compose does not run policy.database" >&2; exit 1; }
+done
+"$root/scaffold/ckinit.php" --check "$work/database" >/dev/null
+# The CI stack is managed and follows the policy; the dev stack is the repo's own.
+rewrite_with_sed 's|database: mariadb:10.11|database: mariadb:12.2|' "$work/database/civikitchen.yaml"
+if "$root/scaffold/ckinit.php" --check "$work/database" >/dev/null 2>&1; then
+  echo "--check missed a CI stack that no longer runs policy.database" >&2
+  exit 1
+fi
+"$root/scaffold/ckinit.php" --update "$work/database" >/dev/null
+grep -qx '    image: mariadb:12.2' "$work/database/.docker/docker-compose.ci.yml"
+grep -qx '    image: mariadb:10.11' "$work/database/.docker/docker-compose.yml"
+rewrite_with_sed 's|database: mariadb:12.2|database: mysql:8.0|' "$work/database/civikitchen.yaml"
+if out=$("$root/scaffold/ckinit.php" --update "$work/database" 2>&1); then
+  echo "ckinit accepted a database the image build does not verify" >&2
+  exit 1
+fi
+grep -q '^ckinit: \$.policy.database: value is not one of' <<<"$out" \
+  || { echo "ckinit did not name the rejected policy.database (got: $out)" >&2; exit 1; }
 
 if "$root/scaffold/ckinit.php" "$work/clean" >/dev/null 2>&1; then
   echo "existing files were overwritten without --force" >&2
@@ -849,6 +881,27 @@ grep -q 'drifted   .gitlab-ci.yml' <<<"$out" || { echo "a drifted GitLab caller 
 "$root/scaffold/ckinit.php" --update "$work/gitlab" >/dev/null
 grep -q 'civikitchen/v1/' "$work/gitlab/.gitlab-ci.yml"
 grep -q 'CK_LIFECYCLE: "0"' "$work/gitlab/.gitlab-ci.yml"
+# GitLab runs CK_DB_IMAGE, which lives below the managed block: policy.database
+# blocks --update until the repo sets it.
+cp -R "$work/gitlab" "$work/gitlab-db"
+printf '%s\n' '  database: mariadb:10.11' >> "$work/gitlab-db/civikitchen.yaml"
+out=$("$root/scaffold/ckinit.php" --check "$work/gitlab-db" 2>&1 || true)
+grep -qF 'drifted   .gitlab-ci.yml (policy.database is mariadb:10.11, but CK_DB_IMAGE is mariadb:11.4;' <<<"$out" \
+  || { echo "a GitLab pipeline on another database was not reported: $out" >&2; exit 1; }
+if out=$("$root/scaffold/ckinit.php" --update "$work/gitlab-db" 2>&1); then
+  echo "--update went ahead while GitLab runs another database" >&2
+  exit 1
+fi
+grep -qF 'refusing to update .gitlab-ci.yml' <<<"$out"
+printf '%s\n' '  CK_DB_IMAGE: mariadb:10.11' >> "$work/gitlab-db/.gitlab-ci.yml"
+"$root/scaffold/ckinit.php" --update "$work/gitlab-db" >/dev/null
+grep -qx '    image: mariadb:10.11' "$work/gitlab-db/.docker/docker-compose.ci.yml"
+"$root/scaffold/ckinit.php" --check "$work/gitlab-db" >/dev/null
+# A caller written from scratch carries the variable itself.
+/bin/rm "$work/gitlab-db/.gitlab-ci.yml"
+"$root/scaffold/ckinit.php" --update "$work/gitlab-db" >/dev/null
+grep -qx '  CK_DB_IMAGE: mariadb:10.11' "$work/gitlab-db/.gitlab-ci.yml"
+"$root/scaffold/ckinit.php" --check "$work/gitlab-db" >/dev/null
 # The managed e2e lib.sh, with docker, cv, mariadb and curl stubbed.
 lib="$work/gitlab/tests/e2e/lib.sh"
 mkdir -p "$work/fakebin" "$work/site"
@@ -971,6 +1024,21 @@ if out=$("$root/scaffold/ckinit.php" --update "$work/gitlab-mono" 2>&1); then
 fi
 grep -q 'ci: gitlab supports a repository holding one extension' <<<"$out"
 test ! -e "$work/gitlab-mono/.github/workflows/ci.yml"
+# An invalid policy at a monorepo root or in one of its extensions is a clean error.
+git init -q "$work/badmono"
+make_extension "$work/badmono/ext_a"
+expect_policy_error() {
+  local status=0 out
+  out=$("$root/scaffold/ckinit.php" --check "$work/badmono" 2>&1) || status=$?
+  if [ "$status" != 2 ] || ! grep -q '^ckinit: \$.policy.database: value is not one of' <<<"$out"; then
+    echo "an invalid $1 did not end in a ckinit error (exit $status): $out" >&2
+    exit 1
+  fi
+}
+printf '%s\n' 'version: 1' 'policy:' '  database: mysql:8.0' > "$work/badmono/civikitchen.yaml"
+expect_policy_error 'root civikitchen.yaml'
+mv "$work/badmono/civikitchen.yaml" "$work/badmono/ext_a/civikitchen.yaml"
+expect_policy_error 'extension civikitchen.yaml'
 
 # The Strauss runner exists only where composer.json declares extra.strauss;
 # there it is managed like any other file.

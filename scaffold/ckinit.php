@@ -122,8 +122,9 @@ release caller with one build job per releasing extension plus the job that
 publishes them together) and runs the same pass for every extension directory. Files from scaffold/template/extension are copied
 recursively; __EXTKEY__ is replaced with info.xml's <file> value,
 __VENDOR__ with the vendor segment of the extension key, __RENOVATE_PRESET__
-with the renovate_preset policy key (default config:recommended) and
-__LICENSE__ with info.xml's <license>.
+with the renovate_preset policy key (default config:recommended), __DB_IMAGE__
+with the database policy key (default mariadb:11.4) and __LICENSE__ with
+info.xml's <license>.
 
 With `ci: gitlab` under policy in civikitchen.yaml, a single-extension
 repository gets a managed .gitlab-ci.yml instead of the GitHub callers and
@@ -268,11 +269,13 @@ if (is_file($legacyPolicy)) {
 $policyRaw = is_file($target . '/civikitchen.yaml') ? file_get_contents($target . '/civikitchen.yaml') : FALSE;
 $releasesNothing = FALSE;
 $onGitlab = FALSE;
+$policy = is_string($policyRaw) ? parsedPolicy($policyRaw) : [];
+$databaseImage = $policy['database'][0] ?? \CiviKitchen\Ckconform\Policy::DEFAULT_DATABASE;
 if (is_string($policyRaw)) {
   // A repo that declares release: none has no caller to keep in line.
-  $releasesNothing = str_starts_with(\CiviKitchen\Ckconform\Policy::parse($policyRaw)['release'][0] ?? '', 'none');
-  $onGitlab = (\CiviKitchen\Ckconform\Policy::parse($policyRaw)['ci'][0] ?? '') === 'gitlab';
-  $declared = \CiviKitchen\Ckconform\Policy::parse($policyRaw)['template_custom'] ?? [];
+  $releasesNothing = str_starts_with($policy['release'][0] ?? '', 'none');
+  $onGitlab = ($policy['ci'][0] ?? '') === 'gitlab';
+  $declared = $policy['template_custom'] ?? [];
   // First occurrence wins; ckconform's policy-key check reports a second line
   // that would silently do nothing.
   foreach (array_slice($declared, 0, 1) as $value) {
@@ -342,12 +345,17 @@ foreach ($iterator as $item) {
     continue;
   }
   $rendered = str_replace(
-      ['__EXTKEY__', '__EXTENSION_KEY__', '__SCENARIO_NAME__', '__VENDOR__', '__RENOVATE_PRESET__', '"__LICENSE__"'],
-      [$extensionFile, trim((string) $xml['key']), $scenarioName, $vendor, $renovatePreset, $composerLicense],
+      ['__EXTKEY__', '__EXTENSION_KEY__', '__SCENARIO_NAME__', '__VENDOR__', '__RENOVATE_PRESET__', '__DB_IMAGE__', '"__LICENSE__"'],
+      [$extensionFile, trim((string) $xml['key']), $scenarioName, $vendor, $renovatePreset, $databaseImage, $composerLicense],
       $content,
     );
   if ($belowRoot && in_array($relative, COMPOSE_FILES, TRUE)) {
     $rendered = withRepositoryMount($rendered, $relative, $extensionFile, $depthBelowRoot);
+  }
+  // GitLab reads the database from a variable below the managed block, which
+  // only a newly created caller gets from here.
+  if ($relative === '.gitlab-ci.yml' && isset($policy['database']) && !file_exists($destination)) {
+    $rendered .= "variables:\n  CK_DB_IMAGE: {$databaseImage}\n";
   }
   $files[] = [$destination, $relative, $item->getPerms() & 0777, $rendered];
   if ($mode === 'seed' && (file_exists($destination) || is_link($destination)) && !$force) {
@@ -631,6 +639,40 @@ function repositoryRoot(string $directory): ?string {
   return NULL;
 }
 
+/**
+ * A civikitchen.yaml's policy view; an invalid file ends the run.
+ *
+ * @return array<string, list<string>>
+ */
+function parsedPolicy(string $raw): array {
+  try {
+    return \CiviKitchen\Ckconform\Policy::parse($raw);
+  }
+  catch (\RuntimeException $e) {
+    fwrite(STDERR, "ckinit: {$e->getMessage()}\n");
+    exit(2);
+  }
+}
+
+/**
+ * The database image a .gitlab-ci.yml runs: its CK_DB_IMAGE, else the shared
+ * pipeline's default. NULL when the file is absent or does not parse.
+ */
+function gitlabDatabase(string $file): ?string {
+  try {
+    $parsed = is_file($file) ? \Symfony\Component\Yaml\Yaml::parse((string) file_get_contents($file), \Symfony\Component\Yaml\Yaml::PARSE_CUSTOM_TAGS) : NULL;
+  }
+  catch (\Symfony\Component\Yaml\Exception\ParseException $e) {
+    return NULL;
+  }
+  if (!is_array($parsed)) {
+    return NULL;
+  }
+  $variable = is_array($parsed['variables'] ?? NULL) ? ($parsed['variables']['CK_DB_IMAGE'] ?? NULL) : NULL;
+  $value = is_array($variable) ? ($variable['value'] ?? NULL) : $variable;
+  return is_string($value) ? $value : \CiviKitchen\Ckconform\Policy::DEFAULT_DATABASE;
+}
+
 /** The validated Renovate preset for a policy file's contents (NULL: no file). */
 function renovatePreset(?string $policyRaw): string {
   try {
@@ -804,7 +846,7 @@ function releaseNeeds(string $root, array $extensions): ?array {
     $keys[trim((string) $xml['key'])] = $directory;
     $requires[$directory] = array_map(static fn ($ext): string => trim((string) $ext), $xml->xpath('requires/ext') ?: []);
     $policy = "{$root}/{$directory}/civikitchen.yaml";
-    $declared = is_file($policy) ? (\CiviKitchen\Ckconform\Policy::parse((string) file_get_contents($policy))['release'][0] ?? '') : '';
+    $declared = is_file($policy) ? (parsedPolicy((string) file_get_contents($policy))['release'][0] ?? '') : '';
     if (!str_starts_with($declared, 'none')) {
       $releasing[] = $directory;
     }
@@ -871,7 +913,7 @@ function runRootPass(string $root, string $mode, bool $force, string $yamlAutolo
   require_once dirname(__DIR__) . '/toolbelt/ckconform/src/Policy.php';
   $policyFile = $root . '/civikitchen.yaml';
   $rootPolicy = is_file($policyFile) ? (string) file_get_contents($policyFile) : NULL;
-  if ($rootPolicy !== NULL && (\CiviKitchen\Ckconform\Policy::parse($rootPolicy)['ci'][0] ?? '') === 'gitlab') {
+  if ($rootPolicy !== NULL && (parsedPolicy($rootPolicy)['ci'][0] ?? '') === 'gitlab') {
     fwrite(STDERR, "ckinit: ci: gitlab supports a repository holding one extension at its root, not {$root}\n");
     return 2;
   }
@@ -1245,11 +1287,23 @@ if ($releasesNothing && !$belowRoot && !isset($custom[RELEASE_CALLER]) && (is_fi
     }
   }
 }
+// GitLab runs CK_DB_IMAGE, not the CI compose file, and that variable sits
+// below the managed block where --update does not write.
+if ($onGitlab && isset($policy['database']) && !isset($custom['.gitlab-ci.yml'])) {
+  $gitlabFile = $target . '/.gitlab-ci.yml';
+  $gitlabDatabase = gitlabDatabase($gitlabFile);
+  if ($gitlabDatabase === NULL && is_file($gitlabFile)) {
+    $blocked['.gitlab-ci.yml'] = 'cannot read its CK_DB_IMAGE: the file does not parse';
+  }
+  elseif ($gitlabDatabase !== NULL && $gitlabDatabase !== $databaseImage) {
+    $blocked['.gitlab-ci.yml'] = "policy.database is {$databaseImage}, but CK_DB_IMAGE is {$gitlabDatabase}; set CK_DB_IMAGE: {$databaseImage} under variables below the managed block";
+  }
+}
 if ($blocked !== [] && $mode === 'update') {
   foreach ($blocked as $relative => $why) {
     fwrite(STDERR, "ckinit: refusing to update {$relative}: {$why}\n");
   }
-  fwrite(STDERR, "Nothing was written. Move that content by hand, then run --update again.\n");
+  fwrite(STDERR, "Nothing was written. Fix that by hand, then run --update again.\n");
   exit(1);
 }
 

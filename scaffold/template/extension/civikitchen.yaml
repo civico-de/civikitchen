@@ -4,7 +4,7 @@ scenario:
   name: __SCENARIO_NAME__
   image: ghcr.io/civico-de/civikitchen:v1
   database:
-    image: mariadb:11.4
+    image: __DB_IMAGE__
   extension:
     key: __EXTENSION_KEY__
     path: .

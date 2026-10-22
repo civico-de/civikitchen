@@ -38,6 +38,20 @@ fi
 if "$root/toolbelt/bin/ck" scenario plan "$work/policy-only.yaml" >/dev/null 2>&1; then
   echo "scenario plan accepted a policy-only configuration" >&2; exit 1
 fi
+# policy.database and the scenario's database name one server.
+mkdir -p "$work/database"
+php "$mutate" "$scenario" "$work/database/civikitchen.yaml" database mariadb:11.4
+"$root/toolbelt/bin/ck" scenario validate "$work/database/civikitchen.yaml" >/dev/null \
+  || { echo "scenario rejected the database policy.database names" >&2; exit 1; }
+php "$mutate" "$scenario" "$work/database/civikitchen.yaml" database mariadb:11.4 "mariadb:11.4.5@sha256:$(printf a%.0s {1..64})"
+"$root/toolbelt/bin/ck" scenario validate "$work/database/civikitchen.yaml" >/dev/null \
+  || { echo "scenario rejected a patch and digest pin of the policy.database image" >&2; exit 1; }
+php "$mutate" "$scenario" "$work/database/civikitchen.yaml" database mariadb:10.11
+if out=$("$root/toolbelt/bin/ck" scenario validate "$work/database/civikitchen.yaml" 2>&1); then
+  echo "scenario accepted a database other than policy.database" >&2; exit 1
+fi
+grep -qF 'policy.database is mariadb:10.11, but scenario.database.image is mariadb:11.4' <<<"$out" \
+  || { echo "scenario did not name the database mismatch (got: $out)" >&2; exit 1; }
 printf '%s\n' 'version: 1' 'profile_definitions: {}' > "$work/embedded-profiles.yaml"
 if "$root/toolbelt/bin/ck" config validate "$work/embedded-profiles.yaml" >/dev/null 2>&1; then
   echo "configuration accepted embedded profile definitions" >&2; exit 1
