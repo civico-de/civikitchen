@@ -14,6 +14,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.50.0] - 2026-10-22
+
 ### Added
 
 - *Build CMS Images* takes a `skip` input on dispatch: the CMS families to
@@ -2300,7 +2302,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.49.0...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.50.0...HEAD
+[1.50.0]: https://github.com/civico-de/civikitchen/compare/v1.49.0...v1.50.0
 [1.49.0]: https://github.com/civico-de/civikitchen/compare/v1.48.0...v1.49.0
 [1.48.0]: https://github.com/civico-de/civikitchen/compare/v1.47.2...v1.48.0
 [1.47.2]: https://github.com/civico-de/civikitchen/compare/v1.47.1...v1.47.2
