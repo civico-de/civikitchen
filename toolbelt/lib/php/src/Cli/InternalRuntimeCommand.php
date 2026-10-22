@@ -4,34 +4,40 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Toolbelt\Cli;
 
-use CiviKitchen\Toolbelt\Runtime\ExtensionArchiveInstaller;
+use CiviKitchen\Toolbelt\Process\Runner;
 use CiviKitchen\Toolbelt\Runtime\ExtensionInspector;
+use CiviKitchen\Toolbelt\Runtime\ExtensionProvisioner;
 use CiviKitchen\Toolbelt\Runtime\ProfileData;
+use CiviKitchen\Toolbelt\Runtime\ProfileProvisioner;
 use CiviKitchen\Toolbelt\Runtime\VendorInstaller;
 use CiviKitchen\Toolbelt\Scaffold\ExtensionEditor;
 use Throwable;
 
 final class InternalRuntimeCommand implements Command
 {
-    public function __construct(private readonly string $checkoutRoot)
-    {
+    /** @var array<string, array{int, int, string}> operands per provisioning operation: minimum, maximum, usage */
+    private const PROVISION = [
+        'provision-extras' => [1, 1, 'LIST'],
+        'provision-enable' => [1, 1, 'LIST'],
+        'provision-requires' => [1, 2, 'KEY [DIR]'],
+        'provision-profile' => [2, 2, '--replaced-state FILE PROFILE_JSON UF'],
+    ];
+
+    public function __construct(
+        private readonly string $checkoutRoot,
+        private readonly Runner $runner = new Runner(),
+    ) {
     }
 
     public function run(array $arguments): int
     {
         $operation = array_shift($arguments) ?? '';
+        if (isset(self::PROVISION[$operation])) {
+            return $this->provision($operation, $arguments);
+        }
         $autoload = $this->checkoutRoot . '/packages/civikitchen-scenario-schema/vendor/autoload.php';
         $inspector = new ExtensionInspector($autoload);
         try {
-            if ($operation === 'install-extension-archive' && count($arguments) === 4) {
-                (new ExtensionArchiveInstaller($inspector))->install($arguments[0], $arguments[1], $arguments[2], $arguments[3]);
-                return 0;
-            }
-            if ($operation === 'assert-extension-version' && count($arguments) === 3) {
-                $xml = $inspector->load($arguments[0], $arguments[1]);
-                $inspector->assertVersion($xml, $arguments[2]);
-                return 0;
-            }
             if ($operation === 'composer-install') {
                 return (new VendorInstaller())->install(array_values($arguments));
             }
@@ -44,16 +50,6 @@ final class InternalRuntimeCommand implements Command
                     echo $key, "\n";
                 }
                 return 0;
-            }
-            if ($operation === 'extension-list-contains' && count($arguments) === 1) {
-                $list = json_decode((string) stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR);
-                foreach (is_array($list) ? $list : [] as $extension) {
-                    if (is_array($extension) && ($extension['key'] ?? null) === $arguments[0]
-                        && !str_ends_with((string) ($extension['status'] ?? ''), '-missing')) {
-                        return 0;
-                    }
-                }
-                return 1;
             }
             if ($operation === 'xml-field' && count($arguments) === 2) {
                 libxml_use_internal_errors(true);
@@ -110,19 +106,6 @@ final class InternalRuntimeCommand implements Command
             if ($operation === 'profile-skipped' && count($arguments) === 2) {
                 foreach ($profiles->skipped($arguments[0], $arguments[1]) as $message) {
                     echo $message, "\n";
-                }
-                return 0;
-            }
-            if ($operation === 'profile-dependencies' && count($arguments) === 3) {
-                foreach ($profiles->dependencies($arguments[0], $arguments[1]) as $dependency) {
-                    $kind = $arguments[2];
-                    if ($kind === 'repo' && isset($dependency['repo'])) {
-                        echo $dependency['repo'], "\t", $dependency['name'], "\t", $dependency['version'], "\n";
-                    } elseif ($kind === 'registry' && ($dependency['registry'] ?? false) === true) {
-                        echo $dependency['name'], "\n";
-                    } elseif ($kind === 'enable' && ($dependency['enable'] ?? false) === true) {
-                        echo $dependency['name'], "\n";
-                    }
                 }
                 return 0;
             }
@@ -203,6 +186,61 @@ final class InternalRuntimeCommand implements Command
             fwrite(STDERR, $e->getMessage() . "\n");
             return 1;
         }
+    }
+
+    /**
+     * `provision-* --ext-dir DIR [--archive-dir DIR] [--mounted DIR]... OPERAND...`, the mounted dirs
+     * in pin precedence; an empty archive dir stages none, and only provision-profile takes `--replaced-state`.
+     *
+     * @param list<string> $arguments
+     */
+    private function provision(string $operation, array $arguments): int
+    {
+        $options = ['--ext-dir' => [], '--archive-dir' => [], '--mounted' => [], '--replaced-state' => []];
+        while ($arguments !== [] && str_starts_with($arguments[0], '--')) {
+            $option = array_shift($arguments);
+            if (!isset($options[$option]) || $arguments === []) {
+                return $this->provisionUsage($operation);
+            }
+            $options[$option][] = array_shift($arguments);
+        }
+        [$minimum, $maximum] = self::PROVISION[$operation];
+        $profile = $operation === 'provision-profile';
+        if (count($options['--ext-dir']) !== 1 || $options['--ext-dir'][0] === '' || count($options['--archive-dir']) > 1
+            || count($options['--replaced-state']) !== ($profile ? 1 : 0) || in_array('', $options['--replaced-state'], true)
+            || count($arguments) < $minimum || count($arguments) > $maximum) {
+            return $this->provisionUsage($operation);
+        }
+        $provisioner = new ExtensionProvisioner(
+            $this->checkoutRoot,
+            $options['--ext-dir'][0],
+            $options['--archive-dir'][0] ?? '',
+            $options['--mounted'],
+            $this->runner,
+        );
+        try {
+            if ($operation === 'provision-extras') {
+                $provisioner->extras($arguments[0]);
+            } elseif ($operation === 'provision-enable') {
+                $provisioner->enable($arguments[0]);
+            } elseif ($operation === 'provision-requires') {
+                $provisioner->requires($arguments[0], $arguments[1] ?? '');
+            } else {
+                (new ProfileProvisioner($this->checkoutRoot, $options['--ext-dir'][0], $options['--replaced-state'][0], $provisioner, $this->runner))
+                    ->provision($arguments[0], $arguments[1]);
+            }
+        } catch (Throwable $e) {
+            // The profile driver's own lines are indented under its "==>" headings.
+            fwrite(STDERR, ($profile ? '  ERROR: ' : '[civikitchen] ERROR: ') . $e->getMessage() . "\n");
+            return 1;
+        }
+        return 0;
+    }
+
+    private function provisionUsage(string $operation): int
+    {
+        fwrite(STDERR, "usage: ck internal {$operation} --ext-dir DIR [--archive-dir DIR] [--mounted DIR]... " . self::PROVISION[$operation][2] . "\n");
+        return 2;
     }
 
     public const SENTINEL_PRESENT = 0;

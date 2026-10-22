@@ -223,7 +223,7 @@ test-missing-tool: ## A tool missing from PATH is named, not a proc_open warning
 test-composer-deps: ## ckdeps ignore patterns: core-provided classes only
 	php tests/toolbelt/test-composer-deps.php
 
-test-profiles: ## Profile schema, external resolution, credentials modes, file permissions and seed helpers
+test-profiles: $(SCENARIO_YAML_STAMP) ## Profile schema, external resolution, credentials modes, file permissions and seed helpers
 	php tests/profiles/test-credentials.php
 	php tests/profiles/test-validator.php
 	php -d zend.assertions=1 -d assert.exception=1 tests/profiles/test-profile-data.php
@@ -235,9 +235,9 @@ test-profiles: ## Profile schema, external resolution, credentials modes, file p
 test-scenario: $(SCENARIO_YAML_STAMP) ## Declarative scenario schema, plan, Compose render and fixed checks
 	bash tests/scenario/test-scenario.sh
 
-# The entrypoint's <requires> resolution decides what a CI stack installs before
-# `ext:enable`; a regression here surfaces as every dependent repo's boot failing.
-test-provision: ## provision.sh: <requires>, mounted extensions, core locales, test DB and its boot patch, no civicrm.org calls (fake cv), site port, database marker
+# The <requires> resolution itself is ExtensionProvisionerTest in test-shared-php-coverage;
+# these check provision.sh hands it the ext dir, archive dir, mounts and lists.
+test-provision: ## provision.sh: extension provisioning wiring, mounted extensions, core locales, test DB and its boot patch, no civicrm.org calls (fake cv), site port, database marker
 	bash tests/toolbelt/test-provision-requires.sh
 	bash tests/toolbelt/test-provision-mounts.sh
 	bash tests/toolbelt/test-provision-locales.sh

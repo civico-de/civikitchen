@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
-# The entrypoint enables whatever is bind-mounted into the ext dir — keys read
-# from each mount's info.xml, the mount table telling mounts from downloads —
-# with CIVIKITCHEN_ENABLE_EXTENSIONS as the ordering/extra override. A bare
-# key in CIVIKITCHEN_EXTRA_EXTENSIONS takes the extension_source pin of a
-# mounted extension. Fake cv records every call; a real ckconform reads the
-# policy file.
+# The entrypoint enables what the mount table shows bind-mounted into the ext dir, ordered by
+# CIVIKITCHEN_ENABLE_EXTENSIONS; the real ck runs against a fake cv that records every call.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -17,31 +13,21 @@ cat > "$work/bin/cv" <<'FAKE'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$CV_LOG"
 case "$1" in
-  api4) echo '[]' ;;
+  api4) [[ -z "${CV_LIST_FAILS:-}" ]] || exit 1; echo '[]' ;;
+  ev)
+    if [[ "$2" == *CRM_Extension_Info::loadFromString* ]]; then
+      php -r 'foreach (simplexml_load_string(stream_get_contents(STDIN))->requires->ext ?? [] as $e) { echo $e, "\n"; }'
+    fi
+    ;;
 esac
 FAKE
 chmod +x "$work/bin/cv"
 export PATH="$work/bin:$root/toolbelt/bin:$PATH"
 export CV_LOG="$work/cv.log"
-CK_WEB_USER="$(id -un)"
-CK_WEB_GROUP="$(id -gn)"
-export CK_WEB_USER CK_WEB_GROUP
-
 ck_as_web() { "$@"; }
-sleep() { :; }
-curl() {
-  local output='' previous='' arg
-  for arg in "$@"; do
-    [[ "$previous" == '-o' ]] && output="$arg"
-    previous="$arg"
-  done
-  cp "$ARCHIVE_FIXTURE" "$output"
-}
 export CK_EXT_DIR="$work/ext"
-export CK_SCENARIO_AUTOLOAD="$root/packages/civikitchen-scenario-schema/vendor/autoload.php"
 export CK_MOUNTINFO="$work/mountinfo"
 export CIVIKITCHEN_ENABLE_EXTENSIONS=""
-export CIVIKITCHEN_EXTRA_EXTENSIONS=""
 # shellcheck source=../../docker/runtime/provision.sh
 . "$root/docker/runtime/provision.sh"
 
@@ -50,6 +36,7 @@ write_info() {
 <?xml version="1.0"?>
 <extension key="$2" type="module">
   <file>$2</file>
+  ${3:-}
 </extension>
 INFO
 }
@@ -72,27 +59,29 @@ MOUNTS
 
 expect_log() {
   local actual
-  actual="$( (grep -v '^api4 Extension.get' "$CV_LOG" || true) | tr '\n' ';' | sed -E 's#@[A-Za-z0-9_./-]*civikitchen-extension\.[A-Za-z0-9]+\.zip#@<archive>#g')"
+  actual="$( (grep -v -e '^api4 Extension.get' -e '^ev echo implode' "$CV_LOG" || true) | tr '\n' ';')"
   [[ "$actual" == "$1" ]] || fail "$2 — expected '$1', got '$actual'"
 }
 
 # Mounts are enabled by their info.xml key, in name order; the download, the
 # key-less mount and the folder of extensions are not.
 : > "$CV_LOG"
-ck_enable_extensions 2>"$work/err"
+ck_enable_extensions >"$work/out" 2>"$work/err"
 expect_log 'ext:enable alpha;ext:enable org.example.beta;' 'mounted extensions'
-grep -q 'no key' "$work/err" || fail "a mount without a key should be reported"
+grep -qx '\[civikitchen\] Enabling extensions: alpha,org.example.beta' "$work/out" || fail "the enabled keys are not listed: $(cat "$work/out")"
+grep -q 'no key is mounted into the ext dir but has no readable info.xml key' "$work/err" || fail "a mount without a key should be reported"
 grep -q 'workspace' "$work/err" && fail "a mount without info.xml is no extension and no warning"
 
 # The explicit list goes first, in its order, and is not repeated.
 : > "$CV_LOG"
-CIVIKITCHEN_ENABLE_EXTENSIONS="org.example.beta, downloaded" ck_enable_extensions 2>/dev/null
+CIVIKITCHEN_ENABLE_EXTENSIONS="org.example.beta, downloaded" ck_enable_extensions >/dev/null 2>&1
 expect_log 'ext:enable org.example.beta;ext:enable downloaded;ext:enable alpha;' 'explicit list first'
 
 # Nothing mounted and nothing listed: nothing to do, no output.
 : > "$CV_LOG"
-CK_MOUNTINFO="$work/none" ck_enable_extensions
+CK_MOUNTINFO="$work/none" ck_enable_extensions >"$work/out"
 expect_log '' 'nothing to enable'
+[ ! -s "$work/out" ] || fail "nothing to enable still printed: $(cat "$work/out")"
 
 # An extension attached via CIVIKITCHEN_EXTENSION_PATH (a CI job that runs
 # inside the image has no bind mount) is enabled like a mount.
@@ -100,7 +89,7 @@ mkdir -p "$work/src/attached"
 write_info "$work/src/attached" org.example.attached
 attach_and_enable() {
   ck_attach_scenario_extension
-  CK_MOUNTINFO="$work/none" ck_enable_extensions
+  CK_MOUNTINFO="$work/none" ck_enable_extensions >/dev/null
 }
 : > "$CV_LOG"
 CIVIKITCHEN_EXTENSION_PATH="$work/src/attached" CIVIKITCHEN_EXTENSION_KEY=org.example.attached attach_and_enable
@@ -109,26 +98,18 @@ expect_log 'ext:enable org.example.attached;' 'attached extension'
 # ckboot attaches it under info.xml's <file>, where the compose stacks mount it.
 : > "$CV_LOG"
 CIVIKITCHEN_EXTENSION_PATH="$work/src/attached" CIVIKITCHEN_EXTENSION_KEY=org.example.attached CIVIKITCHEN_EXTENSION_DIR=attached attach_and_enable
-[ -L "$work/ext/attached" ] || { echo "FAIL: not linked under its <file> name" >&2; exit 1; }
+[ -L "$work/ext/attached" ] || fail "not linked under its <file> name"
 /bin/rm "$work/ext/attached"
 expect_log 'ext:enable org.example.attached;' 'attached extension under its file name'
 
-# A bare key in CIVIKITCHEN_EXTRA_EXTENSIONS takes a mounted extension's pin;
-# an explicit key@URL and an unpinned key pass through.
-mkdir -p "$work/archive/de.example.opt"
-printf '%s\n' '<extension key="de.example.opt" type="module"><file>opt</file><version>2.0.1</version></extension>' > "$work/archive/de.example.opt/info.xml"
-(cd "$work/archive" && zip -qr "$work/opt.zip" de.example.opt)
-export ARCHIVE_FIXTURE="$work/opt.zip"
-digest=$(sha256sum < "$ARCHIVE_FIXTURE" | cut -d' ' -f1)
-printf '%s\n' \
-  'version: 1' 'policy:' '  extension_sources:' \
-  '    - key: de.example.opt' \
-  "      version: '^2.0'" \
-  '      url: https://example.org/opt-2.0.zip' \
-  "      sha256: $digest" \
-  '      reason: not in the feed' > "$work/ext/alpha/civikitchen.yaml"
+# A failure is the step's failure, named, and nothing after it is enabled.
+write_info "$work/ext/alpha" alpha '<requires><ext>org.example.dep</ext></requires>'
 : > "$CV_LOG"
-CIVIKITCHEN_EXTRA_EXTENSIONS="de.example.opt,de.example.bare,de.example.opt@https://example.org/own.zip" ck_extra_extensions >/dev/null
-expect_log 'ev CRM_Extension_System::singleton()->getFullContainer()->refresh();;ext:enable de.example.opt;ext:download -n --no-install de.example.bare;ev CRM_Extension_System::singleton()->getFullContainer()->refresh();;ext:enable de.example.bare;ext:download -n --no-install de.example.opt@https://example.org/own.zip;ev CRM_Extension_System::singleton()->getFullContainer()->refresh();;ext:enable de.example.opt;' 'extra extension pins'
+if CV_LIST_FAILS=1 ck_enable_extensions >/dev/null 2>"$work/err"; then
+  fail "a failed extension query must fail ck_enable_extensions"
+fi
+grep -qx '\[civikitchen\] ERROR: could not query the extension list for org.example.dep' "$work/err" \
+  || fail "a failed provisioning must say why: $(cat "$work/err")"
+expect_log '' 'enabled despite a failed extension query'
 
 echo "provision mounts: ok"

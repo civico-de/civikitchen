@@ -14,6 +14,80 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Changed
+
+- The entrypoint installs extensions with `ck internal provision-*`, run as the
+  web user: the `CIVIKITCHEN_EXTRA_EXTENSIONS` entries, the mounted extensions,
+  a profile's dependencies (Git clones and their composer packages, registry
+  extensions with their `<requires>`, the enable in profile order), and the
+  dependencies of the release workflow's smoke test. A `CK_DEP_ARCHIVE_DIR`
+  has to be readable by the web user. Every `cv ext:enable` that fails during
+  provisioning stops it; a failing requirement could pass unnoticed before.
+  provision.sh no longer defines the resolver functions (`ck_resolve_requires`,
+  `ck_download_extension` and their helpers).
+
+  The release workflow's smoke test resolves the `<requires>` with the `ck` of
+  its own release, mounted into the container, whatever `ck` the image
+  carries. A release run on a workflow older than this release sources those
+  functions, so against an image built from this release its smoke step fails
+  until the caller's `@v1` moves to this release.
+
+- A key without a pin of its own (a bare `CIVIKITCHEN_EXTRA_EXTENSIONS` entry,
+  a `<requires>` of a profile dependency) takes its `extension_source`,
+  `extension_release` and `extension_version` together from the first mounted
+  extension, in mount path order, that pins it. Each was looked up on its own,
+  so one extension's release could beat another's source.
+
+- A short name such as `widget` for `org.example.widget` fails at once and
+  names the key to use: it downloaded under that key, which no pin and no
+  `<requires>` matches. A key the extension feed does not list fails at once
+  as well, instead of after three download attempts.
+
+### Removed
+
+- The `ck internal` operations `profile-dependencies`,
+  `install-extension-archive`, `assert-extension-version` and
+  `extension-list-contains`; `ck internal provision-*` covers what they did.
+
+### Fixed
+
+- A dependency installed from the registry or a `key@URL` (a `<requires>` of a
+  mounted or released extension, or a `CIVIKITCHEN_EXTRA_EXTENSIONS` entry)
+  installs when it requires an extension the site has but has not enabled,
+  such as one bundled with core. CiviCRM refuses to download an extension
+  before its requirements are installed; the entrypoint reads the
+  requirements from the release archive and installs and enables them first.
+  The archive is fetched twice.
+
+- A `<requires>` the site has but has not enabled gets its own `<requires>`
+  installed first, as far down as they go: CiviCRM enables them with it and
+  refuses one that is absent. A `<requires>` cycle fails, naming its keys:
+  CiviCRM enables no extension of a cycle.
+
+- `<requires>` are read the way CiviCRM reads them, so a key core declares
+  obsolete (such as `org.civicrm.api4`) no longer sends the entrypoint to the
+  registry for an extension that does not exist there.
+
+- A digest-pinned or staged-release `CIVIKITCHEN_EXTRA_EXTENSIONS` entry gets
+  its own `<requires>` installed and enabled before it, as a dependency of a
+  mounted extension always did. It was enabled without them.
+
+- A profile's registry dependency gets its `<requires>` installed and enabled
+  before it, from the pins of the mounted extensions and the staged releases
+  in `CK_DEP_ARCHIVE_DIR` as for a mounted extension's dependency. A
+  requirement the same profile clones from Git is enabled first; the download
+  used to refuse the dependency because that requirement was not installed.
+
+- A profile's Git pin never moves a packaged extension into an existing
+  `.<key>.packaged.<pid>` backup, left by an earlier boot under a reused
+  process ID: the phase fails, naming the backup. The packaged copy landed
+  inside it, and a failed phase put the old backup back in its place.
+
+- Every extension download runs under a 120 s `http_timeout`: a
+  `CIVIKITCHEN_EXTRA_EXTENSIONS` entry and a `<requires>` dependency as well as
+  a profile's registry extension. The setting is removed after the download,
+  also when it fails.
+
 ## [1.50.0] - 2026-10-22
 
 ### Added

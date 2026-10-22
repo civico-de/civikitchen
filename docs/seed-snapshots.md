@@ -364,11 +364,11 @@ A count afterwards found no orphans.
 
 - On standalone, the test DB is copied from the main DB **before** the profile
   is applied:
-  - `docker/standalone/entrypoint.sh:176` runs `ck_post_install_config`, which
-    calls `ck_setup_test_db` (`docker/runtime/provision.sh:1039`). That
-    function copies the main DB into `<db>_test` (`provision.sh:223-230`).
-  - Only then does `entrypoint.sh:177` run `ck_post_install_provision`, which
-    applies the profile (`provision.sh:1071` deps, `:1074` content).
+  - `docker/standalone/entrypoint.sh` runs `ck_post_install_config`, which
+    calls `ck_setup_test_db` in `docker/runtime/provision.sh`. Its
+    `ck_provision_test_db` copies the main DB into `<db>_test`.
+  - Only then does the entrypoint run `ck_post_install_provision`, which
+    applies the profile through `ck_apply_profile`, `deps` then `content`.
 - Both bundles are marker-gated, so a later boot does not copy again.
 - On buildkit there is no copy at all: `docker/buildkit/entrypoint-common.sh:71`
   leaves the test DB to civibuild.

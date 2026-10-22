@@ -176,6 +176,59 @@ CK_RUN_ARCHIVES=$run_dir CK_SIBLINGS=$siblings run_step
 [ "$rc" -ne 0 ] || fail "a missing sibling archive was not reported"
 case "$out" in *"no org.example.mid-1.0.0.zip in this run"*) ;; *) fail "missing archive: $out" ;; esac
 
+# --- the smoke step resolves <requires> with this contract's ck -----------
+step "$workflow" dist 'Install smoke test'
+new_workspace smoke
+# A checkout of its own, so the ck the step reaches is told apart from the image's.
+rm "$ws/.civikitchen-ci"
+mkdir -p "$ws/.civikitchen-ci/toolbelt/bin" "$work/smoke-bin" "$work/docker"
+printf '#!/usr/bin/env bash\necho "$*" >> "$CK_LOG"\n' > "$ws/.civikitchen-ci/toolbelt/bin/ck"
+printf '#!/usr/bin/env bash\necho "image ck $*" >> "$CK_LOG"\nexit 1\n' > "$work/smoke-bin/ck"
+printf '#!/usr/bin/env bash\n' > "$work/smoke-bin/cv"
+# docker keeps the compose file and the argv of each exec; the status query answers "installed".
+cat > "$work/smoke-bin/docker" <<'SH'
+#!/usr/bin/env bash
+case "$4" in
+  up) cp "$3" "$DOCKER_LOG/compose.yml" ;;
+  exec)
+    calls=$(($(cat "$DOCKER_LOG/calls" 2>/dev/null || echo 0) + 1))
+    echo "$calls" > "$DOCKER_LOG/calls"
+    printf '%s\0' "$@" > "$DOCKER_LOG/exec-$calls"
+    [ "$calls" != 3 ] || echo installed
+    ;;
+esac
+SH
+chmod +x "$ws/.civikitchen-ci/toolbelt/bin/ck" "$work/smoke-bin/ck" "$work/smoke-bin/cv" "$work/smoke-bin/docker"
+: > "$work/runner/release-siblings.txt"
+PATH="$work/smoke-bin:$PATH" DOCKER_LOG="$work/docker" CK_EXT_KEY=org.example.smoke CK_DIST="$work/dist-smoke" \
+  CK_POLICY_DIR="$work/policy" CK_DEPS="$work/deps" CK_SIBLINGS="$work/siblings-smoke" CK_CIVIKITCHEN="$ws/.civikitchen-ci" run_step
+[ "$rc" -eq 0 ] || fail "smoke step failed: $out"
+# The checkout it mounts is this workflow's own, at the SHA it was resolved from.
+php -r '
+  require $argv[1] . "/tests/parity/workflow-jobs.php";
+  $job = ck_jobs_parsed($argv[2])["dist"];
+  $smoke = array_values(array_filter($job["steps"], fn ($s) => ($s["name"] ?? "") === "Install smoke test"))[0];
+  $checkout = array_values(array_filter($job["steps"], fn ($s) => ($s["with"]["path"] ?? "") === ".civikitchen-ci"))[0];
+  $compose = Symfony\Component\Yaml\Yaml::parseFile($argv[3]);
+  $exec = explode("\0", rtrim((string) file_get_contents($argv[4]), "\0"));
+  $problems = array_keys(array_filter([
+      "env CK_CIVIKITCHEN is not the .civikitchen-ci checkout" => ($smoke["env"]["CK_CIVIKITCHEN"] ?? "") !== "\${{ github.workspace }}/.civikitchen-ci",
+      ".civikitchen-ci is not checked out at job.workflow_sha" => ($checkout["with"]["ref"] ?? "") !== "\${{ job.workflow_sha }}",
+      "the app does not mount CK_CIVIKITCHEN read-only at /ck-civikitchen" => !in_array("\${CK_CIVIKITCHEN}:/ck-civikitchen:ro", $compose["services"]["app"]["volumes"], true),
+      "the provisioning exec does not name the mounted ck" => !in_array("CK_CLI=/ck-civikitchen/toolbelt/bin/ck", $exec, true),
+  ]));
+  foreach ($problems as $problem) { fwrite(STDERR, "FAIL: smoke step: $problem\n"); }
+  exit($problems === [] ? 0 : 1);
+' "$root" "$workflow" "$work/docker/compose.yml" "$work/docker/exec-2"
+# The provisioning script calls that ck, never the image's.
+script=$(php -r '$a = explode("\0", rtrim((string) file_get_contents($argv[1]), "\0")); echo end($a);' "$work/docker/exec-2")
+: > "$work/ck.log"
+PATH="$work/smoke-bin:$PATH" CK_LOG="$work/ck.log" CK_CLI="$ws/.civikitchen-ci/toolbelt/bin/ck" \
+  CK_EXT_KEY=org.example.smoke CK_SIBLING_KEYS='' CK_EXT_DIR=/ext bash -c "$script" \
+  || fail "the provisioning script failed: $(cat "$work/ck.log")"
+[ "$(cat "$work/ck.log")" = 'internal provision-requires --ext-dir /ext --archive-dir /ck-deps org.example.smoke' ] \
+  || fail "the provisioning script did not run the mounted ck: $(cat "$work/ck.log")"
+
 # --- publish: one version across the archives, flags even in a dry run -----
 step "$workflow" publish 'Publish the GitHub release'
 new_workspace publish

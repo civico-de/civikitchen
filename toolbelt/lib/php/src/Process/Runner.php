@@ -79,6 +79,43 @@ class Runner
         return ['status' => proc_close($process), 'output' => $output === false ? '' : $output];
     }
 
+    /**
+     * Stdout only, for output that is parsed; stderr reaches ours, and $input is
+     * the child's stdin (none: /dev/null).
+     *
+     * @param non-empty-list<string> $command
+     * @return array{status: int, output: string}
+     */
+    public function captureStdout(array $command, ?string $input = null, ?string $workingDirectory = null): array
+    {
+        $missing = $this->unresolved($command);
+        if ($missing !== null) {
+            fwrite(STDERR, $missing);
+            return ['status' => 2, 'output' => ''];
+        }
+        $stdin = ['file', '/dev/null', 'r'];
+        if ($input !== null) {
+            // A file rather than a pipe: a child that writes before it reads cannot deadlock on it.
+            $stdin = tmpfile();
+            if ($stdin === false || fwrite($stdin, $input) === false || !rewind($stdin)) {
+                fwrite(STDERR, 'ck: could not buffer the input of ' . $command[0] . "\n");
+                return ['status' => 2, 'output' => ''];
+            }
+        }
+        @fseek(STDERR, 0, SEEK_END);
+        $process = proc_open($command, [0 => $stdin, 1 => ['pipe', 'w'], 2 => STDERR], $pipes, $workingDirectory);
+        if (is_resource($stdin)) {
+            fclose($stdin);
+        }
+        if (!is_resource($process)) {
+            fwrite(STDERR, 'ck: could not start ' . $command[0] . "\n");
+            return ['status' => 2, 'output' => ''];
+        }
+        $output = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        return ['status' => proc_close($process), 'output' => $output === false ? '' : $output];
+    }
+
     /** @param non-empty-list<string> $command @return array{status:int,stdout:string,stderr:string} */
     /** @param array<string, string>|null $environment */
     public function captureSeparate(array $command, ?array $environment = null, ?string $workingDirectory = null): array

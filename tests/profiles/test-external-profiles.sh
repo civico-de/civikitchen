@@ -73,12 +73,17 @@ printf '{"description":"built in","include":["nowhere"],"dependencies":[]}\n' > 
 CK_EXPANDED_PROFILES=()
 if ck_expand_profile combo "" 2>/dev/null; then echo "unknown include passed" >&2; exit 1; fi
 
-# ck_apply_profile drives the expanded list, includes first.
+# ck_apply_profile drives the expanded list, includes first, passing the driver the pins and
+# staged releases explicitly: the web user's switch may drop the environment.
 printf '{"description":"built in","dependencies":[]}\n' > "$work/bundled/builtin/profile.json"
-printf '#!/bin/bash\necho "$(basename "$1") $2" >> "%s"\n' "$work/applied" > "$work/bundled/apply.sh"
-ck_as_web() { "$@"; }
-CIVIKITCHEN_PROFILE="combo, custom" ck_apply_profile deps >/dev/null
-[ "$(tr '\n' ' ' < "$work/applied")" = "builtin deps mid deps custom deps combo deps " ] \
+printf '#!/bin/bash\necho "$(basename "$1") $2 ${CK_DEP_ARCHIVE_DIR:-none} ${CK_SEED_EXTENSION_DIRS:-none}" >> "%s"\n' "$work/applied" > "$work/bundled/apply.sh"
+ck_as_web() { env -i PATH="$PATH" "$@"; }
+mkdir -p "$work/ext/mounted"
+printf '100 90 0:37 /host/m %s rw,relatime - fakeowner /dev/x rw\n' "$work/ext/mounted" > "$work/mountinfo"
+CK_EXT_DIR="$work/ext" CK_MOUNTINFO="$work/mountinfo" CK_DEP_ARCHIVE_DIR=/staged \
+  CIVIKITCHEN_PROFILE="combo, custom" ck_apply_profile deps >/dev/null
+staged="/staged $work/ext/mounted"
+[ "$(tr '\n' ',' < "$work/applied")" = "builtin deps $staged,mid deps $staged,custom deps $staged,combo deps $staged," ] \
   || { echo "ck_apply_profile applied: $(cat "$work/applied")" >&2; exit 1; }
 
 echo "external profile tests passed"

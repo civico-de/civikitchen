@@ -21,7 +21,8 @@ use CiviKitchen\Ckconform\Reporter;
  *
  * The mount is all there is to check: the entrypoint enables every directory
  * bind-mounted under CK_EXT_DIR and resolves each one's `<requires>` first
- * (docker/runtime/provision.sh), so the order of the volume lines is irrelevant.
+ * (docker/runtime/provision.sh hands them to ExtensionProvisioner), so the
+ * order of the volume lines is irrelevant.
  *
  * The expected target is named after the dependency's KEY, not its `<file>`:
  * a required extension is looked up under `<ext dir>/<key>` — the template's

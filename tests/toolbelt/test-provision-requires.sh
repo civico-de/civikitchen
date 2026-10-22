@@ -1,294 +1,86 @@
 #!/usr/bin/env bash
-# The entrypoint resolves a mounted extension's info.xml <requires> before
-# enabling it: a missing dependency is downloaded from the digest-pinned
-# source in civikitchen.yaml, else from the registry, and enabled first.
-# Fake cv records every call; a real ckconform reads the policy file.
+# provision.sh hands extras and mounted extensions to `ck internal provision-*` as the web user;
+# what the provisioner then does is tests/shared-php/ExtensionProvisionerTest.php.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 work="$(mktemp -d)"
 trap '/bin/rm -rf "$work"' EXIT
-mkdir -p "$work/bin" "$work/ext/fixture"
 fail() { echo "FAIL: $*" >&2; exit 1; }
+mkdir -p "$work/ext/alpha" "$work/ext/beta"
 
-cat > "$work/bin/cv" <<'FAKE'
-#!/usr/bin/env bash
-# fake cv: records calls; ext:list serves $CV_LIST; a download adds its key to it.
-printf '%s\n' "$*" >> "$CV_LOG"
-case "$1" in
-  api4)
-    # Extension.get +w key=<key>: rows of $CV_LIST with that key; CV_LIST_FAILS breaks the query.
-    [[ -n "${CV_LIST_FAILS:-}" ]] && exit 1
-    key="${4#key=}"
-    php -r '$l = json_decode(file_get_contents($argv[1]), TRUE); echo json_encode(array_values(array_filter((array) $l, fn($e) => ($e["key"] ?? "") === $argv[2])));' "$CV_LIST" "$key"
-    ;;
-  ext:download)
-    spec="$4"; key="${spec%%@*}"
-    [[ -n "${CV_DOWNLOAD_FAILS:-}" ]] && exit 1
-    php -r '$l = json_decode(file_get_contents($argv[1]), TRUE); $l[] = ["key" => $argv[2], "status" => "uninstalled"]; file_put_contents($argv[1], json_encode($l));' "$CV_LIST" "$key"
-    ;;
-  path) printf '%s\n' "$CK_EXT_DIR/$3" ;;
-  ext:enable) ;;
-esac
-FAKE
-chmod +x "$work/bin/cv"
-export PATH="$work/bin:$root/toolbelt/bin:$PATH"
-export CV_LOG="$work/cv.log" CV_LIST="$work/list.json"
-CK_WEB_USER="$(id -un)"
-CK_WEB_GROUP="$(id -gn)"
-export CK_WEB_USER CK_WEB_GROUP
-
-ck_as_web() {
-  if [[ "${CK_FAIL_REFRESH:-0}" == 1 && "$1 $2" == 'cv ev' ]]; then return 17; fi
-  "$@"
-}
-sleep() { :; }
-curl() {
-  local output='' previous='' arg
-  for arg in "$@"; do
-    [[ "$previous" == '-o' ]] && output="$arg"
-    previous="$arg"
-  done
-  printf '%s\n' "$*" >> "$CURL_LOG"
-  cp "$ARCHIVE_FIXTURE" "$output"
-}
-export CURL_LOG="$work/curl.log"
-: > "$CURL_LOG"
-export CK_EXT_DIR="$work/ext"
-export CK_SCENARIO_AUTOLOAD="$root/packages/civikitchen-scenario-schema/vendor/autoload.php"
-export CIVIKITCHEN_ENABLE_EXTENSIONS=fixture
+# Listed out of name order: the pins of the first mount by name win.
+cat > "$work/mountinfo" <<MOUNTS
+100 90 0:37 /host/b $work/ext/beta rw,relatime - fakeowner /dev/x rw
+101 90 0:37 /host/a $work/ext/alpha rw,relatime - fakeowner /dev/x rw
+MOUNTS
+export PATH="$root/toolbelt/bin:$PATH"
+export CK_EXT_DIR="$work/ext" CK_MOUNTINFO="$work/mountinfo"
 # shellcheck source=../../docker/runtime/provision.sh
 . "$root/docker/runtime/provision.sh"
-
-write_info() {
-  cat > "$work/ext/fixture/info.xml" <<INFO
-<?xml version="1.0"?>
-<extension key="fixture" type="module">
-  <file>fixture</file>
-  $1
-</extension>
-INFO
+ck_as_web() {
+  printf '%s\n' as-web "$@" > "$work/call"
+  return "${CK_CALL_STATUS:-0}"
 }
-reset_site() {
-  printf '%s' "$1" > "$CV_LIST"
-  : > "$CV_LOG"
+expect_call() {
+  [[ "$(cat "$work/call")" == "$(printf '%s\n' "$@")" ]] \
+    || fail "expected '$*', got '$(tr '\n' ' ' < "$work/call")'"
 }
-expect_log() {
-  local expected="$1"
-  local actual
-  actual="$(grep -v -e '^api4 Extension.get' -e '^path -x' "$CV_LOG" | tr '\n' ';' | sed -E 's#@[A-Za-z0-9_./-]*civikitchen-extension\.[A-Za-z0-9]+\.zip#@<archive>#g')"
-  [[ "$actual" == "$expected" ]] || fail "$2 — expected '$expected', got '$actual'"
-}
+cli="$root/toolbelt/bin/ck"
 
-# A pinned dependency: downloaded from the pin, enabled, then the extension.
-write_info '<requires><ext>org.example.dep</ext></requires>'
-mkdir -p "$work/archive/org.example.dep"
-printf '%s\n' '<extension key="org.example.dep" type="module"><file>dep</file><version>1.2.3</version></extension>' > "$work/archive/org.example.dep/info.xml"
-(cd "$work/archive" && zip -qr "$work/dep.zip" org.example.dep)
-export ARCHIVE_FIXTURE="$work/dep.zip"
-digest=$(sha256sum < "$ARCHIVE_FIXTURE" | cut -d' ' -f1)
-if ck_install_verified_archive "$ARCHIVE_FIXTURE" '../escaped' >/dev/null 2>&1; then
-  fail "digest installer accepted a traversal extension key"
-fi
-[ ! -e "$work/escaped" ] || fail "digest installer wrote outside CK_EXT_DIR"
-if CK_FAIL_REFRESH=1 ck_install_verified_archive "$ARCHIVE_FIXTURE" 'org.example.dep' >/dev/null 2>&1; then
-  fail "digest installer accepted a failed extension-container refresh"
-fi
-[ ! -e "$work/ext/org.example.dep" ] || fail "failed digest install left its target behind"
-ck_install_verified_archive "$ARCHIVE_FIXTURE" 'org.example.dep'
-[ -f "$work/ext/org.example.dep/info.xml" ] || fail "digest installer could not retry after rollback"
-/bin/rm -rf "$work/ext/org.example.dep"
-if ck_install_verified_archive "$ARCHIVE_FIXTURE" 'org.example.dep' '^2.0' >/dev/null 2>&1; then
-  fail "digest installer accepted an extension version outside its Composer constraint"
-fi
-[ ! -e "$work/ext/org.example.dep" ] || fail "version mismatch left an extracted extension behind"
-printf '%s\n' \
-  'version: 1' 'policy:' '  extension_sources:' \
-  '    - key: org.example.dep' \
-  "      version: '^1.2'" \
-  '      url: https://example.org/dep-1.0.zip' \
-  "      sha256: $digest" \
-  '      reason: not in the feed' > "$work/ext/fixture/civikitchen.yaml"
-reset_site '[{"key":"civi_contribute","status":"installed"}]'
-ck_enable_extensions
-expect_log 'ev CRM_Extension_System::singleton()->getFullContainer()->refresh();;ext:enable org.example.dep;ext:enable fixture;' 'pinned dependency'
-[ -f "$work/ext/org.example.dep/info.xml" ] || fail "verified dependency archive was not installed"
-/bin/rm -rf "$work/ext/org.example.dep"
-
-# Known to the database but without files (a recreated container on a kept database): installed again.
-reset_site '[{"key":"civi_contribute","status":"installed"},{"key":"org.example.dep","status":"installed-missing"}]'
-ck_enable_extensions
-expect_log 'ev CRM_Extension_System::singleton()->getFullContainer()->refresh();;ext:enable org.example.dep;ext:enable fixture;' 'installed-missing dependency'
-[ -f "$work/ext/org.example.dep/info.xml" ] || fail "an installed-missing dependency was not installed again"
-/bin/rm -rf "$work/ext/org.example.dep"
-
-# A wrong digest fails before cv sees or enables the downloaded archive.
-sed -E 's/^      sha256:.*/      sha256: 0000000000000000000000000000000000000000000000000000000000000000/' \
-  "$work/ext/fixture/civikitchen.yaml" > "$work/bad-digest.yaml"
-cp "$work/bad-digest.yaml" "$work/ext/fixture/civikitchen.yaml"
-reset_site '[]'
-if ck_enable_extensions >/dev/null 2>&1; then
-  fail "a checksum mismatch was accepted"
-fi
-if grep -q '^ext:download' "$CV_LOG"; then
-  fail "cv received an archive whose checksum did not match"
-fi
-sed -E "s/^      sha256:.*/      sha256: $digest/" "$work/ext/fixture/civikitchen.yaml" > "$work/good-digest.yaml"
-cp "$work/good-digest.yaml" "$work/ext/fixture/civikitchen.yaml"
-
-# A malformed unified config is a hard failure, never an unpinned registry
-# fallback for the same dependency.
-printf '%s\n' 'version: 1' 'policy: [' > "$work/ext/fixture/civikitchen.yaml"
-reset_site '[]'
-if ck_enable_extensions >/dev/null 2>&1; then
-  fail "malformed civikitchen.yaml was treated as an absent source pin"
-fi
-if grep -q '^ext:download' "$CV_LOG"; then
-  fail "malformed civikitchen.yaml fell back to the extension registry"
-fi
-cp "$work/good-digest.yaml" "$work/ext/fixture/civikitchen.yaml"
-
-# Already present (even if not enabled): nothing to download, cv enables it as a requirement.
-mkdir -p "$work/ext/org.example.dep"
-printf '%s\n' '<extension key="org.example.dep" type="module"><file>dep</file><version>1.3.0</version></extension>' > "$work/ext/org.example.dep/info.xml"
-reset_site '[{"key":"org.example.dep","status":"uninstalled"}]'
-ck_enable_extensions
-expect_log 'ext:enable fixture;' 'present dependency'
-
-sed -E "s/version: '\^1\.2'/version: '^2.0'/" "$work/ext/fixture/civikitchen.yaml" > "$work/bad-version.yaml"
-cp "$work/bad-version.yaml" "$work/ext/fixture/civikitchen.yaml"
-reset_site '[{"key":"org.example.dep","status":"uninstalled"}]'
-if ck_enable_extensions >/dev/null 2>&1; then
-  fail "an installed dependency outside its Composer constraint was accepted"
-fi
-cp "$work/good-digest.yaml" "$work/ext/fixture/civikitchen.yaml"
-/bin/rm -rf "$work/ext/org.example.dep"
-
-# No pin: the bare key goes to the registry.
-/bin/rm "$work/ext/fixture/civikitchen.yaml"
-reset_site '[]'
-ck_enable_extensions
-expect_log 'ext:download -n --no-install org.example.dep;ev CRM_Extension_System::singleton()->getFullContainer()->refresh();;ext:enable org.example.dep;ext:enable fixture;' 'registry dependency'
-
-# A download that keeps failing aborts provisioning before the extension is enabled.
-reset_site '[]'
-if CV_DOWNLOAD_FAILS=1 ck_enable_extensions 2>/dev/null; then
-  fail "a failed dependency download should fail ck_enable_extensions"
-fi
-if grep -q 'ext:enable fixture' "$CV_LOG"; then
-  fail "the extension must not be enabled without its dependency"
-fi
-
-# A failing extension query aborts instead of downloading what the site may well have.
-reset_site '[{"key":"org.example.dep","status":"installed"}]'
-write_info '<requires><ext>org.example.dep</ext></requires>'
-if CV_LIST_FAILS=1 ck_enable_extensions 2>/dev/null; then
-  fail "a failed extension query must fail ck_enable_extensions"
-fi
-if grep -q 'ext:download' "$CV_LOG"; then
-  fail "a failed extension query must not turn into a download"
-fi
-
-# A staged release pin: the runner downloaded and verified the dependency's
-# release archive, so the container installs it without any network call — and
-# without ever seeing the credential that fetched it.
-write_info '<requires><ext>org.example.dep</ext></requires>'
-mkdir -p "$work/staged"
-cp "$ARCHIVE_FIXTURE" "$work/staged/dep-1.2.3.zip"
-write_release_pin() {
-  printf '%s\n' \
-    'version: 1' 'policy:' '  extension_sources:' \
-    '    - key: org.example.dep' \
-    "      version: '^1.2'" \
-    '      release:' \
-    '        repository: example-org/dep' \
-    '        tag: v1.2.3' \
-    "        asset: $1" \
-    "      sha256: $2" \
-    '      reason: private repository, no registry serves it' > "$work/ext/fixture/civikitchen.yaml"
-}
-write_release_pin 'dep-1.2.3.zip' "$digest"
+# The extras as configured, spaces and empty entries included: one parser, in ck.
+export CIVIKITCHEN_EXTRA_EXTENSIONS=' org.example.one, ,org.example.two@https://example.org/two.zip'
 export CK_DEP_ARCHIVE_DIR="$work/staged"
-reset_site '[]'
-: > "$CURL_LOG"
-ck_enable_extensions
-expect_log 'ev CRM_Extension_System::singleton()->getFullContainer()->refresh();;ext:enable org.example.dep;ext:enable fixture;' 'staged release dependency'
-[ -f "$work/ext/org.example.dep/info.xml" ] || fail "staged dependency archive was not installed"
-[ ! -s "$CURL_LOG" ] || fail "a staged dependency must not be fetched from inside the container"
-/bin/rm -rf "$work/ext/org.example.dep"
+ck_extra_extensions
+expect_call as-web "$cli" internal provision-extras --ext-dir "$work/ext" --archive-dir "$work/staged" \
+  --mounted "$work/ext/alpha" --mounted "$work/ext/beta" "$CIVIKITCHEN_EXTRA_EXTENSIONS"
 
-# A staged dependency's own <requires> resolve before it is enabled, pinned by
-# the mounted extension: its registry dependency is downloaded first, and the
-# requirement back on the mounted extension ends the recursion as present.
-mkdir -p "$work/nested/org.example.dep"
-printf '%s\n' '<extension key="org.example.dep" type="module"><file>dep</file><version>1.2.3</version><requires><ext>org.example.sub</ext><ext>fixture</ext></requires></extension>' > "$work/nested/org.example.dep/info.xml"
-(cd "$work/nested" && zip -qr "$work/staged/dep-nested.zip" org.example.dep)
-write_release_pin 'dep-nested.zip' "$(sha256sum < "$work/staged/dep-nested.zip" | cut -d' ' -f1)"
-reset_site '[{"key":"fixture","status":"uninstalled"}]'
-ck_enable_extensions
-expect_log 'ev CRM_Extension_System::singleton()->getFullContainer()->refresh();;ext:download -n --no-install org.example.sub;ev CRM_Extension_System::singleton()->getFullContainer()->refresh();;ext:enable org.example.sub;ext:enable org.example.dep;ext:enable fixture;' 'nested dependency'
-/bin/rm -rf "$work/ext/org.example.dep"
-
-# The staged bytes are still checked against the pin: the runner's verification
-# is not taken on trust, and a mismatch never becomes a registry download.
-write_release_pin 'dep-1.2.3.zip' '0000000000000000000000000000000000000000000000000000000000000000'
-reset_site '[]'
-if ck_enable_extensions >/dev/null 2>&1; then
-  fail "a staged archive whose checksum does not match the pin was accepted"
-fi
-[ ! -e "$work/ext/org.example.dep" ] || fail "a mismatching staged archive was installed anyway"
-if grep -q '^ext:download' "$CV_LOG"; then
-  fail "a mismatching staged archive fell back to the extension registry"
-fi
-
-# A release pin whose archive was never staged fails loudly. Falling back to
-# the registry would look like a working release for an extension nobody can
-# install.
-write_release_pin 'absent-1.2.3.zip' "$digest"
-reset_site '[]'
-if ck_enable_extensions >"$work/out" 2>"$work/err"; then
-  fail "a release pin without its staged archive was accepted"
-fi
-grep -q 'absent-1.2.3.zip is not there' "$work/err" \
-  || fail "a missing staged archive must name the file it looked for: $(cat "$work/err")"
-if grep -q '^ext:download' "$CV_LOG"; then
-  fail "a missing staged archive fell back to the extension registry"
-fi
-
-# Same when nothing was staged at all — an image booting without a staging
-# directory says so instead of guessing.
-write_release_pin 'dep-1.2.3.zip' "$digest"
+# No staging directory is an empty archive dir, never a guessed one.
 unset CK_DEP_ARCHIVE_DIR
-reset_site '[]'
-if ck_enable_extensions >"$work/out" 2>"$work/err"; then
-  fail "a release pin without CK_DEP_ARCHIVE_DIR was accepted"
-fi
-grep -q 'CK_DEP_ARCHIVE_DIR' "$work/err" \
-  || fail "an unstaged release pin must say what is missing: $(cat "$work/err")"
-if grep -q '^ext:download' "$CV_LOG"; then
-  fail "an unstaged release pin fell back to the extension registry"
-fi
-/bin/rm "$work/ext/fixture/civikitchen.yaml"
-
-# The release smoke test calls ck_resolve_requires as a plain statement under
-# set -e: an absent dependency is a status the resolver inspects, never an
-# error that may end the caller's shell before the install.
-write_release_pin 'dep-1.2.3.zip' "$digest"
-export CK_DEP_ARCHIVE_DIR="$work/staged"
-reset_site '[]'
-export -f ck_as_web sleep curl
-if ! bash -euo pipefail -c '. "$1"; ck_resolve_requires fixture' _ "$root/docker/runtime/provision.sh" >"$work/out" 2>"$work/err"; then
-  fail "ck_resolve_requires must survive a caller's set -e when the dependency is absent: $(cat "$work/err")"
-fi
-grep -q '^ext:enable org.example.dep' "$CV_LOG" \
-  || fail "the absent dependency was not installed under a caller's set -e"
-/bin/rm -rf "$work/ext/org.example.dep" "$work/ext/fixture/civikitchen.yaml"
-unset CK_DEP_ARCHIVE_DIR
-
-# No <requires> at all: just the enable.
-write_info ''
-reset_site '[]'
+export CIVIKITCHEN_ENABLE_EXTENSIONS='org.example.beta, downloaded'
 ck_enable_extensions
-expect_log 'ext:enable fixture;' 'no requires'
+expect_call as-web "$cli" internal provision-enable --ext-dir "$work/ext" --archive-dir '' \
+  --mounted "$work/ext/alpha" --mounted "$work/ext/beta" 'org.example.beta, downloaded'
+
+# Nothing mounted, nothing configured: the call still goes out and decides that.
+unset CIVIKITCHEN_EXTRA_EXTENSIONS CIVIKITCHEN_ENABLE_EXTENSIONS
+CK_MOUNTINFO="$work/none" ck_extra_extensions
+expect_call as-web "$cli" internal provision-extras --ext-dir "$work/ext" --archive-dir '' ''
+CK_MOUNTINFO="$work/none" ck_enable_extensions
+expect_call as-web "$cli" internal provision-enable --ext-dir "$work/ext" --archive-dir '' ''
+
+# A failed provisioning fails the step, so the provisioned marker is not written.
+if CK_CALL_STATUS=1 ck_extra_extensions; then fail "a failed provision-extras was taken as success"; fi
+if CK_CALL_STATUS=1 ck_enable_extensions; then fail "a failed provision-enable was taken as success"; fi
+
+# The boot test runs this provision.sh on a published image with the ck library and profile
+# driver its hand-offs call; docker records each run and reports the app exited.
+mkdir -p "$work/bin"
+cat > "$work/bin/docker" <<'FAKE'
+#!/usr/bin/env bash
+case "$1" in
+  run) runs=$(($(cat "$DOCKER_LOG/runs" 2>/dev/null || echo 0) + 1)); echo "$runs" > "$DOCKER_LOG/runs"; printf '%s\0' "$@" > "$DOCKER_LOG/run-$runs" ;;
+  inspect) echo exited ;;
+esac
+FAKE
+chmod +x "$work/bin/docker"
+if (cd "$root" && PATH="$work/bin:$PATH" DOCKER_LOG="$work" CK_PROVISION_OVERRIDE=docker/runtime/provision.sh \
+  bash tests/images/boot-test-standalone.sh example.org/civikitchen:standalone >/dev/null 2>&1); then
+  fail "the boot test passed against a fake docker"
+fi
+mounts=()
+mapfile -d '' run < "$work/run-2"
+for ((i = 1; i < ${#run[@]}; i++)); do
+  if [ "${run[i - 1]}" = -v ]; then mounts+=("${run[i]}"); fi
+done
+for mount in "$root/docker/runtime/provision.sh:/usr/local/share/civikitchen/provision.sh:ro" \
+  "$root/toolbelt/lib/php:/opt/civikitchen/toolbelt/lib/php:ro" \
+  "$root/docker/profiles/apply.sh:/opt/civikitchen/docker/profiles/apply.sh:ro"; do
+  found=0
+  for actual in "${mounts[@]}"; do
+    if [ "$actual" = "$mount" ]; then found=1; fi
+  done
+  [ "$found" = 1 ] || fail "the provision.sh override does not mount $mount"
+done
 
 echo "provision requires: ok"

@@ -108,6 +108,16 @@ final class SharedPhpTest extends TestCase
         self::assertSame(['status' => 0, 'output' => ''], $runner->capture(['true'], ['HOME' => $this->temporary]));
     }
 
+    public function testRunnerCapturesStdoutAloneWithTheGivenInputAndDirectory(): void
+    {
+        $runner = new Runner();
+        self::assertSame(['status' => 0, 'output' => 'fed'], $runner->captureStdout(['cat'], 'fed'));
+        self::assertSame(['status' => 0, 'output' => ''], $runner->captureStdout(['cat']));
+        self::assertSame(['status' => 3, 'output' => 'out'], $runner->captureStdout(['sh', '-c', 'printf out; echo "captureStdout passes stderr through" >&2; exit 3']));
+        self::assertSame(realpath($this->temporary), realpath(trim($runner->captureStdout(['pwd'], null, $this->temporary)['output'])));
+        self::assertSame(['status' => 2, 'output' => ''], $runner->captureStdout([$this->temporary . '/missing']));
+    }
+
     public function testApi4CatalogExportAddsTheExtensionsEntitiesAndActionClasses(): void
     {
         $catalog = dirname(__DIR__, 2) . '/toolbelt/phpstan/src/Api4Catalog.php';
@@ -262,6 +272,57 @@ final class SharedPhpTest extends TestCase
         $this->expectExceptionMessage('one root directory');
         (new ExtensionArchiveInstaller(new ExtensionInspector('missing')))
             ->install($badArchive, 'org.example.safe', $this->temporary . '/bad-target', '');
+    }
+
+    /**
+     * @return array<string, array{list<string>, string, bool}>
+     */
+    public static function infoArchives(): array
+    {
+        return [
+            'the only root, any name' => [['package/'], 'package/info.xml', true],
+            'the root named after the key among others' => [['__MACOSX/', 'org.example.safe/'], 'org.example.safe/info.xml', true],
+            'the only root besides a ./ entry' => [['./', 'package/'], 'package/info.xml', true],
+            'two roots, neither the key' => [['one/', 'two/'], 'one/info.xml', false],
+            'no directory entries' => [[], 'package/info.xml', false],
+        ];
+    }
+
+    /**
+     * Core's download picks the root the same way; an archive it accepts must be readable here.
+     *
+     * @param list<string> $directories
+     * @dataProvider infoArchives
+     */
+    public function testArchiveInstallerReadsInfoFromTheRootCoreWouldInstall(array $directories, string $infoPath, bool $readable): void
+    {
+        $archive = $this->temporary . '/extension.zip';
+        $info = '<extension key="org.example.safe"><requires><ext>org.example.one</ext></requires></extension>';
+        $zip = new ZipArchive();
+        self::assertTrue($zip->open($archive, ZipArchive::CREATE | ZipArchive::OVERWRITE));
+        foreach ($directories as $directory) {
+            $zip->addEmptyDir(rtrim($directory, '/'));
+        }
+        $zip->addFromString($infoPath, $info);
+        $zip->close();
+        if (!$readable) {
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('no root directory for org.example.safe');
+        }
+        self::assertSame($info, (new ExtensionArchiveInstaller(new ExtensionInspector('missing')))->info($archive, 'org.example.safe'));
+    }
+
+    public function testArchiveInstallerRefusesTheInfoOfAnotherKey(): void
+    {
+        $archive = $this->temporary . '/extension.zip';
+        $zip = new ZipArchive();
+        self::assertTrue($zip->open($archive, ZipArchive::CREATE));
+        $zip->addEmptyDir('package');
+        $zip->addFromString('package/info.xml', '<extension key="org.example.safe"/>');
+        $zip->close();
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('key does not match org.example.other');
+        (new ExtensionArchiveInstaller(new ExtensionInspector('missing')))->info($archive, 'org.example.other');
     }
 
     public function testArchiveInstallerMaterialisesSymlinkToAFileInTheArchive(): void

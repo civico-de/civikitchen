@@ -74,7 +74,7 @@ final class Application
             return (new DependenciesCommand($this->checkoutRoot, $this->runner))->run($arguments);
         }
         if ($command === 'internal') {
-            return (new InternalRuntimeCommand($this->checkoutRoot))->run($arguments);
+            return (new InternalRuntimeCommand($this->checkoutRoot, $this->runner))->run($arguments);
         }
         if ($command === 'conform') {
             $implementation = $this->checkoutRoot . '/toolbelt/ckconform/bin/ckconform';

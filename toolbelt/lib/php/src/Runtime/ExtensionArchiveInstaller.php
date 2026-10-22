@@ -21,13 +21,7 @@ final class ExtensionArchiveInstaller
         if (preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $expectedKey) !== 1) {
             throw new RuntimeException('unsafe extension key in digest-pinned source');
         }
-        if (!class_exists(ZipArchive::class)) {
-            throw new RuntimeException('ZipArchive is unavailable');
-        }
-        $zip = new ZipArchive();
-        if ($zip->open($archive) !== true) {
-            throw new RuntimeException('invalid extension ZIP');
-        }
+        $zip = $this->open($archive);
         try {
             [$top, $links] = $this->validateEntries($zip);
             if (file_exists($target)) {
@@ -54,11 +48,50 @@ final class ExtensionArchiveInstaller
                     throw new RuntimeException('could not install extension ZIP');
                 }
             } finally {
-                $this->removeTree($temporary);
+                self::removeTree($temporary);
             }
         } finally {
             $zip->close();
         }
+    }
+
+    /**
+     * The archive's info.xml, from the root directory core's CRM_Utils_Zip::guessBasedir
+     * picks: the one named after the key, else the only one.
+     */
+    public function info(string $archive, string $expectedKey): string
+    {
+        $zip = $this->open($archive);
+        try {
+            $roots = [];
+            for ($index = 0; $index < $zip->numFiles; $index++) {
+                if (preg_match('#^([^/]+)/$#', (string) $zip->getNameIndex($index), $match) === 1 && !in_array($match[1], ['.', '..'], true)) {
+                    $roots[] = $match[1];
+                }
+            }
+            $top = in_array($expectedKey, $roots, true) ? $expectedKey : (count($roots) === 1 ? $roots[0] : '');
+            if (preg_match('/^[a-zA-Z0-9]/', $top) !== 1) {
+                throw new RuntimeException("extension ZIP has no root directory for {$expectedKey}");
+            }
+            $info = $zip->getFromName($top . '/info.xml', 1 << 20);
+            $info = is_string($info) ? $info : '';
+            $this->inspector->parse($info, $expectedKey);
+            return $info;
+        } finally {
+            $zip->close();
+        }
+    }
+
+    private function open(string $archive): ZipArchive
+    {
+        if (!class_exists(ZipArchive::class)) {
+            throw new RuntimeException('ZipArchive is unavailable');
+        }
+        $zip = new ZipArchive();
+        if ($zip->open($archive) !== true) {
+            throw new RuntimeException('invalid extension ZIP');
+        }
+        return $zip;
     }
 
     /**
@@ -140,7 +173,7 @@ final class ExtensionArchiveInstaller
         return implode('/', $parts);
     }
 
-    private function removeTree(string $directory): void
+    public static function removeTree(string $directory): void
     {
         if (!is_dir($directory)) {
             return;

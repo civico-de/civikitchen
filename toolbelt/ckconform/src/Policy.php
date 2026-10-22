@@ -230,7 +230,7 @@ final class Policy
                 $out['extension_source'][] = $item['key'] . '@' . $item['url'] . '#sha256=' . strtolower($item['sha256']) . ' -- ' . $item['reason'];
             } else {
                 // Space-separated: the schema forbids a space in every field, and
-                // both consumers (bash `read`, the release workflow) split on it.
+                // both consumers (the extension provisioner, the release workflow) split on it.
                 $out['extension_release'][] = implode(' ', [
                     $item['key'],
                     $item['release']['repository'],

@@ -499,6 +499,8 @@ jobs:
           CK_POLICY_DIR: ${{ runner.temp }}/ckrelease-policy
           CK_DEPS: ${{ runner.temp }}/ckrelease-deps
           CK_SIBLINGS: ${{ runner.temp }}/ckrelease-siblings
+          # This contract's ck resolves the <requires>, whatever ck the image carries.
+          CK_CIVIKITCHEN: ${{ github.workspace }}/.civikitchen-ci
         run: |
           set -euo pipefail
           # Always directories, even with nothing staged: compose interpolates
@@ -545,6 +547,7 @@ jobs:
                 - ${CK_POLICY_DIR}:/ck-policy:ro
                 - ${CK_DEPS}:/ck-deps:ro
                 - ${CK_SIBLINGS}:/ck-siblings:ro
+                - ${CK_CIVIKITCHEN}:/ck-civikitchen:ro
             db:
               image: ${CIVIKITCHEN_DB_IMAGE}
               environment:
@@ -583,21 +586,15 @@ jobs:
           # extension (registry download, or the extension_source pin), then
           # install for real — this is where a missing <requires>, a broken
           # upgrader or a PHP file the exclude list swallowed by mistake
-          # actually shows up. provision.sh is sourced for its functions only;
-          # this exec already runs as the web user, so ck_as_web is a no-op.
-          # The same-repository extensions first: enabling this one installs
-          # them, and by then their own requires are in place.
-          docker compose -f smoke-compose.yml exec -T -u www-data \
-            -e "CK_EXT_KEY=$CK_EXT_KEY" -e "CK_SIBLING_KEYS=${sibling_keys[*]}" \
-            -e CK_DEP_ARCHIVE_DIR=/ck-deps app bash -c '
+          # actually shows up. The same-repository extensions first: enabling
+          # this one installs them, and by then their own requires are in place.
+          docker compose -f smoke-compose.yml exec -T -u www-data -e CK_CLI=/ck-civikitchen/toolbelt/bin/ck \
+            -e "CK_EXT_KEY=$CK_EXT_KEY" -e "CK_SIBLING_KEYS=${sibling_keys[*]}" app bash -c '
             set -eu
             cv ev "CRM_Extension_System::singleton()->getFullContainer()->refresh();"
-            ck_as_web() { "$@"; }
-            . /usr/local/share/civikitchen/provision.sh
-            for sibling in $CK_SIBLING_KEYS; do
-              ck_resolve_requires "$sibling"
+            for key in $CK_SIBLING_KEYS "$CK_EXT_KEY"; do
+              "$CK_CLI" internal provision-requires --ext-dir "${CK_EXT_DIR:-/var/www/html/ext}" --archive-dir /ck-deps "$key"
             done
-            ck_resolve_requires "$CK_EXT_KEY"
             cv ext:enable "$CK_EXT_KEY"'
 
           # Same status assertion the lifecycle smoke in extension-ci.yml uses:

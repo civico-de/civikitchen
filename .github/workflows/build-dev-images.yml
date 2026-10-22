@@ -240,11 +240,13 @@ jobs:
           # supported syntaxes:
           # - bare key (mjwshared): pulled from the public registry, exercises
           #   ext:download's network + cache refresh path.
+          # - bare key whose core-bundled requirement is uninstalled (org.project60.sepa →
+          #   legacycustomsearches): core refuses the download until it is installed.
           # - key@URL (de.systopia.xcm): exercises the explicit-URL path. This
           #   one previously regressed because cv ext:download auto-installs
           #   and bombed with "Cannot install or enable extension"; the
           #   entrypoint now splits download (--no-install) + enable.
-          CIVIKITCHEN_EXTRA_EXTENSIONS: "mjwshared,de.systopia.xcm@https://github.com/systopia/de.systopia.xcm/releases/download/1.13.0/de.systopia.xcm-1.13.0.zip"
+          CIVIKITCHEN_EXTRA_EXTENSIONS: "mjwshared,org.project60.sepa,de.systopia.xcm@https://github.com/systopia/de.systopia.xcm/releases/download/1.13.0/de.systopia.xcm-1.13.0.zip"
         run: |
           docker compose -f examples/standalone/docker-compose.yml up -d --pull always
 
@@ -253,12 +255,12 @@ jobs:
           COMPOSE_FILE: examples/standalone/docker-compose.yml
         run: .github/scripts/wait-standalone-ready.sh
 
-      # Both the bare-key (mjwshared) and key@URL (de.systopia.xcm) entries
-      # from CIVIKITCHEN_EXTRA_EXTENSIONS must end up installed.
+      # Every CIVIKITCHEN_EXTRA_EXTENSIONS entry must end up installed, and the
+      # bundled requirement with it.
       - name: Verify CIVIKITCHEN_EXTRA_EXTENSIONS got installed
         env:
           COMPOSE_FILE: examples/standalone/docker-compose.yml
-          EXT_KEYS: mjwshared de.systopia.xcm
+          EXT_KEYS: mjwshared org.project60.sepa legacycustomsearches de.systopia.xcm
         run: .github/scripts/verify-extra-extensions.sh
 
       # Same major the images ship (docker/*/Dockerfile). A browser job on a

@@ -16,8 +16,13 @@ final class ExtensionInspector
 
     public function load(string $infoFile, string $expectedKey): SimpleXMLElement
     {
+        return $this->parse(is_file($infoFile) ? (string) file_get_contents($infoFile) : '', $expectedKey);
+    }
+
+    public function parse(string $info, string $expectedKey): SimpleXMLElement
+    {
         libxml_use_internal_errors(true);
-        $xml = is_file($infoFile) ? simplexml_load_file($infoFile) : false;
+        $xml = $info === '' ? false : simplexml_load_string($info);
         if (!$xml instanceof SimpleXMLElement || trim((string) $xml['key']) !== $expectedKey) {
             throw new RuntimeException("extension info.xml key does not match {$expectedKey}");
         }

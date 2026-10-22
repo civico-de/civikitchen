@@ -33,8 +33,8 @@
 #   bash tests/images/boot-test-standalone.sh <image>
 #   CK_PROVISION_OVERRIDE=docker/runtime/provision.sh bash tests/images/boot-test-standalone.sh ghcr.io/civico-de/civikitchen:standalone
 #   CK_DATABASE_IMAGE=mysql:8.0 bash tests/images/boot-test-standalone.sh ghcr.io/civico-de/civikitchen:standalone
-# CK_PROVISION_OVERRIDE mounts a checkout's provision.sh over the image's —
-# for running the test against a published image before it is rebuilt.
+# CK_PROVISION_OVERRIDE mounts a checkout's provision.sh over the image's, with this checkout's PHP
+# library and profile driver it calls — for running the test against a published image before it is rebuilt.
 set -euo pipefail
 
 IMAGE="${1:?usage: boot-test-standalone.sh <image>}"
@@ -74,7 +74,9 @@ trap cleanup EXIT
 
 extra=()
 if [ -n "${CK_PROVISION_OVERRIDE:-}" ]; then
-    extra+=(-v "$(cd "$(dirname "${CK_PROVISION_OVERRIDE}")" && pwd)/$(basename "${CK_PROVISION_OVERRIDE}"):/usr/local/share/civikitchen/provision.sh:ro")
+    extra+=(-v "$(cd "$(dirname "${CK_PROVISION_OVERRIDE}")" && pwd)/$(basename "${CK_PROVISION_OVERRIDE}"):/usr/local/share/civikitchen/provision.sh:ro"
+        -v "${SRC}/toolbelt/lib/php:/opt/civikitchen/toolbelt/lib/php:ro"
+        -v "${SRC}/docker/profiles/apply.sh:/opt/civikitchen/docker/profiles/apply.sh:ro")
     echo "==> provision.sh overridden from ${CK_PROVISION_OVERRIDE}"
 fi
 

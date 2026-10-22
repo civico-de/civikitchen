@@ -180,7 +180,11 @@ driver applies dependencies, config, seed and scripts in that order:
 Profile dependencies are enabled first, then the mounted and extra
 extensions, then config, seed, scripts and API users, so seed data can use the
 extension under development. init.d hooks run last. An apply.sh in the root or
-profile replaces the driver.
+profile replaces the driver. A registry dependency's `<requires>` are installed
+and enabled before it, staged releases included. A mounted extension's
+dependency takes the pins in that extension's own `civikitchen.yaml`; a profile
+dependency takes the first mounted extension, in mount path order, that pins
+the key (`CIVIKITCHEN_ENABLE_EXTENSIONS` in [configuration](configuration.md)).
 
 A profile with a `snapshot` block generates its data once and restores it on
 later fresh boots of the standalone image, with dates moved to today. The four
