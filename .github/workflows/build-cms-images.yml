@@ -13,6 +13,14 @@ on:
     # daily build runs uncached so a fixed Debian package lands a day later.
     - cron: '0 4 * * *'
   workflow_dispatch:
+    inputs:
+      skip:
+        description: >-
+          CMS families to leave out, comma-separated (e.g. joomla while its
+          download host is down). The release attaches them once a later run
+          promotes them.
+        type: string
+        default: ''
 
 # Own group: a push or dispatch of build-dev-images.yml never cancels a CMS
 # build, and vice versa. Last-writer-wins on the moving tags as there.
@@ -29,11 +37,16 @@ env:
 jobs:
   resolve-civicrm:
     # The same resolution as build-dev-images.yml; only stable and minor are
-    # read here.
+    # read here. Also selects the CMS families every matrix below iterates.
     runs-on: ubuntu-24.04
     outputs:
       stable: ${{ steps.resolve.outputs.stable }}
       minor: ${{ steps.resolve.outputs.minor }}
+      families: ${{ steps.families.outputs.families }}
+      buildkit: ${{ steps.families.outputs.buildkit }}
+      e2e: ${{ steps.families.outputs.e2e }}
+      demo_variants: ${{ steps.families.outputs.demo_variants }}
+      demo_smoke: ${{ steps.families.outputs.demo_smoke }}
     steps:
       - name: Checkout (for the resolve script)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -43,6 +56,12 @@ jobs:
       - name: Resolve current CiviCRM stable
         id: resolve
         run: .github/scripts/resolve-civicrm-stable.sh
+
+      - name: Select the CMS families
+        id: families
+        env:
+          SKIP: ${{ inputs.skip }}
+        run: .github/scripts/cms-families.sh
 
   build-buildkit:
     needs: resolve-civicrm
@@ -56,11 +75,7 @@ jobs:
     # entrypoint creates on first run.
     strategy:
       matrix:
-        variant:
-          - { name: drupal10,  site_type: drupal10-demo }
-          - { name: drupal11,  site_type: drupal11-demo }
-          - { name: wordpress, site_type: wp-demo }
-          - { name: joomla,    site_type: joomla-demo }
+        variant: ${{ fromJSON(needs.resolve-civicrm.outputs.buildkit) }}
         php: ['8.3']
         platform:
           - linux/arm64
@@ -115,16 +130,16 @@ jobs:
           no-cache: ${{ github.event_name == 'schedule' }}
 
   merge-buildkit:
-    needs: build-buildkit
+    needs: [resolve-civicrm, build-buildkit]
     permissions:
       contents: read
       packages: write
     uses: ./.github/workflows/merge-manifest.yml
     with:
-      tags: '["drupal10", "drupal11", "wordpress", "joomla"]'
+      tags: ${{ needs.resolve-civicrm.outputs.families }}
 
   smoke-test-buildkit:
-    needs: merge-buildkit
+    needs: [resolve-civicrm, merge-buildkit]
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -132,7 +147,7 @@ jobs:
 
     strategy:
       matrix:
-        variant: [drupal10, drupal11, wordpress, joomla]
+        variant: ${{ fromJSON(needs.resolve-civicrm.outputs.families) }}
         platform: [linux/arm64, linux/amd64]
         include:
           - platform: linux/arm64
@@ -169,7 +184,7 @@ jobs:
     # Runs each CMS example compose stack with the candidate image and exercises
     # it in real Chromium. This complements boot-test.sh's cv/API assertions by
     # catching browser-visible Apache/SITE_URL/asset failures.
-    needs: smoke-test-buildkit
+    needs: [resolve-civicrm, smoke-test-buildkit]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -177,11 +192,7 @@ jobs:
 
     strategy:
       matrix:
-        variant:
-          - { name: drupal10,  compose: examples/drupal10/docker-compose.yml,  path: "/civicrm" }
-          - { name: drupal11,  compose: examples/drupal11/docker-compose.yml,  path: "/civicrm" }
-          - { name: wordpress, compose: examples/wordpress/docker-compose.yml, path: "/wp-admin/admin.php?page=CiviCRM" }
-          - { name: joomla,    compose: examples/joomla/docker-compose.yml,   path: "/administrator/index.php?option=com_civicrm" }
+        variant: ${{ fromJSON(needs.resolve-civicrm.outputs.e2e) }}
 
     steps:
       - name: Checkout
@@ -256,14 +267,14 @@ jobs:
   scenario-test-buildkit:
     # Exercise the generated extension/profile contract on every CMS family;
     # this is distinct from the fixed example stacks above.
-    needs: smoke-test-buildkit
+    needs: [resolve-civicrm, smoke-test-buildkit]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: read
     strategy:
       matrix:
-        variant: [drupal10, drupal11, wordpress, joomla]
+        variant: ${{ fromJSON(needs.resolve-civicrm.outputs.families) }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -285,7 +296,7 @@ jobs:
   promote-buildkit:
     # Stable tags only move once the candidate passed the tests and the scan,
     # onto the scanned digest.
-    needs: [e2e-test-buildkit, scenario-test-buildkit, scan-buildkit]
+    needs: [resolve-civicrm, e2e-test-buildkit, scenario-test-buildkit, scan-buildkit]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -293,7 +304,7 @@ jobs:
 
     strategy:
       matrix:
-        variant: [drupal10, drupal11, wordpress, joomla]
+        variant: ${{ fromJSON(needs.resolve-civicrm.outputs.families) }}
         php: ['8.3']
 
     steps:
@@ -317,13 +328,13 @@ jobs:
         run: .github/scripts/promote-digest.sh "$VARIANT" "$VARIANT-php$PHP"
 
   scan-buildkit:
-    needs: merge-buildkit
+    needs: [resolve-civicrm, merge-buildkit]
     permissions:
       contents: read
       packages: read
     uses: ./.github/workflows/scan-images.yml
     with:
-      tags: '["drupal10", "drupal11", "wordpress", "joomla"]'
+      tags: ${{ needs.resolve-civicrm.outputs.families }}
 
   cms-demo:
     needs: resolve-civicrm
@@ -332,32 +343,8 @@ jobs:
       packages: write
     uses: ./.github/workflows/build-demo-images.yml
     with:
-      variants: >-
-        [{"name": "drupal10-demo",  "site_type": "drupal10-demo"},
-         {"name": "drupal11-demo",  "site_type": "drupal11-demo"},
-         {"name": "wordpress-demo", "site_type": "wp-demo"},
-         {"name": "joomla-demo",    "site_type": "joomla-demo"}]
-      smoke: >-
-        [{"tag": "drupal10-demo",  "profile": ""},
-         {"tag": "drupal10-demo",  "profile": "verein"},
-         {"tag": "drupal10-demo",  "profile": "fundraising"},
-         {"tag": "drupal10-demo",  "profile": "events"},
-         {"tag": "drupal10-demo",  "profile": "mailing"},
-         {"tag": "drupal11-demo",  "profile": ""},
-         {"tag": "drupal11-demo",  "profile": "verein"},
-         {"tag": "drupal11-demo",  "profile": "fundraising"},
-         {"tag": "drupal11-demo",  "profile": "events"},
-         {"tag": "drupal11-demo",  "profile": "mailing"},
-         {"tag": "wordpress-demo", "profile": ""},
-         {"tag": "wordpress-demo", "profile": "verein"},
-         {"tag": "wordpress-demo", "profile": "fundraising"},
-         {"tag": "wordpress-demo", "profile": "events"},
-         {"tag": "wordpress-demo", "profile": "mailing"},
-         {"tag": "joomla-demo",    "profile": ""},
-         {"tag": "joomla-demo",    "profile": "verein"},
-         {"tag": "joomla-demo",    "profile": "fundraising"},
-         {"tag": "joomla-demo",    "profile": "events"},
-         {"tag": "joomla-demo",    "profile": "mailing"}]
+      variants: ${{ needs.resolve-civicrm.outputs.demo_variants }}
+      smoke: ${{ needs.resolve-civicrm.outputs.demo_smoke }}
       civicrm_version: ${{ needs.resolve-civicrm.outputs.stable }}
       civicrm_build_version: ${{ needs.resolve-civicrm.outputs.minor }}
 

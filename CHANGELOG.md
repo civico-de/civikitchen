@@ -14,6 +14,13 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- *Build CMS Images* takes a `skip` input on dispatch: the CMS families to
+  leave out of the run (e.g. `joomla` while its download host is down), so the
+  others still build and promote. An unknown family or skipping all of them
+  fails the run.
+
 ### Fixed
 
 - A new container's `~/.cv.json` also names the demo user as `DEMO_USER`,

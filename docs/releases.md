@@ -144,6 +144,11 @@ newest v1.x.y, like the git v1 tag. A re-run of an older release attaches only
 the patch tag. Release runs queue rather than overlap, and each reads origin's tags right
 before it decides which release is the newest.
 
+All CMS families build in one run, so one failing family holds back the
+others. When an upstream download host is down, dispatch *Build CMS Images*
+with `skip` set to that family (e.g. `joomla`), re-run the release for the
+rest, and catch the skipped family up once its host is back.
+
 ### Versioning rules
 
 - **patch**: an image content refresh, a bug fix in a tool or the workflow,

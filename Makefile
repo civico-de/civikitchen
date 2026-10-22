@@ -119,7 +119,7 @@ endef
 .DEFAULT_GOAL := help
 .PHONY: help doctor release test test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario \
 	test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-promote-scanned test-promote-digest test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-vendored-paths test-ckeslint test-ckcoverage test-ckcommon-git test-missing-tool test-doctor test-tool-locks \
-	test-ck-headless test-ckcoretest test-phpstan-bootstrap test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git lint lint-shell lint-shell-portability \
+	test-ck-headless test-ckcoretest test-phpstan-bootstrap test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-cms-families lint lint-shell lint-shell-portability \
 	test-database-matrix test-compose-config test-playwright-port test-demo-basic-auth test-release-retag test-release-steps test-ci-gates-step test-release-script test-release-verify-images \
         lint-actions lint-php lint-schema lint-changelog docs docs-serve docs-a11y test-changelog test-extension-docs build test-images e2e-ckcreate e2e tools clean
 
@@ -139,7 +139,7 @@ help: ## Show this help
 doctor: ## Report every missing host prerequisite in one pass
 	bash scripts/doctor.sh
 
-test: test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario test-provision test-core-patches test-ckcoretest test-ck-headless test-ck-headless-phpstan test-phpstan-bootstrap test-ckcommon-git test-missing-tool test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-promote-scanned test-promote-digest test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-sibling-vendor test-sibling-build test-database-matrix test-demo-basic-auth test-release-retag test-release-move-major-tag test-release-publish-flags test-release-steps test-ci-gates-step test-release-script test-release-verify-images test-vendored-paths test-ckeslint test-ckcoverage test-doctor test-tool-locks test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-changelog test-extension-docs ## Run every fast test suite (no Docker)
+test: test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario test-provision test-core-patches test-ckcoretest test-ck-headless test-ck-headless-phpstan test-phpstan-bootstrap test-ckcommon-git test-missing-tool test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-promote-scanned test-promote-digest test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-sibling-vendor test-sibling-build test-database-matrix test-demo-basic-auth test-release-retag test-release-move-major-tag test-release-publish-flags test-release-steps test-ci-gates-step test-release-script test-release-verify-images test-vendored-paths test-ckeslint test-ckcoverage test-doctor test-tool-locks test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-cms-families test-changelog test-extension-docs ## Run every fast test suite (no Docker)
 
 test-shared-php-coverage: $(PHPUNIT) $(SCENARIO_YAML_STAMP) ## Shared PHP unit tests and measured line-coverage floor
 	if command -v phpdbg >/dev/null 2>&1; then \
@@ -392,6 +392,9 @@ test-install-trivy: ## Trivy installer architecture selection and release checks
 
 test-resolve-civicrm-stable: ## The image matrix always builds the phpstan catalog's CiviCRM minor
 	bash tests/parity/test-resolve-civicrm-stable.sh
+
+test-cms-families: $(SCENARIO_YAML_STAMP) ## Build CMS Images skips exactly the families its skip input names
+	bash tests/parity/test-cms-families.sh
 
 test-resolve-civicrm-git: ## The git-built images track master and the newest release branch
 	bash tests/parity/test-resolve-civicrm-git.sh
