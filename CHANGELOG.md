@@ -14,7 +14,7 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
-## [1.51.0] - 2026-10-23
+## [1.51.0] - 2026-10-22
 
 ### Changed
 
