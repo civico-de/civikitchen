@@ -119,6 +119,10 @@ ckcivix - report or fix drift between the civix scaffold and the current format.
 
 Run from the extension root. An extension with no scaffold at all is reported,
 not failed, unless --check is given.
+
+--check compares <civix><format> with civix's newest upgrade step. `civix
+upgrade` also runs a general pass every time (*.civix.php, empty hook stubs,
+mixins), so --update can still change files when --check passes.
 TXT;
     }
 }

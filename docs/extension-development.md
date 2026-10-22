@@ -277,6 +277,13 @@ ckx ckcivix --check                      # fails when the civix layer is behind
 ckx ckcivix --update                     # runs civix upgrade -n
 ```
 
+`ckcivix --check` compares the declared `<civix><format>` with the newest
+upgrade step civix knows. `civix upgrade` also runs a general pass every time:
+it regenerates `*.civix.php`, removes empty hook stubs from the module file and
+reconciles the mixins in info.xml. `--update` can therefore still change files
+while `--check` passes. Mixin declarations are checked by ckconform; run
+`ckcivix --update` after a civix bump to pick up the rest.
+
 Use generate:entity rather than writing a schema file by hand: it also creates
 the DAO stub the schema names. A schema without its stub passes every static
 check and then fails at install with `Class "…" not found`, after earlier

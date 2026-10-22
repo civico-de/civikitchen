@@ -43,6 +43,10 @@ except that a break the consumers are adjusted for ships as a minor, marked
   `<requires>` matches. A key the extension feed does not list fails at once
   as well, instead of after three download attempts.
 
+- `ckcivix --help` and the civix workflow docs state what `--check` covers:
+  the declared civix format, not the general pass `civix upgrade` runs every
+  time, so `ckcivix --update` can still change files after `--check` passed.
+
 ### Removed
 
 - The `ck internal` operations `profile-dependencies`,
