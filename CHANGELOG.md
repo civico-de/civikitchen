@@ -88,6 +88,11 @@ except that a break the consumers are adjusted for ships as a minor, marked
   a profile's registry extension. The setting is removed after the download,
   also when it fails.
 
+- `ckdeps` no longer scans `.civikitchen-siblings/`. In extension CI that
+  directory holds the sibling checkouts, civikitchen among them, and with the
+  common `CRM_` → `.` autoload root their classes were reported as the
+  extension's unknown classes, so the gate failed in CI and passed locally.
+
 ## [1.50.0] - 2026-10-22
 
 ### Added

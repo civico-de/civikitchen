@@ -46,6 +46,11 @@ $configuration = (new Configuration())
 if (is_dir('vendor')) {
   $configuration->addPathToExclude('vendor');
 }
+// Extension CI checks sibling repositories (civikitchen itself among them) out
+// here; their code is not the extension's.
+if (is_dir('.civikitchen-siblings')) {
+  $configuration->addPathToExclude('.civikitchen-siblings');
+}
 if (is_dir('tests')) {
   $configuration->addPathToScan('tests', true);
 }

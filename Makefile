@@ -220,8 +220,10 @@ test-ckcommon-git: ## ck_git trusts the worktree root, not the cwd
 test-missing-tool: ## A tool missing from PATH is named, not a proc_open warning
 	bash tests/toolbelt/test-missing-tool.sh
 
-test-composer-deps: ## ckdeps ignore patterns: core-provided classes only
+test-composer-deps: ## ckdeps config: core-provided classes only, sibling checkouts not scanned
 	php tests/toolbelt/test-composer-deps.php
+	composer install --no-interaction --no-progress --working-dir=toolbelt/ckdeps-root
+	bash tests/toolbelt/test-composer-deps-paths.sh
 
 test-profiles: $(SCENARIO_YAML_STAMP) ## Profile schema, external resolution, credentials modes, file permissions and seed helpers
 	php tests/profiles/test-credentials.php
