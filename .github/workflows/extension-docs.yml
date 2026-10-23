@@ -31,6 +31,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # Handbook images may live in Git LFS; build.py refuses pointer files.
+          lfs: true
 
       # job.workflow_sha: this file's own commit, not the caller's.
       - name: Checkout civikitchen

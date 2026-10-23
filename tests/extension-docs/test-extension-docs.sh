@@ -71,4 +71,11 @@ grep -q 'extra.de.md' "$work/err" || fail "the orphan translation is not named"
 build "$fixture" "$work/x" en 2>"$work/err" && fail "an unbuilt language builds"
 grep -q 'language de is not built' "$work/err" || fail "the unbuilt language is not named"
 
+mkdir -p "$work/lfs/handbook/images"
+cp "$fixture/info.xml" "$work/lfs/"
+printf '# Greeter\n' > "$work/lfs/handbook/index.md"
+printf 'version https://git-lfs.github.com/spec/v1\noid sha256:4d7a\nsize 12345\n' > "$work/lfs/handbook/images/shot.png"
+build "$work/lfs" "$work/l" en 2>"$work/err" && fail "a handbook with Git LFS pointers builds"
+grep -q 'images/shot.png' "$work/err" || fail "the LFS pointer is not named"
+
 echo "extension docs: ok"

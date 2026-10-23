@@ -140,6 +140,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # git archive writes the smudged files only when the LFS objects are
+          # fetched; ckrelease refuses pointer files.
+          lfs: true
 
       # Pinned to the SHA this workflow was resolved from, so the ckrelease that
       # builds the artifact is the one belonging to the pinned contract — same

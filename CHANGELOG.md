@@ -14,6 +14,13 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- `extension-docs` and `extension-release` check the extension out with Git
+  LFS objects, so files a repo tracks in LFS reach the site and the archive.
+  The docs build and `ckrelease verify` refuse Git LFS pointer files and name
+  them.
+
 ## [1.51.0] - 2026-10-22
 
 ### Changed

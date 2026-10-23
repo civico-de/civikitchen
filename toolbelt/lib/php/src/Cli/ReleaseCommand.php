@@ -369,7 +369,17 @@ final class ReleaseCommand implements Command
                 }
             }
         }
+        // git archive writes pointer files where Git LFS objects were not fetched.
+        $pointers = array_values(array_filter($entries, static function (string $entry) use ($zip): bool {
+            $stat = $zip->statName($entry);
+            return $stat !== false && $stat['size'] < 1024
+                && str_starts_with((string) $zip->getFromName($entry), 'version https://git-lfs.github.com/spec/v1');
+        }));
         $zip->close();
+        if ($pointers !== []) {
+            fwrite(STDERR, "ckrelease: FAIL - Git LFS pointers instead of files:\n  " . implode("\n  ", $pointers) . "\n  Fetch the LFS objects (actions/checkout with lfs: true) before the release.\n");
+            $failed = true;
+        }
         if ($offenders !== []) {
             fwrite(STDERR, "ckrelease: FAIL - dev/CI paths in the archive:\n  " . implode("\n  ", array_unique($offenders)) . "\n  Configure policy.dist.exclude/include in civikitchen.yaml.\n");
             $failed = true;

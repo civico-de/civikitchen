@@ -935,6 +935,23 @@ final class SharedPhpTest extends TestCase
         self::assertStringContainsString("policy.dist.build output is tracked at HEAD:\n  staged.php\n", $cli['stderr']);
     }
 
+    public function testReleaseRefusesAnArchiveHoldingGitLfsPointers(): void
+    {
+        $repository = $this->stagedRepository(['ang/app.bundle.js']);
+        $this->write($repository, 'handbook/images/shot.png', "version https://git-lfs.github.com/spec/v1\noid sha256:4d7a\nsize 12345\n");
+        $this->git($repository, 'add', 'handbook');
+        $this->git($repository, '-c', 'user.name=ck', '-c', 'user.email=ck@example.org', 'commit', '-q', '-m', 'pointer');
+        $this->write($repository, 'ang/app.bundle.js', 'built();');
+
+        $cli = (new Runner())->captureSeparate(
+            ['php', dirname(__DIR__, 2) . '/toolbelt/bin/ckrelease', 'dist', '--output', $this->temporary . '/cli'],
+            null,
+            $repository,
+        );
+        self::assertSame(1, $cli['status']);
+        self::assertStringContainsString("Git LFS pointers instead of files:\n  org.example.staged/handbook/images/shot.png\n", $cli['stderr']);
+    }
+
     public function testReleaseStagesOntoATreeThatAlreadyBundlesVendor(): void
     {
         $repository = $this->stagedRepository(['ang/app.bundle.js']);

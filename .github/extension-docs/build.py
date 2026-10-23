@@ -22,6 +22,7 @@ from pathlib import Path
 
 import yaml
 
+LFS_POINTER = b"version https://git-lfs.github.com/spec/v1"
 LANG = re.compile(r"^[a-z]{2}(_[A-Z]{2})?$")
 LANG_NAMES = {"en": "English", "de": "Deutsch", "fr": "Français", "es": "Español", "it": "Italiano", "nl": "Nederlands"}
 # The theme's indigo accent colours the active navigation link below 4.5:1 in both schemes.
@@ -124,6 +125,11 @@ def main():
         die(f"translations without a default page: {', '.join(orphans)}")
     if not pages:
         die(f"{source} holds no Markdown pages")
+    # A checkout without Git LFS holds pointer files where the images should be.
+    pointers = [str(p.relative_to(source)) for p in sorted(source.rglob("*"))
+                if p.is_file() and p.stat().st_size < 1024 and p.read_bytes().startswith(LFS_POINTER)]
+    if pointers:
+        die(f"Git LFS pointers instead of files (check out with lfs: true): {', '.join(pointers)}")
 
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     owner, _, repo_name = repo.partition("/")
