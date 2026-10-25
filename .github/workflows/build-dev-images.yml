@@ -298,11 +298,9 @@ jobs:
         run: docker compose -f examples/standalone/docker-compose.yml down -v
 
   database-compat-standalone:
-    # One current-stable amd64 candidate against the baseline and both database
-    # families CiviCRM recommends. This gates promotion: Dependabot may propose
-    # a new sidecar tag, but the default moves only after install, provisioning,
-    # locale rendering, and the isolated headless DB all pass here.
-    # Every run checks all of them: any run can carry a release.
+    # One current-stable amd64 candidate: install, provisioning, locale
+    # rendering and the isolated headless DB. The databases extension repos
+    # pin (policy.database) gate promotion; the rest follow after it.
     needs: [resolve-civicrm, smoke-test-standalone]
     runs-on: ubuntu-24.04
     permissions:
@@ -311,7 +309,38 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        database: ["mariadb:11.4", "mariadb:10.11", "mariadb:12.2", "mysql:8.0"]
+        database: ["mariadb:11.4", "mariadb:10.11"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: First boot and headless scratch DB
+        env:
+          CK_DATABASE_IMAGE: ${{ matrix.database }}
+          IMG: ${{ env.IMAGE_PREFIX }}:standalone-${{ needs.resolve-civicrm.outputs.stable }}-${{ github.sha }}
+        run: bash tests/images/boot-test-standalone.sh "$IMG"
+
+  database-compat-extended:
+    # The same boot against the other verified databases. Off the promotion
+    # path; a failure still turns the run red and blocks a release.
+    needs: [resolve-civicrm, promote-standalone]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        database: ["mariadb:12.2", "mysql:8.0"]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -479,7 +508,7 @@ jobs:
     # The scans are listed although promote already waits for them: the daily
     # cron is the run that finds a base-image CVE nobody pushed a commit for,
     # and the edge makes that finding open an issue.
-    needs: [promote-standalone, standalone-demo, scan-standalone, monorepo-self-test]
+    needs: [promote-standalone, database-compat-extended, standalone-demo, scan-standalone, monorepo-self-test]
     if: github.event_name == 'schedule' && failure()
     runs-on: ubuntu-24.04
     permissions:
