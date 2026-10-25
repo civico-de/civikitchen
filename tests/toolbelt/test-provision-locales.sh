@@ -23,11 +23,13 @@ tar -C "$work/daily" -czf "$work/civicrm-l10n-daily.tar.gz" l10n
 
 cat > "$work/bin/curl" <<'FAKE'
 #!/usr/bin/env bash
-# fake curl: the last argument is the URL; serve the file of that name.
+# fake curl: the last argument is the URL; serve the file of that name to -o.
 printf '%s\n' "${*: -1}" >> "$CURL_LOG"
-file="$CURL_DIR/$(basename "${*: -1}")"
-[[ -f "$file" ]] || exit 22
-cat "$file"
+printf '%s\n' "$*" >> "$CURL_LOG.args"
+out=; while [[ $# -gt 1 ]]; do [[ "$1" == -o ]] && out="$2"; shift; done
+file="$CURL_DIR/$(basename "$1")"
+[[ -f "$file" && -n "$out" ]] || exit 22
+cp "$file" "$out"
 FAKE
 cat > "$work/bin/cv" <<'FAKE'
 #!/usr/bin/env bash
@@ -60,6 +62,10 @@ grep -qx 'https://l10n.example.org/civicrm-6.17.2-l10n.tar.gz' "$CURL_LOG" || fa
 [[ "$(cat "$work/site/l10n/de_DE/LC_MESSAGES/civicrm.mo")" == de ]] || fail "de_DE .mo not installed"
 [[ ! -e "$work/site/l10n/fr_FR" ]] || fail "fr_FR was not requested"
 grep -q 'setting:set lcMessages=de_DE' "$CV_LOG" || fail "lcMessages not set"
+# A stalled or dropped transfer aborts and is retried instead of hanging.
+for flag in '--speed-time 30' '--retry 3' '--retry-all-errors'; do
+  grep -qF -- "$flag" "$CURL_LOG.args" || fail "curl runs without $flag: $(cat "$CURL_LOG.args")"
+done
 
 # Two locales, no default: both land, lcMessages untouched.
 : > "$CV_LOG"; /bin/rm -rf "$work/site"

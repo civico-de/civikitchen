@@ -14,6 +14,12 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Fixed
+
+- `CIVIKITCHEN_LOCALES` no longer hangs on a stalled download of the core
+  language archive: a transfer under 10 kB/s for 30 s aborts, and a failed
+  download is retried up to three times before provisioning fails.
+
 ## [1.53.0] - 2026-10-25
 
 ### Changed

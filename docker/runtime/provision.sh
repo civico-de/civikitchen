@@ -362,7 +362,7 @@ ck_enable_extensions() {
 }
 
 # Core language files. Opt-in via CIVIKITCHEN_LOCALES=de_DE[,fr_FR,...]: the
-# version-matching civicrm-<version>-l10n.tar.gz is streamed once and only
+# version-matching civicrm-<version>-l10n.tar.gz is downloaded once and only
 # the requested locales land in [civicrm.l10n], the directory core reads
 # translations from; an extension's own l10n/ catalogue translates without
 # them. CIVIKITCHEN_DEFAULT_LOCALE=<locale> additionally
@@ -449,11 +449,12 @@ ck_fetch_locales() {
     fi
     echo "[civikitchen] Installing core language files ${missing[*]} from ${archive} into ${l10n_dir}..."
     unpack="$(mktemp -d)"
-    # Streamed, not saved: the archive carries every locale and only a few MB
-    # of it are wanted. tar exits non-zero for a member that is not in the
-    # archive, so an unknown locale fails here instead of silently leaving
-    # English behind.
-    if ! (set -o pipefail; curl -fsSL "${archive}" | tar -xz -C "${unpack}" "${missing[@]/#/${prefix}/}"); then
+    # Saved before unpacking, so a stalled transfer (under 10 kB/s for 30 s)
+    # aborts and is retried whole. tar exits non-zero for a member that is not
+    # in the archive, so an unknown locale fails instead of leaving English behind.
+    if ! curl -fsSL --connect-timeout 20 --speed-limit 10240 --speed-time 30 \
+            --retry 3 --retry-all-errors -o "${unpack}/l10n.tar.gz" "${archive}" \
+        || ! tar -xzf "${unpack}/l10n.tar.gz" -C "${unpack}" "${missing[@]/#/${prefix}/}"; then
         rm -rf "${unpack}"
         echo "[civikitchen] ERROR: could not fetch ${missing[*]} from ${archive}" >&2
         return 1

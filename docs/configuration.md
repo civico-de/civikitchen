@@ -40,7 +40,7 @@ Older kitchen variables spelled with `CIVICRM_`, and `SITE_URL`, still work but 
 
 ## Locales
 
-With `CIVIKITCHEN_LOCALES` set, first boot streams the `civicrm-<version>-l10n.tar.gz` that matches the installed version from download.civicrm.org and unpacks only the requested locales into `[civicrm.l10n]`. An alpha or beta core, such as `:standalone-master` or `:standalone-beta`, takes core's daily `civicrm-l10n-daily.tar.gz` instead. An unknown locale fails the boot rather than leaving English behind.
+With `CIVIKITCHEN_LOCALES` set, first boot downloads the `civicrm-<version>-l10n.tar.gz` that matches the installed version from download.civicrm.org and unpacks only the requested locales into `[civicrm.l10n]`. An alpha or beta core, such as `:standalone-master` or `:standalone-beta`, takes core's daily `civicrm-l10n-daily.tar.gz` instead. A stalled download is aborted and retried; an unknown locale fails the boot rather than leaving English behind.
 
 Without core language files, core strings stay English. An extension's own `l10n/<locale>/LC_MESSAGES/<file>.mo` still translates (measured on 6.16 and 6.18), so testing an extension's catalogue needs no core language files.
 
