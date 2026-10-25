@@ -44,43 +44,21 @@ vulnerabilities:
   # npm's own bundled dependencies
   #
   # /usr/lib/node_modules/npm/node_modules. A newer npm moves this tree
-  # (NPM_VERSION), but npm 12.2.0, the current npm, still bundles
-  # brace-expansion 5.0.9 and undici 6.28.0 — read out of its registry tarball
-  # on 2026-10-02 — so no release carries these fixes yet.
+  # (NPM_VERSION), but npm 12.2.1, the current npm, still bundles undici
+  # 6.29.0 — read out of its registry tarball on 2026-10-25 — so no release
+  # carries this fix yet.
   # -------------------------------------------------------------------------
-  - id: CVE-2026-102276
+  - id: CVE-2026-109869
     paths:
       - "usr/lib/node_modules/npm/**"
     statement: >-
-      Stack exhaustion in brace-expansion's expand() on crafted brace patterns.
-      In this tree only npm's own CLI calls it, on the glob and workspace
-      patterns of the project the developer runs it in; nothing the images
-      serve reaches it. Scoped to npm's tree on purpose: toolbelt/oxlint
-      resolves 5.0.12, and a regression there must NOT be hidden. On expiry
-      re-read the bundled version
-      (node -p 'require("/usr/lib/node_modules/npm/node_modules/brace-expansion/package.json").version')
-      and delete this entry and CVE-2026-102278 once an npm release ships >= 5.0.11.
-    expired_at: 2026-11-01
-
-  - id: CVE-2026-102278
-    paths:
-      - "usr/lib/node_modules/npm/**"
-    statement: >-
-      Uncontrolled recursion on nested brace patterns in the same bundled
-      brace-expansion 5.0.9; same reachability and expiry check as
-      CVE-2026-102276.
-    expired_at: 2026-11-01
-
-  - id: CVE-2026-19534
-    paths:
-      - "usr/lib/node_modules/npm/**"
-    statement: >-
-      Denial of service in undici's WebSocket client via a subprotocol the
-      server did not offer. In npm's tree only node-gyp loads undici, for the
-      fetch() of Node headers in lib/download.js; nothing opens a WebSocket.
-      On expiry re-read node_modules/undici/package.json the same way and
-      delete this entry once an npm release ships >= 6.28.1.
-    expired_at: 2026-11-01
+      Denial of service in undici via an unhandled stream error. In npm's tree
+      only node-gyp loads undici, for the fetch() of Node headers in
+      lib/download.js; the worst case is a failed native-addon build in a dev
+      container. On expiry re-read the bundled version
+      (node -p 'require("/usr/lib/node_modules/npm/node_modules/undici/package.json").version')
+      and delete this entry once an npm release ships >= 6.29.1.
+    expired_at: 2026-11-15
 
   # -------------------------------------------------------------------------
   # Go stdlib inside the oxlint-tsgolint binary

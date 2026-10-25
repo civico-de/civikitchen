@@ -21,6 +21,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - The extension template's `.gitattributes` tracks `handbook/images/**/*.png`
   in Git LFS. Run `ckinit --update` to take it over; repos without handbook
   screenshots are unaffected beyond the template-drift gate.
+- The images install npm 12.2.1, which bundles patched brace-expansion and
+  undici releases.
 
 ## [1.52.0] - 2026-10-23
 
