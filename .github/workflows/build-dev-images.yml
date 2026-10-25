@@ -299,8 +299,8 @@ jobs:
 
   database-compat-standalone:
     # One current-stable amd64 candidate: install, provisioning, locale
-    # rendering and the isolated headless DB. The databases extension repos
-    # pin (policy.database) gate promotion; the rest follow after it.
+    # rendering and the isolated headless DB. Every image policy.database
+    # offers gates promotion (tests/parity/database-policy.php holds the two equal).
     needs: [resolve-civicrm, smoke-test-standalone]
     runs-on: ubuntu-24.04
     permissions:
@@ -309,7 +309,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        database: ["mariadb:11.4", "mariadb:10.11"]
+        database: ["mariadb:11.4", "mariadb:10.11", "mariadb:12.2"]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -330,8 +330,8 @@ jobs:
         run: bash tests/images/boot-test-standalone.sh "$IMG"
 
   database-compat-extended:
-    # The same boot against the other verified databases. Off the promotion
-    # path; a failure still turns the run red and blocks a release.
+    # The same boot against MySQL, which policy.database does not offer. Off
+    # the promotion path; a failure still turns the run red and blocks a release.
     needs: [resolve-civicrm, promote-standalone]
     runs-on: ubuntu-24.04
     permissions:
@@ -340,7 +340,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        database: ["mariadb:12.2", "mysql:8.0"]
+        database: ["mysql:8.0"]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
