@@ -288,6 +288,17 @@ vulnerabilities:
       buildkit rebuild.
     expired_at: 2026-11-01
 
+  - id: CVE-2026-111181
+    paths:
+      - "home/buildkit/buildkit/**"
+    statement: >-
+      body-parser 1.20.6 via karma@6.4.4, which uses it in its own dev server.
+      The denial of service needs request bodies sent to that server, which
+      runs only when a developer starts karma by hand; the served site never
+      loads it. Scoped to buildkit's clone: the standalone flavors scan clean
+      for this ID. Recheck after a buildkit rebuild.
+    expired_at: 2026-11-15
+
   # -------------------------------------------------------------------------
   # Drupal's package_manager test FIXTURE (drupal11 flavors)
   #
