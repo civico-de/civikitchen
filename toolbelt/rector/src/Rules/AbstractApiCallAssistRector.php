@@ -106,7 +106,7 @@ abstract class AbstractApiCallAssistRector extends AbstractRector {
    * `version` is dropped, civicrm_api3() overwrites it anyway. `select` is
    * always a list literal, the comma list api3 also accepts split up.
    *
-   * @return array{where: list<array{string, Expr}>, top: list<array{string, Expr}>, sequential: ?Expr}|null
+   * @return array{where: list<array{string, Expr}>, top: list<array{'select'|'limit'|'offset'|'checkPermissions', Expr}>, sequential: ?Expr}|null
    */
   protected function classifyApi3GetParams(Array_ $params): ?array {
     $where = [];
@@ -114,7 +114,7 @@ abstract class AbstractApiCallAssistRector extends AbstractRector {
     $sequential = NULL;
 
     foreach ($params->items as $item) {
-      if (!$item instanceof ArrayItem || !$item->key instanceof String_) {
+      if (!$item->key instanceof String_) {
         return NULL;
       }
       $key = $item->key->value;
@@ -179,7 +179,7 @@ abstract class AbstractApiCallAssistRector extends AbstractRector {
       return NULL;
     }
     foreach ($value->items as $item) {
-      if (!$item instanceof ArrayItem || $item->key !== NULL || $item->unpack) {
+      if ($item->key !== NULL || $item->unpack) {
         return NULL;
       }
     }
@@ -198,7 +198,7 @@ abstract class AbstractApiCallAssistRector extends AbstractRector {
     }
     $options = ['limit' => NULL, 'offset' => NULL];
     foreach ($value->items as $opt) {
-      if (!$opt instanceof ArrayItem || !$opt->key instanceof String_ || !array_key_exists($opt->key->value, $options)) {
+      if (!$opt->key instanceof String_ || !array_key_exists($opt->key->value, $options)) {
         return NULL;
       }
       $options[$opt->key->value] = $opt->value;

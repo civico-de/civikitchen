@@ -171,8 +171,9 @@ final class CkProfileSchemaValidator {
 }
 
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
-  $schemaFile = count($argv) >= 3 ? $argv[1] : __DIR__ . '/profile.schema.json';
-  $documentFile = count($argv) >= 3 ? $argv[2] : ($argv[1] ?? '');
+  $arguments = $_SERVER['argv'];
+  $schemaFile = count($arguments) >= 3 ? $arguments[1] : __DIR__ . '/profile.schema.json';
+  $documentFile = count($arguments) >= 3 ? $arguments[2] : ($arguments[1] ?? '');
   if ($documentFile === '') {
     fwrite(STDERR, "usage: validate.php [schema.json] <profile.json>\n");
     exit(2);

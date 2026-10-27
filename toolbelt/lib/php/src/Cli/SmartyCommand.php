@@ -49,7 +49,6 @@ final class SmartyCommand implements Command
         $payload = $this->checkoutRoot . '/toolbelt/lib/smarty-compile.php';
         $skip = (new Policy($this->checkoutRoot, $this->runner))->values('smarty_skip_templates');
         $environment = getenv();
-        $environment = is_array($environment) ? $environment : [];
         $environment['CK_SMARTY_ROOT'] = (string) getcwd();
         $environment['CK_SMARTY_KEY'] = $key;
         $environment['CK_SMARTY_SKIP'] = implode(',', array_map(

@@ -46,6 +46,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - `make test` and `make lint` fetch composer, uv and Node pinned into
   `.cache/`, so the host needs none of them. `make doctor` requires PHP 8.1
   and checks the PHP extensions, `zip` and `unzip` the suites use.
+- `make lint` runs phpstan over the repository's own PHP against the PHP 8.1
+  floor, so a call to a method or function that does not exist fails there.
 
 ### Fixed
 
@@ -66,6 +68,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - `ckmutate` leaves the coverage-driver check to infection, so an existing
   report passed with `--coverage`, `--initial-tests-php-options` and phpdbg
   work through it. It had refused any run without pcov or xdebug loaded.
+- `ck seed` runs on PHP 8.1, the floor images for older CiviCRM lines use. It
+  called `mysqli::execute_query()`, which arrived in PHP 8.2.
 - `ckphpunit` resolves every path in the phpunit config against the config's
   directory, as phpunit does: report and log outputs, listener and extension
   files, `includePath`. They had resolved against its temporary copy, so a

@@ -35,7 +35,7 @@ final class FloatingTagCheck implements Check
             $lines = explode("\n", $contents);
             // A trailing newline yields a trailing empty element that grep
             // never numbers as a line; drop it so line numbers stay true.
-            if ($lines !== [] && $lines[array_key_last($lines)] === '') {
+            if ($lines[array_key_last($lines)] === '') {
                 array_pop($lines);
             }
             $parents = [];

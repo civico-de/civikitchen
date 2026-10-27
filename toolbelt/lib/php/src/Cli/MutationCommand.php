@@ -98,7 +98,6 @@ final class MutationCommand implements Command
             $command = [...$command, '--git-diff-lines', "--git-diff-base={$base}"];
         }
         $environment = getenv();
-        $environment = is_array($environment) ? $environment : [];
         $environment['CIVICRM_UF'] = $environment['CIVICRM_UF'] ?? 'UnitTests';
         $status = $this->runner->passthrough([...$command, ...$arguments], $environment);
         if ($status === 0) {

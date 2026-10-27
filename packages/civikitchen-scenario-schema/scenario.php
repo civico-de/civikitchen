@@ -141,7 +141,7 @@ function ck_scenario_validate_site_url(string $url, int $httpPort): void {
   if (isset($parts['user']) || isset($parts['pass']) || isset($parts['query']) || isset($parts['fragment'])) {
     throw new RuntimeException('$.site_url: credentials, query strings, and fragments are not valid in a site base URL');
   }
-  if (($parts['path'] ?? '') !== '' && ($parts['path'] ?? '') !== '/') {
+  if (!in_array($parts['path'] ?? '', ['', '/'], TRUE)) {
     throw new RuntimeException('$.site_url: subdirectory paths are not supported');
   }
   $rawHost = strtolower((string) $parts['host']);
@@ -156,7 +156,7 @@ function ck_scenario_validate_site_url(string $url, int $httpPort): void {
   }
   $isIpv4Loopback = preg_match('/^127(?:\.[0-9]{1,3}){3}$/', $host) === 1;
   if ($host === 'localhost' || $isIpv4Loopback) {
-    $urlPort = (int) ($parts['port'] ?? (($parts['scheme'] ?? '') === 'https' ? 443 : 80));
+    $urlPort = (int) ($parts['port'] ?? 80);
     if ($urlPort !== $httpPort) {
       throw new RuntimeException("$.site_url: loopback port {$urlPort} does not match $.http_port {$httpPort}");
     }

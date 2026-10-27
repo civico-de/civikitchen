@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Mago\Analyzer;
 
-use CiviKitchen\Mago\Options;
 use CiviKitchen\Mago\Workspace;
 use CiviKitchen\PHPStan\ExtensionBoundary;
 use Mago\Sdk\Analyzer\FileAnalysisRequirement;
@@ -35,10 +34,6 @@ final class ExtensionBoundaryHook implements NodeAnalysisHook
 
     /** @var array<string, array{regexes: list<string>, missing: list<string>}> */
     private array $allowed = [];
-
-    public function __construct(Options $options)
-    {
-    }
 
     public function getTargets(): array
     {

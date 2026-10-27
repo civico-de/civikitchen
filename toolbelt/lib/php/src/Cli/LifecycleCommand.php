@@ -74,7 +74,6 @@ final class LifecycleCommand implements Command
         }
         echo "cklifecycle: checking post-uninstall DB invariants\n";
         $environment = getenv();
-        $environment = is_array($environment) ? $environment : [];
         $environment['CK_LC_KEY'] = $key;
         $environment['CK_LC_DIR'] = $extensionDirectory;
         $environment['CK_LC_PREFIX'] = $prefix;

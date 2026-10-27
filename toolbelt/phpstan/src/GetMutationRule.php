@@ -37,7 +37,7 @@ use PHPStan\Rules\RuleErrorBuilder;
  * !== 'POST'` with a 405 answer is the whole point, and a handler that only
  * writes on POST is fine. The other legitimate case, a GET that writes on
  * purpose (a redirect flow with its own CSRF mitigation), is a narrow
- * `@phpstan-ignore ck.route.mutationOnGet` carrying the reason.
+ * ignore of `ck.route.mutationOnGet` carrying the reason.
  *
  * @implements Rule<InClassNode>
  */

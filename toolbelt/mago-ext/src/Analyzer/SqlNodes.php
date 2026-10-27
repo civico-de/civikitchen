@@ -285,7 +285,7 @@ final class SqlNodes
     /** Every member of the type is the SQL builder or a subclass of it. */
     private static function isTypedSqlSelect(?\Mago\Sdk\Analyzer\Type $type, Codebase $codebase): bool
     {
-        if ($type === null || $type->atomicTypes === []) {
+        if ($type === null) {
             return false;
         }
         $builder = strtolower(Sql::SQL_SELECT);

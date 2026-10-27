@@ -11,4 +11,4 @@ ini_set('display_errors', 'stderr');
 
 require __DIR__ . '/vendor/autoload.php';
 
-(new Worker(CiviKitchenExtension::create(Options::fromArguments(array_slice($argv, 1)))))->run();
+(new Worker(CiviKitchenExtension::create(Options::fromArguments(array_slice($_SERVER['argv'], 1)))))->run();

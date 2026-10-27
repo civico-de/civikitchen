@@ -242,13 +242,13 @@ final class Api4ActionPropertyRule implements Rule
         return $covered;
     }
 
-    /** @phpstan-assert-if-true Node\Expr\BinaryOp $node */
+    /** @phpstan-assert-if-true Node\Expr\BinaryOp\BooleanAnd|Node\Expr\BinaryOp\LogicalAnd $node */
     private static function isConjunction(Node $node): bool
     {
         return $node instanceof Node\Expr\BinaryOp\BooleanAnd || $node instanceof Node\Expr\BinaryOp\LogicalAnd;
     }
 
-    /** @phpstan-assert-if-true Node\Expr\BinaryOp $node */
+    /** @phpstan-assert-if-true Node\Expr\BinaryOp\BooleanOr|Node\Expr\BinaryOp\LogicalOr $node */
     private static function isDisjunction(Node $node): bool
     {
         return $node instanceof Node\Expr\BinaryOp\BooleanOr || $node instanceof Node\Expr\BinaryOp\LogicalOr;
@@ -433,7 +433,7 @@ final class Api4ActionPropertyRule implements Rule
         return Api4ActionParameter::isGenericActionBase($original->extends->toString());
     }
 
-    private static function typeToString(Node $type): string
+    private static function typeToString(Node\Identifier|Node\Name|Node\ComplexType $type): string
     {
         if ($type instanceof Node\NullableType) {
             return '?' . self::typeToString($type->type);
@@ -445,6 +445,6 @@ final class Api4ActionPropertyRule implements Rule
             return implode('&', array_map([self::class, 'typeToString'], $type->types));
         }
 
-        return $type instanceof Node\Name ? $type->toString() : (string) $type;
+        return $type->toString();
     }
 }

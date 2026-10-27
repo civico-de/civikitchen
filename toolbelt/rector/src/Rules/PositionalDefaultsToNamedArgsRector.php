@@ -17,8 +17,6 @@ use PhpParser\NodeFinder;
 use PHPStan\Reflection\ExtendedMethodReflection;
 use PHPStan\Reflection\FunctionReflection;
 use PHPStan\Reflection\MethodReflection;
-use PHPStan\Type\ConstantScalarType;
-use PHPStan\Type\NullType;
 use Rector\Contract\Rector\ConfigurableRectorInterface;
 use Rector\PhpParser\AstResolver;
 use Rector\PhpParser\Node\Value\ValueResolver;
@@ -168,16 +166,10 @@ final class PositionalDefaultsToNamedArgsRector extends AbstractRector implement
       if ($parameter->isVariadic()) {
         return NULL;
       }
-      $defaultType = $parameter->getDefaultValue();
-      if ($defaultType instanceof NullType) {
-        $parameters[] = [$parameter->getName(), TRUE, NULL];
-      }
-      elseif ($defaultType instanceof ConstantScalarType) {
-        $parameters[] = [$parameter->getName(), TRUE, $defaultType->getValue()];
-      }
-      else {
-        $parameters[] = [$parameter->getName(), FALSE, NULL];
-      }
+      $defaults = $parameter->getDefaultValue()?->getConstantScalarValues() ?? [];
+      $parameters[] = count($defaults) === 1
+        ? [$parameter->getName(), TRUE, $defaults[0]]
+        : [$parameter->getName(), FALSE, NULL];
     }
     return $parameters;
   }

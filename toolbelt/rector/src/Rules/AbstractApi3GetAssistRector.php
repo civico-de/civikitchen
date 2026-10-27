@@ -70,7 +70,7 @@ abstract class AbstractApi3GetAssistRector extends AbstractApiCallAssistRector {
    * The api4 call for the classified params, or NULL to bail. $indexById:
    * key the rows by id, the way api3 does unless `sequential` is 1.
    *
-   * @param array{where: list<array{string, Expr}>, top: list<array{string, Expr}>, sequential: ?Expr} $parts
+   * @param array{where: list<array{string, Expr}>, top: list<array{'select'|'limit'|'offset'|'checkPermissions', Expr}>, sequential: ?Expr} $parts
    */
   abstract protected function api4Call(String_ $entity, String_ $action, array $parts, bool $indexById): ?Expr;
 

@@ -66,9 +66,7 @@ final class NoSilentDatabaseCatchRule implements Rule
     {
         $found = (new NodeFinder())->findFirst(
             $catch->stmts,
-            static fn (Node $n): bool => $n instanceof Node\Stmt\Throw_
-                || $n instanceof Node\Expr\Throw_
-                || self::isLoudLog($n),
+            static fn (Node $n): bool => $n instanceof Node\Expr\Throw_ || self::isLoudLog($n),
         );
 
         return $found !== null;

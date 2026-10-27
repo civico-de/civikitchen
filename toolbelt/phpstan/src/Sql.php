@@ -94,12 +94,10 @@ final class Sql
 
             return $left === null ? null : $left . (self::literalString($expr->right) ?? '');
         }
-        if ($expr instanceof Node\Scalar\InterpolatedString || $expr instanceof Node\Scalar\Encapsed) {
+        if ($expr instanceof Node\Scalar\InterpolatedString) {
             $first = $expr->parts[0] ?? null;
 
-            return $first instanceof Node\InterpolatedStringPart || $first instanceof Node\Scalar\EncapsedStringPart
-                ? $first->value
-                : null;
+            return $first instanceof Node\InterpolatedStringPart ? $first->value : null;
         }
 
         return null;

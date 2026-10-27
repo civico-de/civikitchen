@@ -6,7 +6,6 @@ namespace CiviKitchen\Rector\Rules;
 
 use PhpParser\Node;
 use PhpParser\Node\Arg;
-use PhpParser\Node\ArrayItem;
 use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
@@ -44,7 +43,7 @@ final class Api4ArrayToOopRector extends AbstractApiCallAssistRector {
     $methods = [];
 
     foreach ($params->items as $item) {
-      if (!$item instanceof ArrayItem || !$item->key instanceof String_) {
+      if (!$item->key instanceof String_) {
         return NULL;
       }
       $key = $item->key->value;
@@ -60,7 +59,7 @@ final class Api4ArrayToOopRector extends AbstractApiCallAssistRector {
             return NULL;
           }
           foreach ($value->items as $row) {
-            if (!$row instanceof ArrayItem || $row->key !== NULL || !$row->value instanceof Array_) {
+            if ($row->key !== NULL || !$row->value instanceof Array_) {
               return NULL;
             }
             $whereCall = self::whereCall($row->value);
@@ -75,7 +74,7 @@ final class Api4ArrayToOopRector extends AbstractApiCallAssistRector {
           if ($value instanceof Array_) {
             $selectArgs = [];
             foreach ($value->items as $sel) {
-              if (!$sel instanceof ArrayItem || $sel->key !== NULL) {
+              if ($sel->key !== NULL) {
                 return NULL;
               }
               $selectArgs[] = new Arg($sel->value);
@@ -92,7 +91,7 @@ final class Api4ArrayToOopRector extends AbstractApiCallAssistRector {
             return NULL;
           }
           foreach ($value->items as $ord) {
-            if (!$ord instanceof ArrayItem || !$ord->key instanceof String_) {
+            if (!$ord->key instanceof String_) {
               return NULL;
             }
             $methods[] = ['addOrderBy', [new Arg(new String_($ord->key->value)), new Arg($ord->value)]];
@@ -138,7 +137,7 @@ final class Api4ArrayToOopRector extends AbstractApiCallAssistRector {
   private static function whereCall(Array_ $row): ?array {
     $cells = [];
     foreach ($row->items as $cell) {
-      if (!$cell instanceof ArrayItem || $cell->key !== NULL || $cell->unpack) {
+      if ($cell->key !== NULL || $cell->unpack) {
         return NULL;
       }
       $cells[] = $cell->value;

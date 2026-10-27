@@ -1,0 +1,25 @@
+# The repository's own PHP, checked against the PHP 8.1 floor (docs/building.md).
+# Level 3 checks calls on every expression, so a method a refactor removed fails here.
+parameters:
+  level: 3
+  phpVersion: 80100
+  paths:
+    - toolbelt/lib
+    - toolbelt/ckconform/src
+    - toolbelt/ckconform/bin
+    - toolbelt/phpstan/src
+    - toolbelt/mago-ext/src
+    - toolbelt/mago-ext/worker.php
+    - toolbelt/rector/src
+    - packages/civikitchen-scenario-schema/scenario.php
+    - packages/civicrm-profile-schema/validate.php
+  bootstrapFiles:
+    - %env.CK_PHPUNIT_PHAR%
+    - packages/civikitchen-scenario-schema/vendor/autoload.php
+    - toolbelt/mago-ext/vendor/autoload.php
+    - toolbelt/rector/vendor/autoload.php
+    - toolbelt/ckdeps-root/vendor/autoload.php
+  scanDirectories:
+    - %env.CIVICRM_CORE_DIR%
+    # rector ships the rule-definition contracts inside its own vendor tree.
+    - toolbelt/rector/vendor/rector/rector/vendor/symplify/rule-doc-generator-contracts/src

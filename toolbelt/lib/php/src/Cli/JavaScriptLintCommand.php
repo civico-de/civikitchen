@@ -260,7 +260,6 @@ final class JavaScriptLintCommand implements Command
     private function environment(string $toolchain, string $catalogJson): array
     {
         $environment = getenv();
-        $environment = is_array($environment) ? $environment : [];
         $environment['CIVIKITCHEN_API4_CATALOG'] = $catalogJson;
         if (($environment['OXLINT_TSGOLINT_PATH'] ?? '') === '') {
             foreach (glob($toolchain . '/node_modules/@oxlint-tsgolint/*/tsgolint') ?: [] as $candidate) {

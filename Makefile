@@ -431,7 +431,7 @@ test-extension-docs: $(UVX) ## extension-docs.py: a site per language with fallb
 
 # --- static checks -----------------------------------------------------------
 
-lint: lint-shell lint-shell-portability lint-actions lint-php lint-schema lint-changelog docs ## Every static check CI runs
+lint: lint-shell lint-shell-portability lint-actions lint-php lint-phpstan lint-schema lint-changelog docs ## Every static check CI runs
 
 lint-shell: $(SHELLCHECK) ## shellcheck (pinned) over every tracked or untracked, non-ignored shell file
 	@files=$$($(SHELL_FILES)) ; \
@@ -481,6 +481,14 @@ lint-php: ## php -l over every tracked or untracked, non-ignored PHP file
 	  rc=0 ; \
 	  while IFS= read -r f; do php -l "$$f" >/dev/null || rc=1; done <<< "$$files" ; \
 	  [ "$$rc" = 0 ] && echo "php syntax clean ($$(printf '%s\n' "$$files" | wc -l) files)"
+
+# phpstan.neon.dist names the trees and the vendor trees they load at run time.
+lint-phpstan: $(PHPUNIT) $(CORE) $(COMPOSER) $(SCENARIO_YAML_STAMP) ## phpstan over the repository's own PHP at the PHP 8.1 floor
+	for package in phpstan mago-ext rector ckdeps-root; do \
+	  composer install --no-interaction --no-progress --quiet --working-dir=toolbelt/$$package || exit 1; \
+	done
+	CIVICRM_CORE_DIR=$(abspath $(CORE)) CK_PHPUNIT_PHAR=$(abspath $(PHPUNIT)) \
+	  toolbelt/phpstan/vendor/bin/phpstan analyse --no-progress --memory-limit=2G
 
 # The schemas are published contracts, so validate both the schemas themselves
 # and every repository-owned example/fixture. Keeping fixtures in this gate is

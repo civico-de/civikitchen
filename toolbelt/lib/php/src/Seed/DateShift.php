@@ -56,7 +56,7 @@ final class DateShift
         $db = $this->database->connection();
         // UTC, so a TIMESTAMP keeps its time across a daylight-saving change.
         $db->query("SET time_zone = '+00:00'");
-        $result = $db->execute_query(
+        $result = $this->database->rows(
             "SELECT c.TABLE_NAME, c.COLUMN_NAME
              FROM information_schema.COLUMNS c
              JOIN information_schema.TABLES t ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
@@ -66,7 +66,7 @@ final class DateShift
             [$this->database->name()],
         );
         $columns = [];
-        foreach ($result instanceof \mysqli_result ? $result->fetch_all() : [] as $row) {
+        foreach ($result as $row) {
             $columns[] = [(string) $row[0], (string) $row[1]];
         }
         $statements = self::statements($columns, $days);

@@ -24,9 +24,9 @@ use CiviKitchen\Ckconform\Reporter;
 final class GitignoreCoverageCheck implements Check
 {
     /**
-     * pattern => [representative paths git is asked about, what makes it relevant]
+     * Ignore patterns for what a repo can produce; samplesFor() picks the paths git is asked about.
      *
-     * @var array<string, array{0: list<string>, 1: string}>
+     * @var list<string>
      */
     private const ARTIFACTS = ['.phpunit.result.cache', 'vendor/', 'node_modules/', '*.tsbuildinfo'];
 

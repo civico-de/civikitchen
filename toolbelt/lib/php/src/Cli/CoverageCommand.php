@@ -79,7 +79,6 @@ final class CoverageCommand implements Command
         echo "ckcoverage: running the suite with coverage (this is slower than a plain run) ...\n";
         $runner = $this->runner->which('ckphpunit') ?? 'phpunit';
         $environment = getenv();
-        $environment = is_array($environment) ? $environment : [];
         $environment['CIVICRM_UF'] = $environment['CIVICRM_UF'] ?? 'UnitTests';
         // An empty segment keeps PHP's own scan directory, as an unset variable does;
         // a variable set to '' scans nothing, so it gets no such segment.

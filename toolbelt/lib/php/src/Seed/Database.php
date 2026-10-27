@@ -51,14 +51,27 @@ class Database
         return $this->connection;
     }
 
-    /** @return list<string> */
+    /**
+     * prepare + execute(array) works from PHP 8.1; mysqli::execute_query needs 8.2.
+     *
+     * @param list<string> $parameters
+     * @return list<list<mixed>>
+     */
+    public function rows(string $sql, array $parameters = []): array
+    {
+        $statement = $this->connection()->prepare($sql);
+        $statement->execute($parameters);
+        $result = $statement->get_result();
+        return $result instanceof \mysqli_result ? $result->fetch_all() : [];
+    }
+
+    /**
+     * @param list<string> $parameters
+     * @return list<string>
+     */
     public function column(string $sql, array $parameters = []): array
     {
-        $rows = $this->connection()->execute_query($sql, $parameters);
-        if (!$rows instanceof \mysqli_result) {
-            return [];
-        }
-        return array_map(static fn(array $row): string => (string) $row[0], $rows->fetch_all());
+        return array_map(static fn(array $row): string => (string) $row[0], $this->rows($sql, $parameters));
     }
 
     /** @return list<string> */

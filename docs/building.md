@@ -19,6 +19,8 @@ pull requests, so CI and a laptop cannot drift apart.
 - a portability check that rejects the BSD-only `sed -i ''`
 - actionlint and zizmor over the workflows
 - `php -l` over every PHP file
+- phpstan over the repository's own PHP at the PHP 8.1 floor, with the pinned
+  CiviCRM source for the scripts that run inside a site (`phpstan.neon.dist`)
 - the profile and scenario schemas against their metaschema, and every
   repository-owned instance against its schema
 - the grammar of `CHANGELOG.md`
