@@ -10,10 +10,8 @@ fixture="$root/tests/extension-docs/fixture"
 work=$(mktemp -d)
 trap '/bin/rm -rf "$work"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
-build() {
-  if command -v uvx >/dev/null 2>&1; then uvx --from "zensical@$version" python "$script" "$@"
-  else pipx run --spec "zensical==$version" python "$script" "$@"; fi
-}
+# uvx is the Makefile's pinned one.
+build() { uvx --from "zensical@$version" python "$script" "$@"; }
 
 GITHUB_REPOSITORY=acme/greeter build "$fixture" "$work/site" en de >/dev/null 2>&1 \
   || fail "the fixture does not build"

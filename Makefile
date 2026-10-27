@@ -3,10 +3,12 @@
 # sides. Before it, the fast test suites could be run in exactly one place:
 # GitHub Actions.
 #
-# Every target is .PHONY: nothing here is built from file timestamps, so Make
-# contributes no dependency graph — it contributes being installed everywhere
-# and `make help`.
+# Every named target is .PHONY: only the fetched tools and install stamps are
+# files, all spelled $(VARIABLE), so Make contributes no dependency graph — it
+# contributes being installed everywhere and `make help`.
 
+# This file, read before any include, so a wrapper's own targets stay its own.
+SELF := $(lastword $(MAKEFILE_LIST))
 include toolbelt/versions.env
 
 # Strict bash for every recipe: `set -eu -o pipefail` is what the shell in this
@@ -52,18 +54,10 @@ CK_ZIZMOR_VERSION := 1.29.0
 CK_JSCPD_VERSION := 5.0.14
 CK_ZENSICAL_VERSION := 0.0.70
 
-# zizmor and check-jsonschema are Python CLIs fetched on demand rather than
-# installed. uv and pipx both do that, so demanding one specific runner would
-# invent a prerequisite this repo does not have — GitHub's runners ship pipx,
-# a laptop is as likely to have uv. Same pinned versions either way; only the
-# pin syntax differs.
-ifeq ($(shell command -v uvx >/dev/null 2>&1 && echo yes),yes)
-pyrun_pinned = uvx $(1)@$(2)
-pyrun = uvx $(1)
-else
-pyrun_pinned = pipx run $(1)==$(2)
-pyrun = pipx run $(1)
-endif
+# zizmor, check-jsonschema and zensical are Python CLIs that the pinned uvx
+# fetches on demand.
+pyrun_pinned = $(UVX) $(1)@$(2)
+pyrun = $(UVX) $(1)
 
 # shellcheck is fetched and pinned like the phars, because the sweep's verdict
 # depends on the version: 0.10 grew checks 0.9 never ran, so a laptop's distro
@@ -77,14 +71,42 @@ SHELLCHECK_PLATFORM := $(shell uname -s | tr '[:upper:]' '[:lower:]').$(subst ar
 SHELLCHECK_SHA256 := $(CK_SHELLCHECK_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)))
 SHELLCHECK := $(CACHE)/shellcheck-$(CK_SHELLCHECK_VERSION)
 
+# Release assets of mago and uv are named by target triple.
+TRIPLE_linux_x86_64 := x86_64-unknown-linux-gnu
+TRIPLE_linux_aarch64 := aarch64-unknown-linux-gnu
+TRIPLE_darwin_aarch64 := aarch64-apple-darwin
+TRIPLE := $(TRIPLE_$(subst .,_,$(SHELLCHECK_PLATFORM)))
+
 # mago for the extension's fixture suite: the image's release (versions.env),
-# one hash per platform there. Release assets are named by target triple.
-MAGO_TRIPLE_linux_x86_64 := x86_64-unknown-linux-gnu
-MAGO_TRIPLE_linux_aarch64 := aarch64-unknown-linux-gnu
-MAGO_TRIPLE_darwin_aarch64 := aarch64-apple-darwin
-MAGO_TRIPLE := $(MAGO_TRIPLE_$(subst .,_,$(SHELLCHECK_PLATFORM)))
+# one hash per platform there.
 MAGO_SHA256 := $(CK_MAGO_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)))
 MAGO := $(CACHE)/mago-$(CK_MAGO_VERSION)
+
+# Composer, uv and Node are fetched pinned too, so the host needs no package
+# manager of its own. Their directories lead every recipe's PATH.
+CK_COMPOSER_VERSION := 2.10.3
+CK_COMPOSER_SHA256 := 7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6
+CK_UV_VERSION := 0.13.6
+CK_UV_SHA256_linux_x86_64 := f29c3e94ffabd7e6f3ba521dba169a9b7ec12100bf3257087f0f24f6123f3645
+CK_UV_SHA256_darwin_aarch64 := 60fbd5c8a1ed681845eea28d9d622fcde03c51e91a43465b64a1e17db1ed3472
+# The image's Node major; it runs the pinned oxlint behind test-ckeslint.
+CK_NODE_VERSION := 24.22.1
+CK_NODE_SHA256_linux_x86_64 := 6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6
+CK_NODE_SHA256_darwin_aarch64 := 654ba79de6155647e22321932b45f2a1ccb705976cc337c9b8e278beb085a628
+NODE_PLATFORM_linux_x86_64 := linux-x64
+NODE_PLATFORM_darwin_aarch64 := darwin-arm64
+NODE_PLATFORM := $(NODE_PLATFORM_$(subst .,_,$(SHELLCHECK_PLATFORM)))
+UV_SHA256 := $(CK_UV_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)))
+NODE_SHA256 := $(CK_NODE_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)))
+COMPOSER_DIR := $(abspath $(CACHE))/composer-$(CK_COMPOSER_VERSION)
+UV_DIR := $(abspath $(CACHE))/uv-$(CK_UV_VERSION)
+NODE_DIR := $(abspath $(CACHE))/node-$(CK_NODE_VERSION)
+COMPOSER := $(COMPOSER_DIR)/composer
+UVX := $(UV_DIR)/uvx
+NODE := $(NODE_DIR)/bin/node
+export PATH := $(COMPOSER_DIR):$(UV_DIR):$(NODE_DIR)/bin:$(PATH)
+# A Python that uvx has to download lands here too, and `make clean` removes it.
+export UV_PYTHON_INSTALL_DIR := $(abspath $(CACHE))/uv-python
 
 # What gets linted is decided by WHAT A FILE IS, never by where it lives.
 #
@@ -117,11 +139,8 @@ define require_nonempty
 endef
 
 .DEFAULT_GOAL := help
-.PHONY: help doctor release test test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario \
-	test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-promote-scanned test-promote-digest test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-vendored-paths test-ckeslint test-ckcoverage test-ckcommon-git test-missing-tool test-doctor test-tool-locks \
-	test-ck-headless test-ckcoretest test-phpstan-bootstrap test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-cms-families lint lint-shell lint-shell-portability \
-	test-database-matrix test-compose-config test-playwright-network test-demo-basic-auth test-release-retag test-release-steps test-ci-gates-step test-release-script test-release-verify-images \
-        lint-actions lint-php lint-schema lint-changelog docs docs-serve docs-a11y test-changelog test-extension-docs build test-images e2e-ckcreate e2e tools clean
+# Read from the targets themselves, so a new one cannot be left out.
+.PHONY: $(shell sed -n 's/^\([a-z][a-z0-9-]*\):.*/\1/p' $(SELF))
 
 help: ## Show this help
 	@echo "civikitchen — make targets"
@@ -139,7 +158,7 @@ help: ## Show this help
 doctor: ## Report every missing host prerequisite in one pass
 	bash scripts/doctor.sh
 
-test: test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario test-provision test-core-patches test-ckcoretest test-ck-headless test-ck-headless-phpstan test-phpstan-bootstrap test-ckcommon-git test-missing-tool test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-promote-scanned test-promote-digest test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-sibling-vendor test-sibling-build test-database-matrix test-demo-basic-auth test-release-retag test-release-move-major-tag test-release-publish-flags test-release-steps test-ci-gates-step test-release-script test-release-verify-images test-vendored-paths test-ckeslint test-ckcoverage test-doctor test-tool-locks test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-cms-families test-changelog test-extension-docs ## Run every fast test suite (no Docker)
+test: test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario test-provision test-core-patches test-ckcoretest test-ck-headless test-ck-headless-phpstan test-phpstan-bootstrap test-ckcommon-git test-missing-tool test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-promote-scanned test-promote-digest test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-sibling-vendor test-sibling-build test-database-matrix test-demo-basic-auth test-release-retag test-release-move-major-tag test-release-publish-flags test-release-steps test-ci-gates-step test-release-script test-release-verify-images test-vendored-paths test-ckeslint test-ckcoverage test-doctor test-make-phony test-tool-locks test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-cms-families test-changelog test-extension-docs ## Run every fast test suite (no Docker)
 
 test-shared-php-coverage: $(PHPUNIT) $(SCENARIO_YAML_STAMP) ## Shared PHP unit tests and measured line-coverage floor
 	if command -v phpdbg >/dev/null 2>&1; then \
@@ -162,7 +181,7 @@ test-ckconform: $(PHPUNIT) $(CORE) $(SCENARIO_YAML_STAMP) ## ckconform's check f
 
 # The rule fixtures run through phpstan's own test harness, so this package
 # needs its vendor tree; the drift gates alone would not.
-test-phpstan: $(PHPUNIT) $(CORE) ## The phpstan extension's rule tests + catalog drift gates
+test-phpstan: $(PHPUNIT) $(CORE) $(COMPOSER) ## The phpstan extension's rule tests + catalog drift gates
 	composer install --no-interaction --no-progress --working-dir=toolbelt/phpstan
 	CIVICRM_CORE_DIR=$(abspath $(CORE)) \
 	  php $(PHPUNIT) -c toolbelt/phpstan/phpunit.xml.dist
@@ -172,7 +191,7 @@ test-phpstan: $(PHPUNIT) $(CORE) ## The phpstan extension's rule tests + catalog
 
 # Every mago extension rule against its fixtures, through the pinned mago
 # binary; the runner refuses a binary whose version differs from the SDK's.
-test-mago-ext: $(MAGO) ## The mago extension's rule and plugin fixtures
+test-mago-ext: $(MAGO) $(COMPOSER) ## The mago extension's rule and plugin fixtures
 	composer install --no-interaction --no-progress --working-dir=toolbelt/mago-ext
 	php toolbelt/mago-ext/tests/run.php --mago=$(abspath $(MAGO))
 
@@ -183,7 +202,7 @@ test-mago-stubs: $(CORE) ## The mago stubs declare every member of the pinned co
 
 # ckmodernize writes these rewrites into extension code, so each rule's
 # fixtures pin both the rewrite and the calls it must leave alone.
-test-rector: $(PHPUNIT) ## The rector rules' fixture tests
+test-rector: $(PHPUNIT) $(COMPOSER) ## The rector rules' fixture tests
 	composer install --no-interaction --no-progress --working-dir=toolbelt/rector
 	php $(PHPUNIT) -c toolbelt/rector/phpunit.xml.dist
 
@@ -220,7 +239,7 @@ test-ckcommon-git: ## ck_git trusts the worktree root, not the cwd
 test-missing-tool: ## A tool missing from PATH is named, not a proc_open warning
 	bash tests/toolbelt/test-missing-tool.sh
 
-test-composer-deps: ## ckdeps config: core-provided classes only, sibling checkouts not scanned
+test-composer-deps: $(COMPOSER) ## ckdeps config: core-provided classes only, sibling checkouts not scanned
 	php tests/toolbelt/test-composer-deps.php
 	composer install --no-interaction --no-progress --working-dir=toolbelt/ckdeps-root
 	bash tests/toolbelt/test-composer-deps-paths.sh
@@ -260,7 +279,7 @@ test-core-patches: ## Standalone core patches: applied once, contained ones skip
 test-ck-headless: ## ck_headless() installs the <requires> closure and rebuilds on install-file changes (stubbed Civi)
 	bash tests/toolbelt/test-ck-headless.sh
 
-test-ck-headless-phpstan: $(CORE) ## The managed ckHeadless.php passes phpstan level 10 against the pinned core
+test-ck-headless-phpstan: $(CORE) $(COMPOSER) ## The managed ckHeadless.php passes phpstan level 10 against the pinned core
 	composer install --no-interaction --no-progress --working-dir=toolbelt/phpstan
 	CIVICRM_CORE_DIR=$(abspath $(CORE)) bash tests/toolbelt/test-ck-headless-phpstan.sh
 
@@ -287,10 +306,13 @@ test-ckcoverage: $(SCENARIO_YAML_STAMP) ## ckcoverage temporary logs, coverage f
 test-doctor: ## doctor verdicts against synthesised hosts
 	bash tests/toolbelt/test-doctor.sh
 
+test-make-phony: ## A file named like a target cannot satisfy it
+	MAKE='$(MAKE)' bash tests/toolbelt/test-make-phony.sh
+
 # A lock that installs is not a lock that runs: resolved against a newer PHP
 # than the images ship, a tool tree can pick a transitive that dies at startup
 # on an 8.1/8.2 image. No build catches that — this does, without Docker.
-test-tool-locks: ## Tool lockfiles: in sync, and resolved against the PHP floor
+test-tool-locks: $(COMPOSER) ## Tool lockfiles: in sync, and resolved against the PHP floor
 	bash tests/toolbelt/test-tool-locks.sh
 
 # Two jobs of one run sharing a compose project means the second one's
@@ -404,7 +426,7 @@ test-resolve-civicrm-git: ## The git-built images track master and the newest re
 test-changelog: ## Changelog gate: grammar, release mode and section extraction
 	bash tests/parity/test-changelog-check.sh
 
-test-extension-docs: ## extension-docs.py: a site per language with fallback, nav from frontmatter
+test-extension-docs: $(UVX) ## extension-docs.py: a site per language with fallback, nav from frontmatter
 	CK_ZENSICAL_VERSION=$(CK_ZENSICAL_VERSION) bash tests/extension-docs/test-extension-docs.sh
 
 # --- static checks -----------------------------------------------------------
@@ -425,7 +447,7 @@ lint-shell-portability: ## Reject host-incompatible BSD sed in-place syntax
 # actionlint reads workflows as YAML+shell; zizmor reads them as a threat model
 # — unpinned actions, expression injection into run blocks, tokens wider than
 # the job needs. Exemptions and their reasons live in zizmor.yml.
-lint-actions: $(CACHE)/actionlint ## actionlint + zizmor over the workflows
+lint-actions: $(CACHE)/actionlint $(UVX) ## actionlint + zizmor over the workflows
 	$(CACHE)/actionlint -color
 	$(call pyrun_pinned,zizmor,$(CK_ZIZMOR_VERSION)) --no-online-audits --config zizmor.yml \
 	  .github/workflows .github/actions scaffold/template/extension/.github/workflows
@@ -438,10 +460,10 @@ lint-changelog: ## CHANGELOG.md follows the Keep a Changelog grammar
 
 # The site is built from docs/ by zensical.toml; --strict fails on a link to a
 # missing page or anchor. No --clean: it empties .cache/, this Makefile's tool cache.
-docs: ## Build the documentation site into site/, failing on broken links
+docs: $(UVX) ## Build the documentation site into site/, failing on broken links
 	$(call pyrun_pinned,zensical,$(CK_ZENSICAL_VERSION)) build --strict
 
-docs-serve: ## Serve the documentation site locally with live reload
+docs-serve: $(UVX) ## Serve the documentation site locally with live reload
 	$(call pyrun_pinned,zensical,$(CK_ZENSICAL_VERSION)) serve
 
 docs-a11y: docs ## WCAG 2.1 AA checks of the site in light and dark mode (in Docker)
@@ -449,8 +471,9 @@ docs-a11y: docs ## WCAG 2.1 AA checks of the site in light and dark mode (in Doc
 
 # Advisory token-level clone report, not part of `lint`. Duplicated on purpose:
 # check run() skeletons, parallel test fixtures, clones across composer packages.
-dupcheck: ## Copy-paste clone report (jscpd), advisory
-	bunx jscpd@$(CK_JSCPD_VERSION) --config .jscpd.json
+dupcheck: ## Copy-paste clone report (jscpd, in Docker), advisory
+	docker run --rm -v "$$PWD:$$PWD" -w "$$PWD" -u "$$(id -u):$$(id -g)" -e HOME=/tmp -e NPM_CONFIG_UPDATE_NOTIFIER=false \
+	  node:24-bookworm-slim npx --yes jscpd@$(CK_JSCPD_VERSION) --config .jscpd.json
 
 lint-php: ## php -l over every tracked or untracked, non-ignored PHP file
 	@files=$$($(PHP_FILES)) ; \
@@ -463,7 +486,7 @@ lint-php: ## php -l over every tracked or untracked, non-ignored PHP file
 # and every repository-owned example/fixture. Keeping fixtures in this gate is
 # important: runtime tests must not be the first place an external profile or
 # scenario discovers that it drifted from its canonical format.
-lint-schema: ## Validate the profile/scenario schemas and every repository-owned instance
+lint-schema: $(UVX) ## Validate the profile/scenario schemas and every repository-owned instance
 	$(call pyrun,check-jsonschema) --check-metaschema \
 	  packages/civicrm-profile-schema/profile.schema.json \
 	  packages/civikitchen-scenario-schema/scenario.schema.json
@@ -495,15 +518,15 @@ e2e: ## Playwright smoke tests against a running compose stack (in Docker; CIVIC
 
 # --- fetched inputs ----------------------------------------------------------
 
-$(OXLINT_STAMP): toolbelt/oxlint/package.json toolbelt/oxlint/package-lock.json
+$(OXLINT_STAMP): toolbelt/oxlint/package.json toolbelt/oxlint/package-lock.json | $(NODE)
 	npm ci --prefix toolbelt/oxlint --no-audit --no-fund --loglevel=error
 	@touch $(OXLINT_STAMP)
 
-$(SCENARIO_YAML_STAMP): packages/civikitchen-scenario-schema/composer.json packages/civikitchen-scenario-schema/composer.lock
+$(SCENARIO_YAML_STAMP): packages/civikitchen-scenario-schema/composer.json packages/civikitchen-scenario-schema/composer.lock | $(COMPOSER)
 	composer install --no-interaction --no-progress --working-dir=packages/civikitchen-scenario-schema
 	@touch $(SCENARIO_YAML_STAMP)
 
-tools: $(PHPUNIT) $(MAGO) $(CACHE)/actionlint $(SHELLCHECK) $(SCENARIO_YAML_STAMP) $(OXLINT_STAMP) ## Pre-fetch the pinned tools and YAML parser
+tools: $(PHPUNIT) $(MAGO) $(CACHE)/actionlint $(SHELLCHECK) $(COMPOSER) $(UVX) $(NODE) $(SCENARIO_YAML_STAMP) $(OXLINT_STAMP) ## Pre-fetch the pinned tools and YAML parser
 
 $(SHELLCHECK):
 	@mkdir -p $(CACHE)
@@ -518,14 +541,39 @@ $(SHELLCHECK):
 
 $(MAGO):
 	@mkdir -p $(CACHE)
-	@[ -n "$(MAGO_SHA256)" ] && [ -n "$(MAGO_TRIPLE)" ] || { \
+	@[ -n "$(MAGO_SHA256)" ] && [ -n "$(TRIPLE)" ] || { \
 	  echo "no mago hash pinned for $(SHELLCHECK_PLATFORM) — add CK_MAGO_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)) to toolbelt/versions.env" >&2; exit 1; }
 	curl -fsSLo $@.tar.gz \
-	  "https://github.com/carthage-software/mago/releases/download/$(CK_MAGO_VERSION)/mago-$(CK_MAGO_VERSION)-$(MAGO_TRIPLE).tar.gz"
+	  "https://github.com/carthage-software/mago/releases/download/$(CK_MAGO_VERSION)/mago-$(CK_MAGO_VERSION)-$(TRIPLE).tar.gz"
 	echo "$(MAGO_SHA256)  $@.tar.gz" | sha256sum -c --strict -
-	tar -xzf $@.tar.gz -C $(CACHE) --strip-components=1 mago-$(CK_MAGO_VERSION)-$(MAGO_TRIPLE)/mago
+	tar -xzf $@.tar.gz -C $(CACHE) --strip-components=1 mago-$(CK_MAGO_VERSION)-$(TRIPLE)/mago
 	mv $(CACHE)/mago $@
 	rm $@.tar.gz
+
+$(COMPOSER):
+	@mkdir -p $(@D)
+	curl -fsSLo $@ "https://getcomposer.org/download/$(CK_COMPOSER_VERSION)/composer.phar"
+	echo "$(CK_COMPOSER_SHA256)  $@" | sha256sum -c --strict -
+	chmod +x $@
+
+$(UVX):
+	@[ -n "$(UV_SHA256)" ] && [ -n "$(TRIPLE)" ] || { \
+	  echo "no uv hash pinned for $(SHELLCHECK_PLATFORM) — add CK_UV_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)) to the Makefile" >&2; exit 1; }
+	@mkdir -p $(@D)
+	curl -fsSLo $(@D).tar.gz "https://github.com/astral-sh/uv/releases/download/$(CK_UV_VERSION)/uv-$(TRIPLE).tar.gz"
+	echo "$(UV_SHA256)  $(@D).tar.gz" | sha256sum -c --strict -
+	tar -xzf $(@D).tar.gz -C $(@D) --strip-components=1
+	rm $(@D).tar.gz
+
+$(NODE):
+	@[ -n "$(NODE_SHA256)" ] && [ -n "$(NODE_PLATFORM)" ] || { \
+	  echo "no Node hash pinned for $(SHELLCHECK_PLATFORM) — add CK_NODE_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)) to the Makefile" >&2; exit 1; }
+	rm -rf $(NODE_DIR).tmp && mkdir -p $(NODE_DIR).tmp
+	curl -fsSLo $(NODE_DIR).tar.xz "https://nodejs.org/dist/v$(CK_NODE_VERSION)/node-v$(CK_NODE_VERSION)-$(NODE_PLATFORM).tar.xz"
+	echo "$(NODE_SHA256)  $(NODE_DIR).tar.xz" | sha256sum -c --strict -
+	tar -xJf $(NODE_DIR).tar.xz -C $(NODE_DIR).tmp --strip-components=1
+	rm $(NODE_DIR).tar.xz
+	mv $(NODE_DIR).tmp $(NODE_DIR)
 
 $(PHPUNIT):
 	@mkdir -p $(CACHE)
@@ -563,5 +611,5 @@ $(CORE):
 	rm $(CORE).tar.gz; \
 	mv $(CORE).tmp $(CORE)
 
-clean: ## Remove .cache/ (fetched phars and the CiviCRM source tree)
+clean: ## Remove .cache/ (the fetched tools and the CiviCRM source tree)
 	rm -rf $(CACHE)

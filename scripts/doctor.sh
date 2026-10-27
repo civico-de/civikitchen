@@ -7,8 +7,9 @@
 # wanted it or how to get it. Worse, each run reveals exactly one: the next
 # target fails on the next missing tool.
 #
-# Pinned tools (phpunit, shellcheck, actionlint) are NOT prerequisites; `make
-# tools` fetches them into .cache/. Only what has to come from the host is here.
+# Pinned tools (phpunit, shellcheck, actionlint, composer, uv, Node) are NOT
+# prerequisites; `make tools` fetches them into .cache/. Only what has to come
+# from the host is here.
 #
 # Deliberately standalone and free of the things it checks: the make version
 # gate refuses before any recipe runs, so this has to be runnable as
@@ -120,14 +121,32 @@ check_version bash 4.0 \
   'brew install bash' \
   'apt install bash'
 
-check_version php 8.0 \
+# The tool belt uses readonly properties, which PHP 8.0 cannot parse.
+check_version php 8.1 \
   'ckconform, the phpstan rules, the catalog drift gates' \
   'brew install php' \
   'apt install php-cli'
+modules="$(php -m 2>/dev/null || true)"
+
+# PHPUnit's own list, the tool belt's (archives, XML, the host uid), and
+# composer's (phars, TLS). Debian's php-cli lacks the XML ones, mbstring and zip.
+if command -v php >/dev/null 2>&1; then
+  absent=()
+  for ext in ctype dom filter mbstring openssl phar posix simplexml tokenizer xmlwriter zip; do
+    grep -qixF "$ext" <<<"$modules" || absent+=("$ext")
+  done
+  if [ "${#absent[@]}" -eq 0 ]; then
+    say_ok extensions 'every PHP extension the suites load'
+  else
+    say_missing extensions "php lacks ${absent[*]}" \
+      'brew install php' \
+      'apt install php-xml php-mbstring php-zip'
+  fi
+fi
 
 if command -v phpdbg >/dev/null 2>&1; then
   say_ok phpdbg 'present (shared PHP coverage driver)'
-elif grep -qiE '^(pcov|xdebug)$' <<<"$(php -m 2>/dev/null)"; then
+elif grep -qiE '^(pcov|xdebug)$' <<<"$modules"; then
   say_ok coverage 'PCOV or Xdebug is enabled'
 else
   say_missing 'coverage' 'make test-shared-php-coverage needs phpdbg, PCOV, or Xdebug' \
@@ -137,35 +156,20 @@ fi
 
 check_present git 'fetching the pinned CiviCRM source tree, and every repo-aware check' \
   'xcode-select --install' 'apt install git'
-check_present curl 'downloading the pinned phpunit/shellcheck/actionlint into .cache/' \
+check_present curl 'downloading the pinned tools into .cache/' \
   'xcode-select --install' 'apt install curl'
-check_present composer 'the YAML parser the policy-reading tests load, and the phpstan rule package' \
-  'brew install composer' 'apt install composer'
-
-# lint-actions runs zizmor and lint-schema runs check-jsonschema. Both are
-# Python CLIs invoked through a runner that fetches them on demand — either
-# runner does, so requiring one specific binary would be inventing a
-# constraint the Makefile does not have.
-if command -v uvx >/dev/null 2>&1; then
-  say_ok uvx 'present (runs zizmor + check-jsonschema)'
-elif command -v pipx >/dev/null 2>&1; then
-  say_ok pipx 'present (runs zizmor + check-jsonschema)'
-else
-  say_missing 'uvx|pipx' 'make lint-actions (zizmor) and lint-schema (check-jsonschema)' \
-    'brew install uv   # or: brew install pipx' \
-    'apt install pipx  # or: curl -LsSf https://astral.sh/uv/install.sh | sh'
-fi
+check_present zip 'building the extension archives the release and profile suites read' \
+  'xcode-select --install' 'apt install zip'
+check_present unzip 'the release workflow steps, which the release suite runs as written' \
+  'xcode-select --install' 'apt install unzip'
 
 # The slow loop only. `make test` and `make lint` do not touch Docker, so a
 # host without it is fine for the fast loop and should not be told otherwise.
 if command -v docker >/dev/null 2>&1; then
   say_ok docker 'present'
 else
-  say_warn docker 'absent — make build, test-images and e2e need it; lint and test do not'
+  say_warn docker 'absent — make build, test-images, e2e, docs-a11y and dupcheck need it; lint and test do not'
 fi
-
-check_present npm 'the pinned oxlint behind make test-ckeslint, and make e2e' \
-  'brew install node' 'apt install npm'
 
 echo
 if [ "$missing" -gt 0 ]; then

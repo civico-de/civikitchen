@@ -35,6 +35,13 @@ host() {
     printf '#!/bin/sh\necho "%s"\n' "$banner" > "$dir/$tool"
     chmod +x "$dir/$tool"
   done
+  # php -m reads $dir/modules, which a case may rewrite.
+  if [ -f "$dir/php" ]; then
+    printf '%s\n' "${MODULES[@]}" > "$dir/modules"
+    banner="$(sed -n 's/^echo "\(.*\)"$/\1/p' "$dir/php")"
+    printf '#!/bin/sh\ncase "$1" in -m) exec %s "%s" ;; *) echo "%s" ;; esac\n' \
+      "$(command -v cat)" "$dir/modules" "$banner" > "$dir/php"
+  fi
   echo "$dir"
 }
 
@@ -46,11 +53,20 @@ COMPLETE=(
   'phpdbg=PHP 8.3.10 (phpdbg)'
   'git=git version 2.45.0'
   'curl=curl 8.7.1'
-  'composer=Composer version 2.7.6'
-  'uvx=uvx 0.5.11'
+  'zip=Zip 3.0 (July 5th 2008)'
+  'unzip=UnZip 6.00 of 20 April 2009'
   'docker=Docker version 27.1.1'
-  'npm=10.8.1'
 )
+# A Homebrew php -m, trimmed to the sections and what the suites load.
+MODULES=('[PHP Modules]' Core ctype dom filter json libxml mbstring openssl Phar posix SimpleXML tokenizer xmlwriter zip '' '[Zend Modules]')
+
+# COMPLETE without the entry for $1.
+except() {
+  local entry
+  for entry in "${COMPLETE[@]}"; do
+    [ "${entry%%=*}" = "$1" ] || printf '%s\n' "$entry"
+  done
+}
 
 # Sets `out` and `status`. Not via command substitution: that runs in a
 # subshell, where the exit code assignment would be discarded.
@@ -79,23 +95,13 @@ refute() { # label, needle, haystack
 }
 
 # --- a complete host is silent about problems --------------------------------
+# It has no composer, uv, pipx, Node or npm: the Makefile fetches those pinned.
 run_doctor "$(host complete "${COMPLETE[@]}")"
 [ "$status" -eq 0 ] || fail "complete host: expected exit 0, got $status"
 refute 'complete host' 'MISSING' "$out"
-
-# --- no Python runner at all -------------------------------------------------
-without_uvx=()
-for entry in "${COMPLETE[@]}"; do
-  [ "${entry%%=*}" = uvx ] || without_uvx+=("$entry")
+for tool in composer uvx pipx npm; do
+  refute 'complete host' "$tool" "$out"
 done
-run_doctor "$(host no-pyrun "${without_uvx[@]}")"
-[ "$status" -eq 1 ] || fail "no python runner: expected exit 1, got $status"
-expect 'no python runner' 'uvx|pipx' "$out"
-
-# --- pipx alone satisfies it: the Makefile pins versions for both ------------
-run_doctor "$(host pipx-only "${without_uvx[@]}" 'pipx=pipx 1.6.0')"
-[ "$status" -eq 0 ] || fail "pipx-only host: expected exit 0, got $status"
-expect 'pipx-only host' 'ok       pipx' "$out"
 
 # --- Apple's make with a modern gmake beside it is usable, not broken --------
 run_doctor "$(host apple-make "${COMPLETE[@]}" 'make=GNU Make 3.81' 'gmake=GNU Make 4.4.1')"
@@ -110,19 +116,13 @@ expect 'apple make alone' 'MISSING  make' "$out"
 expect 'apple make alone' '3.81 is too old' "$out"
 
 # --- a missing interpreter is a hard stop ------------------------------------
-without_php=()
-for entry in "${COMPLETE[@]}"; do
-  [ "${entry%%=*}" = php ] || without_php+=("$entry")
-done
+mapfile -t without_php < <(except php)
 run_doctor "$(host no-php "${without_php[@]}")"
 [ "$status" -eq 1 ] || fail "no php: expected exit 1, got $status"
 expect 'no php' 'MISSING  php' "$out"
 
 # --- line coverage is a hard prerequisite of the fast PHP suite -------------
-without_coverage=()
-for entry in "${COMPLETE[@]}"; do
-  [ "${entry%%=*}" = phpdbg ] || without_coverage+=("$entry")
-done
+mapfile -t without_coverage < <(except phpdbg)
 run_doctor "$(host no-coverage "${without_coverage[@]}")"
 [ "$status" -eq 1 ] || fail "no coverage driver: expected exit 1, got $status"
 expect 'no coverage driver' 'MISSING  coverage' "$out"
@@ -130,30 +130,39 @@ expect 'no coverage driver' 'MISSING  coverage' "$out"
 # --- a module list beyond a pipe buffer still yields its coverage driver ----
 # grep -q exits on the first match; a producer still writing then dies of
 # SIGPIPE, which pipefail reports as "no match".
-{ echo pcov; "$real_awk" 'BEGIN { for (i = 0; i < 200000; i++) print "module_" i }'; } > "$work/modules"
 long_modules="$(host long-modules "${without_coverage[@]}")"
-printf '#!/bin/sh\ncase "$1" in -m) exec %s "%s" ;; *) echo "PHP 8.3.10 (cli)" ;; esac\n' \
-  "$(command -v cat)" "$work/modules" > "$long_modules/php"
+{ echo pcov; printf '%s\n' "${MODULES[@]}"; "$real_awk" 'BEGIN { for (i = 0; i < 200000; i++) print "module_" i }'; } \
+  > "$long_modules/modules"
 run_doctor "$long_modules"
 [ "$status" -eq 0 ] || fail "long module list: expected exit 0, got $status"
 expect 'long module list' 'ok       coverage' "$out"
 
-# --- Docker is the slow loop only: absent must not fail the fast one ---------
-without_docker=()
-for entry in "${COMPLETE[@]}"; do
-  [ "${entry%%=*}" = docker ] || without_docker+=("$entry")
+# --- PHP 8.0 cannot parse the tool belt --------------------------------------
+run_doctor "$(host php80 "${COMPLETE[@]}" 'php=PHP 8.0.30 (cli)')"
+[ "$status" -eq 1 ] || fail "php 8.0: expected exit 1, got $status"
+expect 'php 8.0' '8.0.30 is too old, needs >= 8.1' "$out"
+
+# --- Debian's php-cli without php-xml, php-mbstring and php-zip ---------------
+php_cli_only="$(host php-cli-only "${COMPLETE[@]}")"
+printf '%s\n' '[PHP Modules]' Core ctype filter json libxml openssl Phar posix tokenizer > "$php_cli_only/modules"
+printf '#!/bin/sh\necho Linux\n' > "$php_cli_only/uname"
+run_doctor "$php_cli_only"
+[ "$status" -eq 1 ] || fail "php-cli only: expected exit 1, got $status"
+expect 'php-cli only' 'MISSING  extensions php lacks dom mbstring simplexml xmlwriter zip' "$out"
+expect 'php-cli only' 'apt install php-xml php-mbstring php-zip' "$out"
+
+# --- the archive tools are hard prerequisites --------------------------------
+for tool in zip unzip; do
+  mapfile -t without < <(except "$tool")
+  run_doctor "$(host "no-$tool" "${without[@]}")"
+  [ "$status" -eq 1 ] || fail "no $tool: expected exit 1, got $status"
+  expect "no $tool" "MISSING  $tool" "$out"
 done
+
+# --- Docker is the slow loop only: absent must not fail the fast one ---------
+mapfile -t without_docker < <(except docker)
 run_doctor "$(host no-docker "${without_docker[@]}")"
 [ "$status" -eq 0 ] || fail "no docker: expected exit 0, got $status"
 expect 'no docker' 'WARN     docker' "$out"
-
-# --- npm fetches the pinned oxlint that make test runs ----------------------
-without_npm=()
-for entry in "${COMPLETE[@]}"; do
-  [ "${entry%%=*}" = npm ] || without_npm+=("$entry")
-done
-run_doctor "$(host no-npm "${without_npm[@]}")"
-[ "$status" -eq 1 ] || fail "no npm: expected exit 1, got $status"
-expect 'no npm' 'MISSING  npm' "$out"
 
 echo "doctor suite OK"

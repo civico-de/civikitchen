@@ -43,12 +43,17 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - The docs site uses system fonts. A web font arriving after the theme
   measured code blocks left them without keyboard focus.
 - `ck demo` records in the `ck playwright` image (`civikitchen-playwright:<hash>`).
+- `make test` and `make lint` fetch composer, uv and Node pinned into
+  `.cache/`, so the host needs none of them. `make doctor` requires PHP 8.1
+  and checks the PHP extensions, `zip` and `unzip` the suites use.
 
 ### Fixed
 
 - `CIVIKITCHEN_LOCALES` no longer hangs on a stalled download of the core
   language archive: a transfer under 10 kB/s for 30 s aborts, and a failed
   download is retried up to three times before provisioning fails.
+- Every `make` target is phony, so a file named like one, such as
+  `test-provision`, no longer skips its suite.
 - `ckcoverage`, `ckmutate`, `cksmarty` and `ckmigrate` stop with an error
   when `civikitchen.yaml` cannot be read. A broken file no longer reads as
   unset, which had turned a coverage or mutation floor into "reporting only".

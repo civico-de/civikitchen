@@ -29,17 +29,16 @@ shellcheck) and the CiviCRM source tree the catalog drift gates need into
 
 ## Requirements
 
-Besides git and curl, the fast loop needs:
+Besides git, curl, zip and unzip, the fast loop needs:
 
 - GNU Make 3.82 or newer. The Makefile refuses older versions; Apple ships
   3.81, which silently drops the strict-shell flags.
 - bash on the PATH
-- php with a coverage driver (phpdbg, PCOV or Xdebug)
-- composer, for the YAML parser and the phpstan rule package
-- npm, for the pinned oxlint
-- uvx or pipx, for zizmor and the schema check
+- PHP 8.1 or newer with a coverage driver (phpdbg, PCOV or Xdebug). Debian's
+  `php-cli` also needs `php-xml`, `php-mbstring` and `php-zip`.
 
-Everything else is fetched pinned. `make doctor` reports what is missing.
+Everything else is fetched pinned into `.cache/`, including composer, uv and
+Node; `make clean` removes it. `make doctor` reports what is missing.
 
 The slow loop also needs Docker. It consists of `make build`, which builds the
 standalone image as `civikitchen:standalone`, plus `make test-images`,
