@@ -38,6 +38,17 @@ final class SharedPhpTest extends TestCase
         Directory::remove($this->temporary);
     }
 
+    public function testXmlFieldReadsNestedElementsByPath(): void
+    {
+        $file = $this->temporary . '/info.xml';
+        file_put_contents($file, '<extension key="org.example.nested"><civix><namespace>CRM/Nested</namespace></civix></extension>');
+        $command = new InternalRuntimeCommand(dirname(__DIR__, 2));
+
+        $this->expectOutputString('CRM/Nestedorg.example.nested');
+        self::assertSame(0, $command->run(['xml-field', $file, 'civix/namespace']));
+        self::assertSame(0, $command->run(['xml-field', $file, 'key']));
+    }
+
     public function testApplicationRoutesHelpForEveryCommandThatOffersIt(): void
     {
         $application = new Application(dirname(__DIR__, 2) . '/toolbelt/bin', dirname(__DIR__, 2));
