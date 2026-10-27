@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Mago\Analyzer;
 
+use CiviKitchen\Mago\Linter\Support\Syntax;
 use CiviKitchen\Mago\Workspace;
 use CiviKitchen\PHPStan\Api4Contract;
 use Mago\Sdk\Analyzer\FileAnalysisRequirement;
@@ -58,7 +59,7 @@ final class Api4CallHook implements NodeAnalysisHook
     private function functionCall(NodeAnalysisContext $context, Api4Contract $contract): array
     {
         $source = $context->source;
-        $callee = Api4Calls::unwrap($source, $source->getChildren($context->node)[0]);
+        $callee = Syntax::unwrap($source, $source->getChildren($context->node)[0]);
         $identifier = $callee->kind === NodeKind::Identifier ? $source->getChildren($callee)[0] ?? null : null;
         if ($identifier === null || !in_array($identifier->kind, [NodeKind::LocalIdentifier, NodeKind::FullyQualifiedIdentifier], true)
             || self::functionName($context, $identifier) !== 'civicrm_api4') {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Mago\Analyzer;
 
+use CiviKitchen\Mago\Linter\Support\Syntax;
 use CiviKitchen\Mago\Workspace;
 use CiviKitchen\PHPStan\Api4ActionParameter;
 use Mago\Sdk\Analyzer\Codebase;
@@ -173,7 +174,7 @@ final class Api4ActionPropertyHook implements NodeAnalysisHook
         $assigned = [];
         foreach ($source->getDescendants($constructor, NodeKind::Assignment) as $assignment) {
             [$target, $operator] = $source->getChildren($assignment);
-            $target = Api4Calls::unwrap($source, $target);
+            $target = Syntax::unwrap($source, $target);
             $target = $target->kind === NodeKind::Access ? $source->getChildren($target)[0] : $target;
             if ($source->getText($operator) !== '=' || $target->kind !== NodeKind::PropertyAccess) {
                 continue;

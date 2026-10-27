@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Mago\Analyzer;
 
+use CiviKitchen\Mago\Linter\Support\Syntax;
 use CiviKitchen\PHPStan\Api4Fluent;
 use CiviKitchen\PHPStan\ClassLookup;
 use Mago\Sdk\Analyzer\NodeAnalysisContext;
@@ -40,23 +41,13 @@ final class Api4Calls
         return $node === null ? null : $context->analysis->getExpressionType($node);
     }
 
-    /** Strips the Expression wrappers around an expression. */
-    public static function unwrap(SourceFile $source, Node $node): Node
-    {
-        while ($node->kind === NodeKind::Expression && ($inner = $source->getChildren($node)[0] ?? null) !== null) {
-            $node = $inner;
-        }
-
-        return $node;
-    }
-
     /**
      * The entity a `\Civi\Api4\X::…` class reference names, in X's declared
      * spelling: php resolves class names case-insensitively.
      */
     public static function entityOfClassReference(SourceFile $source, Node $class, ClassLookup $classes): ?string
     {
-        $class = self::unwrap($source, $class);
+        $class = Syntax::unwrap($source, $class);
         if ($class->kind !== NodeKind::Identifier) {
             return null;
         }

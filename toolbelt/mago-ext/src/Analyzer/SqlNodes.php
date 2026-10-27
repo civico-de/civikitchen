@@ -80,16 +80,7 @@ final class SqlNodes
     /** The argument bound to parameter $name at $position; null when a spread hides the binding. */
     public static function argument(SourceFile $source, Node $call, int $position, string $name): ?Node
     {
-        foreach (CallExpression::fromNode($source, $call)->arguments as $argument) {
-            if ($argument->unpacked) {
-                return null;
-            }
-            if ($argument->name === null ? $argument->index === $position : $argument->name === $name) {
-                return $argument->value;
-            }
-        }
-
-        return null;
+        return Api4Calls::argument(CallExpression::fromNode($source, $call), $position, $name);
     }
 
     /** @return list<Node> every argument value, spreads included */
