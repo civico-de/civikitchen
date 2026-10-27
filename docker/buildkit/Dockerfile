@@ -156,13 +156,15 @@ RUN --mount=type=secret,id=composer_auth,env=COMPOSER_AUTH composer install --no
 # without the in-place sed dance Ubuntu's apache2 package required.
 ENV APACHE_RUN_USER=buildkit \
     APACHE_RUN_GROUP=buildkit
+# No MultiViews: Backdrop keeps civicrm.settings.php in the web root, and content
+# negotiation would serve /civicrm/<path> from it instead of the CMS front controller.
 RUN useradd -m -s /bin/bash buildkit \
     && chown -R buildkit:buildkit /var/log/apache2 /var/run/apache2 \
     && printf '<VirtualHost *:80>\n\
     ServerName localhost\n\
     DocumentRoot /home/buildkit/buildkit/build/site/web\n\
     <Directory /home/buildkit/buildkit/build/site/web>\n\
-        Options Indexes FollowSymLinks MultiViews\n\
+        Options Indexes FollowSymLinks\n\
         AllowOverride All\n\
         Require all granted\n\
     </Directory>\n\

@@ -137,7 +137,7 @@ docker exec civicrm cat /home/buildkit/api-credentials.txt
 ## Images
 
 `ghcr.io/civico-de/civikitchen` is multi-arch. The standalone image is the
-main one; drupal10, drupal11, wordpress and joomla carry the same tools on a
+main one; drupal10, drupal11, wordpress, joomla and backdrop carry the same tools on a
 CMS site, each with a demo variant. Moving tags are rebuilt daily and move only
 after their tests pass. Extensions pin the v1 release tags.
 → [Images](docs/images.md), [Tags and versions](docs/images.md#tags-and-versions)

@@ -1,4 +1,4 @@
-# The CMS flavors: drupal10, drupal11, wordpress, joomla and their -demo
+# The CMS flavors: drupal10, drupal11, wordpress, joomla, backdrop and their -demo
 # images. They do not gate a release (docs/releases.md): build-dev-images.yml
 # builds the standalone images a release needs, and a release attaches a CMS
 # flavor's tags only once this workflow has promoted a matching image.
@@ -105,7 +105,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Test-then-promote: only sha-suffixed candidate tags here; the stable
-      # tags (:drupal10, :drupal11, :wordpress, :joomla, :*-php8.3) are
+      # tags (:drupal10, :drupal11, :wordpress, :joomla, :backdrop, :*-php8.3) are
       # created by promote-buildkit after the smoke tests pass.
       - name: Build and push ${{ matrix.variant.name }} candidate image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0

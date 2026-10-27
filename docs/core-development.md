@@ -103,7 +103,7 @@ ck demo ./fix.diff --page 'civicrm/contact/search?reset=1' --cms standalone,joom
 ```
 
 `--cms` takes a list of `standalone` (the default), `wordpress`, `drupal10`,
-`drupal11` and `joomla`, or `all`. Every CMS boots from its image in a compose
+`drupal11`, `joomla` and `backdrop`, or `all`. Every CMS boots from its image in a compose
 project of its own, on a free port from 8300 up; `--image <cms>=<ref>` boots
 one from another image. The docker CLI in `scaffold/ck` has no registry login,
 so pull an image from a private registry on the host first; a stack boots from

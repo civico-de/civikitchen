@@ -14,6 +14,7 @@
 #   bash tests/images/boot-test.sh civikitchen:drupal11  drupal11-demo
 #   bash tests/images/boot-test.sh civikitchen:wordpress wp-demo
 #   bash tests/images/boot-test.sh civikitchen:joomla    joomla-demo
+#   bash tests/images/boot-test.sh civikitchen:backdrop  backdrop-demo
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
@@ -97,6 +98,15 @@ if [[ "${SITE_TYPE}" == joomla* ]]; then
         'http://localhost/index.php?option=com_civicrm' 2>/dev/null || echo 000)
     check "Joomla com_civicrm route is registered (HTTP ${jcode}, not 404)" \
         "[ '${jcode}' != '404' ] && [ '${jcode}' != '000' ]"
+fi
+
+# 4) Backdrop only: /civicrm/<path> must reach the front controller. Backdrop keeps
+# civicrm.settings.php in the web root, so Apache MultiViews would answer it with a 404.
+if [[ "${SITE_TYPE}" == backdrop* ]]; then
+    bcode=$(docker exec "${APP}" curl -s -o /dev/null -w '%{http_code}' \
+        'http://localhost/civicrm/dashboard' 2>/dev/null || echo 000)
+    check "Backdrop civicrm/ route reaches the CMS (HTTP ${bcode}, not 404)" \
+        "[ '${bcode}' != '404' ] && [ '${bcode}' != '000' ]"
 fi
 
 verdict "${IMAGE}"

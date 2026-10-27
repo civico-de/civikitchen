@@ -158,7 +158,20 @@ BK
 # build with --build-arg KEEP_GIT=1 to keep the repos (see docs/building.md).
 if [ "${KEEP_GIT:-0}" != "1" ]; then
     echo "bake.sh: stripping git history from the baked site (--build-arg KEEP_GIT=1 keeps it)"
+    # Backdrop's uninstall, run by every `civibuild reinstall`, restores settings.php and
+    # files/ with `git checkout`: keep a one-commit repo holding just their pristine state.
+    web=/home/buildkit/buildkit/build/site/web
+    pristine=/home/buildkit/backdrop-pristine
+    if [[ "${DEFAULT_SITE_TYPE}" == backdrop* ]]; then
+        su -s /bin/bash buildkit -c "mkdir ${pristine} && git -C ${web} archive HEAD settings.php files | tar -x -C ${pristine}"
+    fi
     find /home/buildkit/buildkit/build/site -type d -name .git -prune -exec rm -rf {} +
+    if [[ "${DEFAULT_SITE_TYPE}" == backdrop* ]]; then
+        su -s /bin/bash buildkit -c "set -e; git init -q ${web}
+            git -C ${web} --work-tree=${pristine} add settings.php files
+            git -C ${web} -c user.name=civikitchen -c user.email=civikitchen@localhost commit -q -m 'Pristine Backdrop settings'
+            rm -rf ${pristine}"
+    fi
 fi
 
 # VERIFIED clean shutdown. The `demo` target is `FROM builder` and ships this

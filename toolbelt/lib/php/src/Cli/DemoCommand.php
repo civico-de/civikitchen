@@ -29,7 +29,7 @@ ck demo — record a civicrm-core change before and after, on one or more CMS
                        after the routes:
                        export default async ({ page, url, cms, phase }) => { ... }
   --cms <list>         comma-separated standalone, wordpress, drupal10, drupal11,
-                       joomla, or all (default: standalone)
+                       joomla, backdrop, or all (default: standalone)
   --image <cms>=<ref>  boot that CMS from another image (repeatable)
   --cv '<arguments>'   run `cv <arguments>` on every site before recording (repeatable)
   --out <dir>          for the videos and index.html (default: ./ck-demo-<PR or file>)

@@ -67,7 +67,7 @@ A new push or dispatch cancels the run in progress, so the last commit wins. A
 run cancelled while promoting leaves some tags on the older commit until the
 next run.
 
-The CMS flavors (drupal10, drupal11, wordpress, joomla and their demos) build
+The CMS flavors (drupal10, drupal11, wordpress, joomla, backdrop and their demos) build
 in *Build CMS Images*, daily and on dispatch, in their own concurrency group.
 They never block a release: their tags catch up later.
 

@@ -3,8 +3,9 @@
  * Configure API users from profile.json (apiUsers + authx sections).
  *
  * Runs via `cv scr` from apply.sh. cv boots CiviCRM *and* the host CMS, so
- * one script covers all three user frameworks natively — no drush, no wp-cli:
+ * one script covers every user framework natively — no drush, no wp-cli:
  *   Drupal8    → Drupal entity API (\Drupal\user\Entity\User / Role)
+ *   Backdrop   → user_save() / user_role_save() / user_role_grant_permissions()
  *   WordPress  → wp_insert_user() / add_role() / WP_Role::add_cap()
  *   Standalone → standaloneusers User/Role APIv4 entities
  *
@@ -27,7 +28,7 @@ require_once $credentialsHelper;
 $credentialsOutput = ck_credentials_output_mode();
 $apiUsers = $config['apiUsers'] ?? [];
 $uf = CRM_Core_Config::singleton()->userFramework;
-if (!in_array($uf, ['Drupal8', 'WordPress', 'Standalone', 'Joomla'], TRUE)) {
+if (!in_array($uf, ['Drupal8', 'Backdrop', 'WordPress', 'Standalone', 'Joomla'], TRUE)) {
   throw new \RuntimeException("configure-api-users: unsupported user framework '{$uf}'");
 }
 echo "  🔑 Configuring API access ({$uf})...\n";
@@ -63,6 +64,19 @@ function ck_drupal_grant(string $roleId, array $perms, bool $exact = FALSE): voi
     }
   }
   $role->save();
+}
+
+/** Backdrop counterpart of ck_drupal_grant(): same fail-closed inventory check. */
+function ck_backdrop_grant(string $roleName, array $perms): void {
+  $role = user_role_load($roleName) ?: (object) ['name' => $roleName, 'label' => $roleName];
+  $known = array_keys(user_permission_get_modules());
+  foreach ($perms as $perm) {
+    if (!in_array($perm, $known, TRUE)) {
+      throw new \RuntimeException("configure-api-users: unknown Backdrop permission '{$perm}' for role '{$roleName}'");
+    }
+  }
+  $role->permissions = array_values(array_unique($perms));
+  user_role_save($role);
 }
 
 const CK_PROFILE_CONTACT_SOURCE = 'CiviKitchen profile API user';
@@ -104,6 +118,7 @@ function ck_claim_roles(array $roleNames): void {
 
 function ck_role_exists(string $uf, string $roleName): bool {
   if ($uf === 'Drupal8') return (bool) \Drupal\user\Entity\Role::load($roleName);
+  if ($uf === 'Backdrop') return (bool) user_role_load($roleName);
   if ($uf === 'WordPress') return (bool) get_role($roleName);
   if ($uf === 'Standalone') {
     return (bool) \Civi\Api4\Role::get(FALSE)
@@ -119,6 +134,9 @@ function ck_role_exists(string $uf, string $roleName): bool {
 function ck_delete_owned_role(string $uf, string $roleName): void {
   if ($uf === 'Drupal8') {
     if ($role = \Drupal\user\Entity\Role::load($roleName)) $role->delete();
+  }
+  elseif ($uf === 'Backdrop') {
+    if (user_role_load($roleName)) user_role_delete($roleName);
   }
   elseif ($uf === 'WordPress') {
     remove_role($roleName);
@@ -161,6 +179,10 @@ function ck_existing_profile_account_contact(string $uf, string $username): ?int
   if ($uf === 'Drupal8') {
     $accounts = \Drupal::entityTypeManager()->getStorage('user')->loadByProperties(['name' => $username]);
     $uid = $accounts ? (int) reset($accounts)->id() : 0;
+  }
+  elseif ($uf === 'Backdrop') {
+    $account = user_load_by_name($username);
+    $uid = $account ? (int) $account->uid : 0;
   }
   elseif ($uf === 'WordPress') {
     $uid = (int) username_exists($username);
@@ -224,6 +246,11 @@ function ck_reconcile_stale_profile_accounts(string $uf, array $desiredUsernames
         $username = $account ? (string) $account->getAccountName() : '';
         if (!$account) $uid = 0;
       }
+      elseif ($uid > 0 && $uf === 'Backdrop') {
+        $account = user_load($uid);
+        $username = $account ? (string) $account->name : '';
+        if (!$account) $uid = 0;
+      }
       elseif ($uid > 0 && $uf === 'WordPress') {
         $account = get_userdata($uid);
         $username = $account ? (string) $account->user_login : '';
@@ -248,6 +275,11 @@ function ck_reconcile_stale_profile_accounts(string $uf, array $desiredUsernames
       }
       $account->block();
       $account->save();
+    }
+    elseif ($uid > 0 && $uf === 'Backdrop') {
+      $account->roles = array_values(array_filter($account->roles, fn($roleName) => !str_starts_with($roleName, 'civikitchen_')));
+      $account->status = 0;
+      user_save($account);
     }
     elseif ($uid > 0 && $uf === 'WordPress') {
       (new \WP_User($uid))->set_role('');
@@ -366,6 +398,13 @@ if ($apiUsers || ($authxPolicy !== FALSE && $authxPolicy !== '') || isset($confi
       }
       break;
 
+    case 'Backdrop':
+      if (user_role_load('administrator')) {
+        user_role_revoke_permissions('administrator', ['authenticate with password', 'authenticate with api key']);
+        user_role_grant_permissions('administrator', array_merge($authPermissions, ['access CiviCRM', 'administer CiviCRM']));
+      }
+      break;
+
     case 'WordPress':
       if ($adminRole = get_role('administrator')) {
         foreach (['authenticate with password', 'authenticate with api key'] as $authPermission) {
@@ -456,6 +495,18 @@ foreach ($apiUsers as $spec) {
       $account->addRole($roleName);
       $account->save();
       $uid = (int) $account->id();
+      break;
+
+    case 'Backdrop':
+      ck_backdrop_grant($roleName, array_merge($perms, $authPermissions));
+      $account = user_load_by_name($username) ?: entity_create('user', ['name' => $username]);
+      $account->mail = $email;
+      $account->pass = $password;
+      $account->status = 1;
+      $roles = array_filter($account->roles ?? [], fn($existingRole) => !str_starts_with($existingRole, 'civikitchen_'));
+      $account->roles = array_values(array_unique(array_merge($roles, [$roleName])));
+      user_save($account);
+      $uid = (int) $account->uid;
       break;
 
     case 'WordPress':

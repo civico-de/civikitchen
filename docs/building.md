@@ -100,6 +100,11 @@ docker build -f docker/buildkit/Dockerfile \
     --build-arg PHP_VERSION=8.3 \
     --build-arg DEFAULT_SITE_TYPE=joomla-demo \
     -t civikitchen:joomla .
+
+docker build -f docker/buildkit/Dockerfile \
+    --build-arg PHP_VERSION=8.3 \
+    --build-arg DEFAULT_SITE_TYPE=backdrop-demo \
+    -t civikitchen:backdrop .
 ```
 
 ## Bumping a dev tool

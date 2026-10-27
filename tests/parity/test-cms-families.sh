@@ -15,27 +15,27 @@ families() {
 output() { sed -n "s/^$1=//p" "$work/out"; }
 
 families ''
-[ "$(output families)" = '["drupal10","drupal11","wordpress","joomla"]' ] || fail "default families: $(output families)"
-[ "$(jq length <<<"$(output demo_smoke)")" = 20 ] || fail "every demo family smokes every profile"
+[ "$(output families)" = '["drupal10","drupal11","wordpress","joomla","backdrop"]' ] || fail "default families: $(output families)"
+[ "$(jq length <<<"$(output demo_smoke)")" = 25 ] || fail "every demo family smokes every profile"
 while IFS= read -r compose; do
   [ -f "$root/$compose" ] || fail "e2e names a missing compose file: $compose"
 done < <(jq -r '.[].compose' <<<"$(output e2e)")
 
 families ' joomla , wordpress'
-[ "$(output families)" = '["drupal10","drupal11"]' ] || fail "skip kept: $(output families)"
+[ "$(output families)" = '["drupal10","drupal11","backdrop"]' ] || fail "skip kept: $(output families)"
 if grep -q 'joomla\|wordpress' "$work/out"; then
   fail "a skipped family is still in an output: $(cat "$work/out")"
 fi
 
 if out=$(families 'joomla,bogus' 2>&1); then fail "an unknown family was accepted"; fi
 grep -qF 'unknown CMS families: ["bogus"]' <<<"$out" || fail "the unknown family was not named: $out"
-if families 'drupal10,drupal11,wordpress,joomla' >/dev/null 2>&1; then fail "skipping every family was accepted"; fi
+if families 'drupal10,drupal11,wordpress,joomla,backdrop' >/dev/null 2>&1; then fail "skipping every family was accepted"; fi
 
 # A family a job lists itself would build even when skipped.
 php -r '
   require $argv[1];
   foreach (ck_jobs_parsed($argv[2]) as $name => $job) {
-    if (preg_match("/drupal10|drupal11|wordpress|joomla/", ck_job_text($job)) === 1) {
+    if (preg_match("/drupal10|drupal11|wordpress|joomla|backdrop/", ck_job_text($job)) === 1) {
       fwrite(STDERR, "job $name lists a CMS family past cms-families.sh\n");
       exit(1);
     }

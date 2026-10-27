@@ -7,7 +7,8 @@ table='[
   {"name": "drupal10",  "site_type": "drupal10-demo", "path": "/civicrm"},
   {"name": "drupal11",  "site_type": "drupal11-demo", "path": "/civicrm"},
   {"name": "wordpress", "site_type": "wp-demo",       "path": "/wp-admin/admin.php?page=CiviCRM"},
-  {"name": "joomla",    "site_type": "joomla-demo",   "path": "/administrator/index.php?option=com_civicrm"}
+  {"name": "joomla",    "site_type": "joomla-demo",   "path": "/administrator/index.php?option=com_civicrm"},
+  {"name": "backdrop",  "site_type": "backdrop-demo", "path": "/civicrm"}
 ]'
 profiles='["", "verein", "fundraising", "events", "mailing"]'
 

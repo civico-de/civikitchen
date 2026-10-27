@@ -39,8 +39,8 @@ git commit -q -am rel
 rel=$(git rev-parse HEAD)
 
 export OWNER=owner PKG=civikitchen TAG=v1.2.3 RELEASE_SHA="${rel}" ALLOW_DRIFT=0
-flavors=(standalone drupal10 drupal11 wordpress joomla
-         standalone-demo drupal10-demo drupal11-demo wordpress-demo joomla-demo)
+flavors=(standalone drupal10 drupal11 wordpress joomla backdrop
+         standalone-demo drupal10-demo drupal11-demo wordpress-demo joomla-demo backdrop-demo)
 
 # One package version per argument, `<digest>=<tag>,<tag>…`.
 versions() {

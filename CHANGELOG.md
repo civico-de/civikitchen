@@ -16,6 +16,12 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Added
 
+- A Backdrop flavor: `:backdrop` and `:backdrop-demo` run CiviCRM on Backdrop
+  CMS from civibuild's `backdrop-demo` site type. Extensions mount below
+  `web/files/civicrm/ext` ([examples/backdrop/](examples/backdrop/));
+  `ck demo --cms backdrop` records on it, and profiles create their API users
+  as Backdrop roles and accounts. The buildkit images no longer enable
+  Apache MultiViews, which answered Backdrop's `/civicrm/…` routes with a 404.
 - `ck demo <PR|diff>` records a civicrm-core change before and after on fresh
   sites of one or more CMS and writes the videos side by side into one HTML
   page. It runs on the host through `scaffold/ck`; the browser runs in

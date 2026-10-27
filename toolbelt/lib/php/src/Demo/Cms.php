@@ -9,7 +9,7 @@ use RuntimeException;
 /** What `ck demo` needs to boot, patch, log into and navigate one CMS flavor. */
 final class Cms
 {
-    public const NAMES = ['standalone', 'wordpress', 'drupal10', 'drupal11', 'joomla'];
+    public const NAMES = ['standalone', 'wordpress', 'drupal10', 'drupal11', 'joomla', 'backdrop'];
 
     private const IMAGE = 'ghcr.io/civico-de/civikitchen:';
     private const BUILDKIT_SITE = '/home/buildkit/buildkit/build/site';
@@ -117,6 +117,18 @@ final class Cms
                     'dismiss' => ['role' => 'button', 'name' => 'No'],
                 ],
                 '/administrator/index.php?option=com_civicrm&task=',
+                false,
+            ),
+            'backdrop' => new self(
+                $name,
+                'Backdrop',
+                $image ?? self::IMAGE . 'backdrop',
+                'buildkit',
+                self::BUILDKIT_SITE,
+                $buildkitApp,
+                $buildkitDatabase,
+                $drupalLogin,
+                '/',
                 false,
             ),
             default => throw new RuntimeException("unknown CMS '{$name}' (one of: " . implode(', ', self::NAMES) . ', all)'),

@@ -75,11 +75,11 @@ Ready to run: [examples/standalone/](https://github.com/civico-de/civikitchen/tr
 
 ## Buildkit flavors (dev)
 
-For CMS-specific behaviour, the drupal10, drupal11, wordpress and joomla
-flavors run CiviCRM on a CMS via
+For CMS-specific behaviour, the drupal10, drupal11, wordpress, joomla and
+backdrop flavors run CiviCRM on a CMS via
 [civicrm-buildkit](https://github.com/civicrm/civicrm-buildkit). They share
 one Dockerfile and differ only in the default civibuild site type
-(drupal10-demo, drupal11-demo, wp-demo, joomla-demo), which
+(drupal10-demo, drupal11-demo, wp-demo, joomla-demo, backdrop-demo), which
 `CIVICRM_SITE_TYPE` overrides. civibuild builds the site on first start, in
 about a minute, against an external MariaDB.
 
@@ -113,7 +113,8 @@ Ready to run, with each CMS's extension mount path:
 [drupal10](https://github.com/civico-de/civikitchen/tree/main/examples/drupal10/),
 [drupal11](https://github.com/civico-de/civikitchen/tree/main/examples/drupal11/),
 [wordpress](https://github.com/civico-de/civikitchen/tree/main/examples/wordpress/),
-[joomla](https://github.com/civico-de/civikitchen/tree/main/examples/joomla/).
+[joomla](https://github.com/civico-de/civikitchen/tree/main/examples/joomla/),
+[backdrop](https://github.com/civico-de/civikitchen/tree/main/examples/backdrop/).
 
 ### Drupal 11
 
@@ -142,7 +143,7 @@ docker rm.
 
 ```bash
 # Pick a flavor: standalone-demo (CMS-less), drupal10-demo, drupal11-demo,
-# wordpress-demo, joomla-demo
+# wordpress-demo, joomla-demo, backdrop-demo
 docker run -d -p 80:80 --name civicrm ghcr.io/civico-de/civikitchen:drupal10-demo
 
 # then open http://localhost  —  login: admin / admin
@@ -303,7 +304,7 @@ repo:
 |-----|-------------------|
 | `:standalone`, `:standalone-latest` | The most recent build of CiviCRM's latest release. |
 | `:standalone-<minor>` | The latest patch of that minor, for example `:standalone-6.16`. The current stable minor always has one; older minors keep rebuilding while listed in `CK_STANDALONE_EXTRA_MINORS` in toolbelt/versions.env, and freeze once dropped. To rebuild another minor once, dispatch *Build Dev Images* with extra_standalone_minors. |
-| `:drupal10`, `:drupal11`, `:wordpress`, `:joomla`, `:*-demo` | The current stable at build time; see the version label below. |
+| `:drupal10`, `:drupal11`, `:wordpress`, `:joomla`, `:backdrop`, `:*-demo` | The current stable at build time; see the version label below. |
 | `:<flavor>-php<version>` | The buildkit dev flavors with an explicit PHP version, for example `:drupal10-php8.3`. |
 | `:standalone-master` | The head of civicrm-core master, built daily from git by *Build Git Images*. |
 | `:standalone-beta` | The head of core's newest X.Y branch, built daily from git. Shortly after a release this may still be the branch that just shipped. |

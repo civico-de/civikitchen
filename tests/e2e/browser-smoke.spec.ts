@@ -10,6 +10,7 @@ const CMS_TARGETS: Record<string, { loginPath: string; civiPath: string }> = {
   drupal11: { loginPath: '/user/login', civiPath: '/civicrm' },
   wordpress: { loginPath: '/wp-login.php', civiPath: '/wp-admin/admin.php?page=CiviCRM' },
   joomla: { loginPath: '/administrator/index.php', civiPath: '/administrator/index.php?option=com_civicrm' },
+  backdrop: { loginPath: '/user/login', civiPath: '/civicrm' },
 };
 
 function looksLikeAsset(url: string): boolean {
@@ -67,7 +68,7 @@ test.describe(`${TARGET} browser smoke`, () => {
 async function loginToCms(page: import('@playwright/test').Page, target: string, loginPath: string) {
   await page.goto(loginPath, { waitUntil: 'domcontentloaded' });
 
-  if (target === 'drupal10' || target === 'drupal11') {
+  if (target === 'drupal10' || target === 'drupal11' || target === 'backdrop') {
     await page.locator('input[name="name"]').fill(ADMIN_USER);
     await page.locator('input[name="pass"]').fill(ADMIN_PASS);
     await submitLogin(page);

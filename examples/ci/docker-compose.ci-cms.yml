@@ -28,6 +28,7 @@ services:
       #   drupal10/11: …/web/sites/default/files/civicrm/ext
       #   wordpress:   …/web/wp-content/uploads/civicrm/ext
       #   joomla:      …/web/media/civicrm/ext
+      #   backdrop:    …/web/files/civicrm/ext
       - .:${CK_EXT_BASE:-/home/buildkit/buildkit/build/site/web/sites/default/files/civicrm/ext}/myextension
 
   db:

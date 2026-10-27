@@ -35,8 +35,8 @@ while getopts "p:h" opt; do
 done
 shift $((OPTIND - 1))
 
-DEV_FLAVORS=(standalone drupal10 drupal11 wordpress joomla)
-DEMO_FLAVORS=(standalone-demo drupal10-demo drupal11-demo wordpress-demo joomla-demo)
+DEV_FLAVORS=(standalone drupal10 drupal11 wordpress joomla backdrop)
+DEMO_FLAVORS=(standalone-demo drupal10-demo drupal11-demo wordpress-demo joomla-demo backdrop-demo)
 FLAVORS=("$@")
 [ "${#FLAVORS[@]}" -gt 0 ] || FLAVORS=("${DEV_FLAVORS[@]}" "${DEMO_FLAVORS[@]}")
 
@@ -46,6 +46,7 @@ site_type_for() {
         drupal11)  echo drupal11-demo ;;
         wordpress) echo wp-demo ;;
         joomla)    echo joomla-demo ;;
+        backdrop)  echo backdrop-demo ;;
         *)         echo "" ;;
     esac
 }

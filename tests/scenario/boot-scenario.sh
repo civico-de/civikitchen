@@ -59,6 +59,12 @@ api_user_state() {
       $account=$match ? \Drupal\user\Entity\User::load($match["uf_id"]) : NULL;
       $active=$account && $account->isActive();
     }
+    elseif ($contact && CIVICRM_UF === "Backdrop") {
+      $match=\Civi\Api4\UFMatch::get(FALSE)->addWhere("contact_id", "=", $contact["id"])
+        ->addSelect("uf_id")->execute()->first();
+      $account=$match ? user_load($match["uf_id"]) : NULL;
+      $active=$account && $account->status == 1;
+    }
     elseif ($contact && CIVICRM_UF === "WordPress") {
       $match=\Civi\Api4\UFMatch::get(FALSE)->addWhere("contact_id", "=", $contact["id"])
         ->addSelect("uf_id")->execute()->first();
@@ -123,6 +129,10 @@ role_union=$(app_cv ev '
   elseif (CIVICRM_UF === "Drupal8") {
     $role=\Drupal\user\Entity\Role::load("civikitchen_smoke_api");
     $permissions=$role ? $role->getPermissions() : [];
+  }
+  elseif (CIVICRM_UF === "Backdrop") {
+    $role=user_role_load("civikitchen_smoke_api");
+    $permissions=$role ? $role->permissions : [];
   }
   else {
     $permissions=$wanted;

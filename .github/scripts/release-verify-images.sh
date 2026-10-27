@@ -47,9 +47,9 @@ fatal=()
 # Every published flavor. standalone leads because the unprefixed :v1 /
 # :v1.2.3 tags alias it — it is the image the extension template's compose
 # stacks run.
-for flavor in standalone drupal10 drupal11 wordpress joomla \
+for flavor in standalone drupal10 drupal11 wordpress joomla backdrop \
               standalone-demo drupal10-demo drupal11-demo \
-              wordpress-demo joomla-demo; do
+              wordpress-demo joomla-demo backdrop-demo; do
   case "${flavor}" in
     standalone | standalone-demo) mandatory=1 ;;
     *) mandatory=0 ;;
