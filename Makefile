@@ -33,7 +33,7 @@ SHELL := bash
 CACHE := .cache
 PHPUNIT := $(CACHE)/phpunit-$(CK_PHPUNIT_VERSION).phar
 SHARED_PHP_COVERAGE := $(CACHE)/shared-php-coverage.xml
-SHARED_PHP_COVERAGE_MIN := 36
+SHARED_PHP_COVERAGE_MIN := 74
 SCENARIO_YAML_STAMP := packages/civikitchen-scenario-schema/vendor/.civikitchen-installed
 OXLINT_STAMP := toolbelt/oxlint/node_modules/.civikitchen-installed
 
