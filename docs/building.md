@@ -1,16 +1,18 @@
 # Building locally
 
-Every step on this page is a make target; `make help` lists them. The fast
-loop needs no Docker daemon:
+Every step on this page is a make target, and make runs in the toolchain
+container that `scaffold/ck` builds from `scaffold/ck.Dockerfile`, with PHP,
+GNU Make, bash, git, jq and the docker CLI. `scaffold/ck make help` lists the
+targets. The fast loop:
 
 ```bash
-make test                  # ckconform's fixtures, the phpstan extension's rule tests, ckinit
-make lint                  # all static checks, see below
-make test-compose-config   # the compose files; needs the docker CLI, not a daemon
+scaffold/ck make test   # ckconform's fixtures, the phpstan extension's rule tests, ckinit, the compose files
+scaffold/ck make lint   # all static checks, see below
 ```
 
-The `Lint` workflow runs exactly these three targets on pushes to main and on
-pull requests, so CI and a laptop cannot drift apart.
+The `Lint` workflow runs exactly these two targets in the same container on
+pushes to main and on pull requests, so CI and a laptop cannot drift apart.
+A plain `make` on the host stops and names the `scaffold/ck make` command.
 
 `make lint` covers:
 
@@ -26,29 +28,22 @@ pull requests, so CI and a laptop cannot drift apart.
 - the grammar of `CHANGELOG.md`
 
 On first use, make fetches the pinned tools (phpunit phar, actionlint,
-shellcheck) and the CiviCRM source tree the catalog drift gates need into
-`.cache/`. `make clean` removes it.
+shellcheck, composer, uv, Node) and the CiviCRM source tree the catalog drift
+gates need into `.cache/`. `scaffold/ck make clean` removes it.
 
 ## Requirements
 
-Besides git, curl, zip and unzip, the fast loop needs:
+The host needs bash and Docker. `scaffold/ck` mounts `$HOME`, the checkout and
+the Docker socket at their own paths, so on macOS the checkout has to live
+under `$HOME`, which colima and Docker Desktop share with their VM.
 
-- GNU Make 3.82 or newer. The Makefile refuses older versions; Apple ships
-  3.81, which silently drops the strict-shell flags.
-- bash on the PATH
-- PHP 8.1 or newer with a coverage driver (phpdbg, PCOV or Xdebug). Debian's
-  `php-cli` also needs `php-xml`, `php-mbstring` and `php-zip`.
-
-Everything else is fetched pinned into `.cache/`, including composer, uv and
-Node; `make clean` removes it. `make doctor` reports what is missing.
-
-The slow loop also needs Docker. It consists of `make build`, which builds the
-standalone image as `civikitchen:standalone`, plus `make test-images`,
-`make e2e`, `make docs-a11y` and `make e2e-ckcreate`. The browser checks run in
-the repository's Playwright image, so the host needs no Node and no browsers
-for them. `make e2e-ckcreate IMAGE=civikitchen:standalone`
-creates an extension with real civix and runs `ck ci` on it in the template's
-dev stack. The image workflow runs the same check before promoting.
+The slow loop builds and boots images: `build` builds the standalone image as
+`civikitchen:standalone`, and `test-images`, `e2e`, `docs-a11y` and
+`e2e-ckcreate` test them. The browser checks run in the repository's
+Playwright image, so the host needs no Node and no browsers for them.
+`scaffold/ck make e2e-ckcreate IMAGE=civikitchen:standalone` creates an
+extension with real civix and runs `ck ci` on it in the template's dev stack.
+The image workflow runs the same check before promoting.
 
 ## Building images by hand
 

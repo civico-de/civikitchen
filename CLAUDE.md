@@ -6,13 +6,16 @@ release workflows the extension repos call. User-facing: `README.md`, `docs/`.
 ## Layout
 
 `toolbelt/` (tools), `docker/` (image definitions) and `packages/` (schemas)
-are baked into the images; `scaffold/` and `scripts/` run on the host only. The build context is the repo root.
+are baked into the images. `scaffold/` and `scripts/release.sh` run on the
+host, which needs only bash and Docker; the Makefile runs in the toolchain
+container (`scaffold/ck make`). The build context is the repo root.
 
 ## Verify
 
-`make test` and `make lint` need no Docker and are literally what
-`.github/workflows/lint.yml` runs. Run both before committing. `make help` for
-the rest; `make test-images` is the ~1 h Docker round.
+`scaffold/ck make test` and `scaffold/ck make lint` are literally what
+`.github/workflows/lint.yml` runs, in the same container. Run both before
+committing. `scaffold/ck make help` for the rest; `test-images` is the ~1 h
+Docker round.
 
 ## Rules
 

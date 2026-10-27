@@ -32,7 +32,7 @@ ok "${tag} is free locally and on origin"
 
 bash .github/scripts/changelog-check.sh --release "$version" >/dev/null || die "changelog gate failed"
 ok "changelog has a [${version}] section and an empty [Unreleased]"
-bash tests/ckinit/test-ckinit.sh >/dev/null || die "ckinit suite failed"
+scaffold/ck make test-ckinit >/dev/null || die "ckinit suite failed"
 ok "ckinit suite passed"
 
 # The image gate: the trigger paths are read out of the workflow itself, so the

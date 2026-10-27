@@ -106,8 +106,8 @@ The run the push started counts. Without APPLY it only reports.
 
 ```bash
 git switch main && git pull
-make release VERSION=1.0.1            # report only
-make release VERSION=1.0.1 APPLY=1    # tag and push
+scripts/release.sh 1.0.1           # report only
+scripts/release.sh 1.0.1 --apply   # tag and push
 ```
 
 The tag push then

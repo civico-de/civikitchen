@@ -28,7 +28,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
   `playwright-e2e.yml` offers it to its commands as `$CK`.
 - `scaffold/ck playwright|demo` runs those two host commands in a container
   with PHP and the docker CLI, so a developer host needs only Docker: no PHP
-  and no buildx plugin.
+  and no buildx plugin. `scaffold/ck make <target>` runs civikitchen's own
+  make targets in the same container.
 
 ### Changed
 
@@ -45,9 +46,13 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - The docs site uses system fonts. A web font arriving after the theme
   measured code blocks left them without keyboard focus.
 - `ck demo` records in the `ck playwright` image (`civikitchen-playwright:<hash>`).
-- `make test` and `make lint` fetch composer, uv and Node pinned into
-  `.cache/`, so the host needs none of them. `make doctor` requires PHP 8.1
-  and checks the PHP extensions, `zip` and `unzip` the suites use.
+- The Makefile runs only in the toolchain container, as
+  `scaffold/ck make <target>`, on a laptop and in the Lint and Docs workflows.
+  It fetches composer, uv and Node pinned into `.cache/`. After updating, run
+  `scaffold/ck make clean` once and delete `toolbelt/oxlint/node_modules`:
+  both can hold binaries built for the host.
+- `make test` includes the compose file checks (`test-compose-config`,
+  `test-playwright-network`).
 - `make lint` runs phpstan over the repository's own PHP against the PHP 8.1
   floor, so a call to a method or function that does not exist fails there.
 - `mail_count` and `newest_mail_text` in the managed `tests/e2e/lib.sh` filter
@@ -59,6 +64,9 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Removed
 
+- `make doctor`: the host needs no PHP, GNU Make or unzip for the make targets.
+- `make release`. Run `scripts/release.sh X.Y.Z [--apply]` on the host, where
+  git and gh have the push credentials.
 - The standalone core patch for the SearchKit smart group panel. Every
   standalone image the build publishes either predates the bug (6.16 to 6.18)
   or carries the upstream fix (6.19.2 and later).

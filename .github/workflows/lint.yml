@@ -1,13 +1,13 @@
-# Static checks and the fast test suites: everything that needs no Docker daemon
-# and no built image. Runs on pushes to main and on pull requests.
+# Static checks and the fast test suites: everything that needs no built image.
+# Runs on pushes to main and on pull requests.
 #
 # The steps are `make` calls on purpose. What they run — which trees shellcheck
 # sweeps, which CiviCRM release the catalog drift gates test against, which
 # phpunit phar and which checksum — is defined once, in the Makefile and
-# versions.env, so the same commands run here and on a laptop. Before that
-# split these suites could be run in exactly one place: this file. Anything
-# that belongs to "how a check runs" goes in the Makefile; what stays here is
-# when it runs and with what permissions.
+# versions.env, and scaffold/ck runs it in the same toolchain container here and
+# on a laptop. Before that split these suites could be run in exactly one
+# place: this file. Anything that belongs to "how a check runs" goes in the
+# Makefile; what stays here is when it runs and with what permissions.
 name: Lint
 
 on:
@@ -32,16 +32,11 @@ jobs:
       # + php -l + the profile/scenario schemas and their fixtures. actionlint's installer is piped
       # into bash, so the Makefile pins its content hash as well as its tag.
       - name: Static checks
-        run: make lint
+        run: scaffold/ck make lint
 
       # ckconform's fixtures, the phpstan extension's rule tests, and ckinit's
       # integration checks. `make test` fetches the CiviCRM source tree the
       # catalog drift gates need — without it those gates SKIP, and the suites
       # would go green while the thing they guard never ran.
       - name: Test suites
-        run: make test
-
-      # Need the docker CLI and jq, which the runner has and `make test`
-      # does not assume.
-      - name: Compose files
-        run: make test-compose-config test-playwright-network
+        run: scaffold/ck make test

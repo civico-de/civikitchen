@@ -30,10 +30,11 @@ git init -q --bare "${work}/remote.git"
 git init -q "${work}/clone"
 cd "${work}/clone"
 git remote add origin https://github.com/owner/repo
-mkdir -p scripts .github/scripts .github/workflows tests/ckinit docker
+mkdir -p scripts scaffold .github/scripts .github/workflows docker
 cp "${root}/scripts/release.sh" scripts/release.sh
 printf '#!/bin/bash\nexit 0\n' > .github/scripts/changelog-check.sh
-printf '#!/bin/bash\nexit 0\n' > tests/ckinit/test-ckinit.sh
+printf '#!/bin/bash\nexit 0\n' > scaffold/ck
+chmod +x scaffold/ck
 cat > .github/workflows/build-dev-images.yml <<'YAML'
 name: Build Dev Images
 on:

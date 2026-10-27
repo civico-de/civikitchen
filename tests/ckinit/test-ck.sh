@@ -39,7 +39,7 @@ mkdir -p "$work/home" "$work/tree/.git" "$work/tree/e2e"
 printf '{}\n' > "$work/tree/e2e/package.json"
 printf '{}\n' > "$work/tree/e2e/package-lock.json"
 (cd "$work/tree/e2e" && HOME="$work/home" FAKE_IMAGE_MISSING=1 CK_PROBE=1 DOCKER_HOST=tcp://elsewhere:2375 \
-  "$root/scaffold/ck" playwright npm run test:e2e) > /dev/null
+  LANG=C.UTF-8 LC_ALL=C.UTF-8 "$root/scaffold/ck" playwright npm run test:e2e) > /dev/null
 log="$(cat "$FAKE_DOCKER_LOG")"
 [[ "$log" == *"build -t civikitchen-ck:"* ]] || fail "a missing image is not built"
 wrapper="$(grep -E '^run .* civikitchen-ck:' "$FAKE_DOCKER_LOG" | grep -vF -- '--entrypoint stat')"
@@ -47,7 +47,7 @@ for expected in "-v $work/home:$work/home" "-v $root:$root" "-v $work/tree:$work
     "--group-add 991" "-e HOME=/tmp" "-e CK_PROBE" "php $root/toolbelt/bin/ck playwright npm run test:e2e"; do
   [[ "$wrapper" == *" $expected"* ]] || fail "the container lacks '$expected': $wrapper"
 done
-for unexpected in "-e PATH" "-e DOCKER_HOST" "-t"; do
+for unexpected in "-e PATH" "-e DOCKER_HOST" "-e LANG" "-e LC_ALL" "-t"; do
   [[ "$wrapper " != *" $unexpected "* ]] || fail "the container gets '$unexpected': $wrapper"
 done
 grep -qE "^run .* -v $work/tree:$work/tree .*civikitchen-playwright:[0-9a-f]{12} npm run test:e2e$" "$FAKE_DOCKER_LOG" \
@@ -59,6 +59,15 @@ grep -qE "^run .* -v $work/tree:$work/tree .*civikitchen-playwright:[0-9a-f]{12}
 ! grep -qF 'build ' "$FAKE_DOCKER_LOG" || fail "an existing image is rebuilt"
 wrapper="$(grep -E '^run .* civikitchen-ck:' "$FAKE_DOCKER_LOG" | grep -vF -- '--entrypoint stat')"
 [[ "$wrapper" != *"-v $work/tree:"* ]] || fail "a work tree inside \$HOME is mounted twice: $wrapper"
+
+# ck make runs make itself in the container, not ck.
+printf '#!/bin/sh\necho "make $*"\n' > "$work/bin/make"
+chmod +x "$work/bin/make"
+: > "$FAKE_DOCKER_LOG"
+out="$(cd "$root" && "$root/scaffold/ck" make test lint)"
+[ "$out" = "make test lint" ] || fail "ck make ran '$out', not make test lint"
+grep -qE "^run .* -w $root .*civikitchen-ck:[0-9]+ make test lint$" "$FAKE_DOCKER_LOG" \
+  || fail "ck make is not make in the container: $(cat "$FAKE_DOCKER_LOG")"
 
 # One docker CLI for both images.
 cli() { sed -n 's/^FROM \(docker:[^ ]*-cli\).*/\1/p' "$1"; }

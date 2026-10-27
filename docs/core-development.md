@@ -62,7 +62,7 @@ core's `master` and from its newest release branch
 tag, or for a build of your own, build Standalone from git:
 
 ```bash
-make build CIVICRM_SOURCE=git CIVICRM_VERSION=master   # tags civikitchen:standalone-master
+scaffold/ck make build CIVICRM_SOURCE=git CIVICRM_VERSION=master   # tags civikitchen:standalone-master
 ```
 
 The build does what core's release script does for the tarball. It checks out

@@ -155,7 +155,7 @@ after their tests pass. Extensions pin the v1 release tags.
 | [Reusable workflows](docs/reusable-workflows.md) | Frontend CI, Playwright e2e, command checks |
 | [Releasing an extension](docs/extension-releases.md) | ckrelease and the release workflow |
 | [Releases](docs/releases.md) | How civikitchen itself is versioned |
-| [Building locally](docs/building.md) | Build arguments, tool pins, image tests, make doctor |
+| [Building locally](docs/building.md) | The test and lint loop, build arguments, tool pins, image tests |
 | [Architecture](docs/implementation-architecture.md), [ADRs](docs/adr/) | Design decisions; [mago](docs/mago-consolidation.md) and [core types](docs/core-types.md) background |
 | [Changelog](CHANGELOG.md) | Changes per release |
 

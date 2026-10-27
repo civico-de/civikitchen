@@ -1,9 +1,10 @@
 #!/bin/bash
 #
-# ck — run ck's host commands in a container with PHP and the docker CLI, so the
-# host needs only bash and Docker:
+# ck — run ck's host commands and this checkout's make targets in a container
+# with PHP and the docker CLI, so the host needs only bash and Docker:
 #
 #   ck playwright npm run test:e2e     ck demo 12345 --page civicrm/admin/search
+#   ck make test lint                  this checkout's make targets
 #
 # Every other ck command runs in the dev stack: ckx ck <command>.
 set -euo pipefail
@@ -11,10 +12,10 @@ set -euo pipefail
 die() { echo "ck: $*" >&2; exit 2; }
 
 case "${1:-}" in
-  playwright|demo) ;;
-  -h|--help) sed -n '3,8s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"; exit 0 ;;
-  "") die "which command? ck playwright <command> or ck demo <change> (ck --help)" ;;
-  *) die "$1 runs in the dev stack: ckx ck $1 (here only playwright and demo)" ;;
+  playwright|demo|make) ;;
+  -h|--help) sed -n '3,9s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"; exit 0 ;;
+  "") die "which command? ck playwright <command>, ck demo <change> or ck make <target> (ck --help)" ;;
+  *) die "$1 runs in the dev stack: ckx ck $1 (here only playwright, demo and make)" ;;
 esac
 command -v docker >/dev/null 2>&1 || die "docker is required"
 
@@ -49,11 +50,14 @@ run=(docker run --rm --init -i --network host -u "$(id -u):$(id -g)" --group-add
      -e HOME=/tmp -v "$socket:$socket" -w "$cwd")
 for dir in "${mounts[@]}"; do run+=(-v "$dir:$dir"); done
 # The rest of the environment reaches ck, which passes it on to the Playwright container.
+# The locale stays the image's: the host's may not exist there.
 while IFS= read -r name; do
   case "$name" in
-    PATH|HOME|TMPDIR|TMP|TEMP|DOCKER_CERT_PATH|DOCKER_CONFIG|DOCKER_CONTEXT|DOCKER_HOST|DOCKER_TLS_VERIFY) ;;
+    PATH|HOME|TMPDIR|TMP|TEMP|LANG|LANGUAGE|LC_*) ;;
+    DOCKER_CERT_PATH|DOCKER_CONFIG|DOCKER_CONTEXT|DOCKER_HOST|DOCKER_TLS_VERIFY) ;;
     *) run+=(-e "$name") ;;
   esac
 done < <(compgen -e)
 if [[ -t 0 && -t 1 ]]; then run+=(-t); fi
-exec "${run[@]}" "$image" php "$checkout/toolbelt/bin/ck" "$@"
+[ "$1" = make ] || set -- php "$checkout/toolbelt/bin/ck" "$@"
+exec "${run[@]}" "$image" "$@"

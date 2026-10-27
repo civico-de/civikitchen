@@ -54,7 +54,7 @@ docker run --rm -v "$PWD":/work -w /work \
 
 Its own classes need no composer — `src/Autoloader.php` is a dozen lines. Reading
 `civikitchen.yaml` needs Symfony YAML from
-`packages/civikitchen-scenario-schema/vendor/` (`make tools`), which the image
+`packages/civikitchen-scenario-schema/vendor/` (`scaffold/ck make tools`), which the image
 ships.
 
 ## Policy lives in the consuming repo

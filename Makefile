@@ -1,11 +1,18 @@
 # The entry point for working on civikitchen locally, and the implementation
 # .github/workflows/lint.yml calls — one implementation, reachable from both
 # sides. Before it, the fast test suites could be run in exactly one place:
-# GitHub Actions.
+# GitHub Actions. Both sides run it in the same container, as
+# scaffold/ck make <target>.
 #
 # Every named target is .PHONY: only the fetched tools and install stamps are
 # files, all spelled $(VARIABLE), so Make contributes no dependency graph — it
 # contributes being installed everywhere and `make help`.
+
+# scaffold/ck.Dockerfile sets CK_TOOLCHAIN: the PHP, make and bash these recipes
+# expect, on every host.
+ifndef CK_TOOLCHAIN
+$(error make runs in the toolchain container: scaffold/ck make $(MAKECMDGOALS))
+endif
 
 # This file, read before any include, so a wrapper's own targets stay its own.
 SELF := $(lastword $(MAKEFILE_LIST))
@@ -14,17 +21,6 @@ include toolbelt/versions.env
 # Strict bash for every recipe: `set -eu -o pipefail` is what the shell in this
 # repo already runs under, and a recipe that swallows a failing stage in a pipe
 # is exactly the kind of green-but-untested that this file exists to end.
-#
-# A make without .SHELLFLAGS (< 3.82, e.g. Apple's 3.81) IGNORES that line and
-# runs every recipe unguarded — a failing shellcheck then still prints "clean"
-# and exits 0. Refuse loudly instead; `oneshell` arrived in the same release,
-# so its presence in .FEATURES is the exact capability probe.
-ifeq ($(filter oneshell,$(.FEATURES)),)
-$(error GNU Make >= 3.82 required: this make ($(MAKE_VERSION)) ignores .SHELLFLAGS, so recipes would run without 'set -eu -o pipefail'. Run `bash scripts/doctor.sh` for this and every other host prerequisite at once)
-endif
-
-# `bash` resolved via PATH, not /bin/bash: macOS ships bash 3.2 frozen at that
-# path, and a modern one is expected to be first in PATH there.
 SHELL := bash
 .SHELLFLAGS := -eu -o pipefail -c
 
@@ -59,44 +55,40 @@ CK_ZENSICAL_VERSION := 0.0.70
 pyrun_pinned = $(UVX) $(1)@$(2)
 pyrun = $(UVX) $(1)
 
+# The toolchain container's architecture: x86_64 in CI, aarch64 on Apple Silicon.
+# Every fetched binary carries one content hash per architecture.
+ARCH := $(shell uname -m)
+PLATFORM := linux_$(ARCH)
+
 # shellcheck is fetched and pinned like the phars, because the sweep's verdict
 # depends on the version: 0.10 grew checks 0.9 never ran, so a laptop's distro
 # shellcheck and CI's disagreeing turns "one implementation for both" into two.
-# One content hash per supported platform; a new platform adds its pair here.
 CK_SHELLCHECK_VERSION := 0.11.0
 CK_SHELLCHECK_SHA256_linux_x86_64 := 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
-CK_SHELLCHECK_SHA256_darwin_aarch64 := 56affdd8de5527894dca6dc3d7e0a99a873b0f004d7aabc30ae407d3f48b0a79
-# `uname -m` says arm64 on macOS but the release assets say aarch64.
-SHELLCHECK_PLATFORM := $(shell uname -s | tr '[:upper:]' '[:lower:]').$(subst arm64,aarch64,$(shell uname -m))
-SHELLCHECK_SHA256 := $(CK_SHELLCHECK_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)))
+CK_SHELLCHECK_SHA256_linux_aarch64 := 12b331c1d2db6b9eb13cfca64306b1b157a86eb69db83023e261eaa7e7c14588
+SHELLCHECK_SHA256 := $(CK_SHELLCHECK_SHA256_$(PLATFORM))
 SHELLCHECK := $(CACHE)/shellcheck-$(CK_SHELLCHECK_VERSION)
 
 # Release assets of mago and uv are named by target triple.
-TRIPLE_linux_x86_64 := x86_64-unknown-linux-gnu
-TRIPLE_linux_aarch64 := aarch64-unknown-linux-gnu
-TRIPLE_darwin_aarch64 := aarch64-apple-darwin
-TRIPLE := $(TRIPLE_$(subst .,_,$(SHELLCHECK_PLATFORM)))
+TRIPLE := $(ARCH)-unknown-linux-gnu
 
 # mago for the extension's fixture suite: the image's release (versions.env),
-# one hash per platform there.
-MAGO_SHA256 := $(CK_MAGO_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)))
+# one hash per architecture there.
+MAGO_SHA256 := $(CK_MAGO_SHA256_$(PLATFORM))
 MAGO := $(CACHE)/mago-$(CK_MAGO_VERSION)
 
-# Composer, uv and Node are fetched pinned too, so the host needs no package
-# manager of its own; composer is the images' release (versions.env). Their
-# directories lead every recipe's PATH.
+# Composer, uv and Node are fetched pinned too; composer is the images' release
+# (versions.env). Their directories lead every recipe's PATH.
 CK_UV_VERSION := 0.13.6
 CK_UV_SHA256_linux_x86_64 := f29c3e94ffabd7e6f3ba521dba169a9b7ec12100bf3257087f0f24f6123f3645
-CK_UV_SHA256_darwin_aarch64 := 60fbd5c8a1ed681845eea28d9d622fcde03c51e91a43465b64a1e17db1ed3472
+CK_UV_SHA256_linux_aarch64 := 229e194255c7958d86d56e8790d969a6f74736592133f0dfd0076f754c642c1d
 # The image's Node major; it runs the pinned oxlint behind test-ckeslint.
 CK_NODE_VERSION := 24.22.1
 CK_NODE_SHA256_linux_x86_64 := 6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6
-CK_NODE_SHA256_darwin_aarch64 := 654ba79de6155647e22321932b45f2a1ccb705976cc337c9b8e278beb085a628
-NODE_PLATFORM_linux_x86_64 := linux-x64
-NODE_PLATFORM_darwin_aarch64 := darwin-arm64
-NODE_PLATFORM := $(NODE_PLATFORM_$(subst .,_,$(SHELLCHECK_PLATFORM)))
-UV_SHA256 := $(CK_UV_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)))
-NODE_SHA256 := $(CK_NODE_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)))
+CK_NODE_SHA256_linux_aarch64 := dbabf7a1cbf947e6059ffad2c27b80041db97dea1e553b62afdee7f13fca336e
+NODE_PLATFORM := linux-$(patsubst x86_64,x64,$(patsubst aarch64,arm64,$(ARCH)))
+UV_SHA256 := $(CK_UV_SHA256_$(PLATFORM))
+NODE_SHA256 := $(CK_NODE_SHA256_$(PLATFORM))
 COMPOSER_DIR := $(abspath $(CACHE))/composer-$(CK_COMPOSER_VERSION)
 UV_DIR := $(abspath $(CACHE))/uv-$(CK_UV_VERSION)
 NODE_DIR := $(abspath $(CACHE))/node-$(CK_NODE_VERSION)
@@ -104,8 +96,11 @@ COMPOSER := $(COMPOSER_DIR)/composer
 UVX := $(UV_DIR)/uvx
 NODE := $(NODE_DIR)/bin/node
 export PATH := $(COMPOSER_DIR):$(UV_DIR):$(NODE_DIR)/bin:$(PATH)
-# A Python that uvx has to download lands here too, and `make clean` removes it.
+# The container's HOME is thrown away after each run, so the download caches
+# and a Python that uvx fetches live here; `make clean` removes them.
 export UV_PYTHON_INSTALL_DIR := $(abspath $(CACHE))/uv-python
+export UV_CACHE_DIR := $(abspath $(CACHE))/uv-cache
+export COMPOSER_CACHE_DIR := $(abspath $(CACHE))/composer-cache
 
 # What gets linted is decided by WHAT A FILE IS, never by where it lives.
 #
@@ -117,8 +112,6 @@ export UV_PYTHON_INSTALL_DIR := $(abspath $(CACHE))/uv-python
 #
 # `if`, not `cmd && printf`: under `set -e` a non-matching grep fails the whole
 # AND-list and kills the loop, silently and short. An `if` condition is exempt.
-# `(*.sh)`, balanced: bash 3.2 cannot parse an unbalanced case paren inside
-# `$( )` and dies on the whole substitution.
 WORKTREE_FILES = git ls-files --cached --others --exclude-standard
 SHELL_FILES = $(WORKTREE_FILES) | while read -r f; do \
 	  case "$$f" in (*.sh) printf '%s\n' "$$f"; continue ;; esac ; \
@@ -147,17 +140,11 @@ help: ## Show this help
 	@grep -hE '^[a-z][a-z0-9-]*:.*?## ' $(MAKEFILE_LIST) \
 	  | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 	@echo
-	@echo "  test and lint need no Docker. build and test-images do."
+	@echo "  Run each target as scaffold/ck make <target>."
 
 # --- the fast loop -----------------------------------------------------------
 
-# Every host prerequisite in one pass, before a recipe fails on the first of
-# them. Deliberately not a prerequisite of lint/test: those must stay usable on
-# a host that is missing only what they do not touch.
-doctor: ## Report every missing host prerequisite in one pass
-	bash scripts/doctor.sh
-
-test: test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario test-provision test-core-patches test-ckcoretest test-ck-headless test-ck-headless-phpstan test-phpstan-bootstrap test-ckcommon-git test-missing-tool test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-promote-scanned test-promote-digest test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-sibling-vendor test-sibling-build test-database-matrix test-demo-basic-auth test-release-retag test-release-move-major-tag test-release-publish-flags test-release-steps test-ci-gates-step test-release-script test-release-verify-images test-vendored-paths test-ckeslint test-ckcoverage test-doctor test-make-phony test-make-downloads test-tool-locks test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-cms-families test-changelog test-extension-docs ## Run every fast test suite (no Docker)
+test: test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario test-provision test-core-patches test-ckcoretest test-ck-headless test-ck-headless-phpstan test-phpstan-bootstrap test-ckcommon-git test-missing-tool test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-promote-scanned test-promote-digest test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-sibling-vendor test-sibling-build test-database-matrix test-demo-basic-auth test-release-retag test-release-move-major-tag test-release-publish-flags test-release-steps test-ci-gates-step test-release-script test-release-verify-images test-vendored-paths test-ckeslint test-ckcoverage test-make-phony test-make-downloads test-tool-locks test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-cms-families test-changelog test-extension-docs test-compose-config test-playwright-network ## Run every fast test suite (no Docker daemon)
 
 test-shared-php-coverage: $(PHPUNIT) $(SCENARIO_YAML_STAMP) ## Shared PHP unit tests and measured line-coverage floor
 	if command -v phpdbg >/dev/null 2>&1; then \
@@ -300,12 +287,6 @@ test-ckeslint: $(OXLINT_STAMP) $(SCENARIO_YAML_STAMP) ## ckeslint: APIv4 contrac
 test-ckcoverage: $(SCENARIO_YAML_STAMP) ## ckcoverage temporary logs, coverage floor, tests opt-out
 	bash tests/toolbelt/test-ckcoverage.sh
 
-# A doctor that cannot fail is worse than none: it reports a healthy host while
-# the prerequisite it was written for is absent. The fixtures shadow PATH so
-# every verdict is exercised against a host that really lacks the tool.
-test-doctor: ## doctor verdicts against synthesised hosts
-	bash tests/toolbelt/test-doctor.sh
-
 test-make-phony: ## A file named like a target cannot satisfy it
 	MAKE='$(MAKE)' bash tests/toolbelt/test-make-phony.sh
 
@@ -378,8 +359,7 @@ test-database-matrix: $(SCENARIO_YAML_STAMP) ## Supported database images gate s
 test-compose-config: ## Every shipped compose file passes `docker compose config`
 	bash tests/parity/test-compose-config.sh
 
-# Browser jobs on one self-hosted host share its ports and its netns. Needs jq
-# and the docker CLI, like test-compose-config.
+# Browser jobs on one self-hosted host share its ports and its netns.
 test-playwright-network: $(SCENARIO_YAML_STAMP) ## The browser job publishes no port and runs its suite in the app's netns
 	bash tests/parity/test-playwright-network.sh
 
@@ -397,10 +377,6 @@ test-release-publish-flags: ## Extension releases: pre-release flag, Latest only
 
 test-release-steps: $(SCENARIO_YAML_STAMP) ## Extension releases: working_directory, same-repository closure, pins and staging steps as written
 	bash tests/parity/test-release-steps.sh
-
-release: ## Cut a release: VERSION=X.Y.Z [APPLY=1] — every pre-flight check, then the tag
-	@[ -n "$(VERSION)" ] || { echo "VERSION=X.Y.Z is required" >&2; exit 1; }
-	bash scripts/release.sh $(VERSION) $(if $(APPLY),--apply)
 
 test-ci-gates-step: $(SCENARIO_YAML_STAMP) ## Extension CI: the ck ci step as written, over a fake docker
 	bash tests/parity/test-ci-gates-step.sh
@@ -470,7 +446,7 @@ docs-serve: $(UVX) ## Serve the documentation site locally with live reload
 	$(call pyrun_pinned,zensical,$(CK_ZENSICAL_VERSION)) serve
 
 docs-a11y: docs ## WCAG 2.1 AA checks of the site in light and dark mode (in Docker)
-	scaffold/ck playwright playwright test -c playwright.docs.config.ts
+	php toolbelt/bin/ck playwright playwright test -c playwright.docs.config.ts
 
 # Advisory token-level clone report, not part of `lint`. Duplicated on purpose:
 # check run() skeletons, parallel test fixtures, clones across composer packages.
@@ -525,7 +501,7 @@ test-images: ## Boot tests + dev-tool tests against the published images (~1 h)
 	bash tests/images/run-local.sh
 
 e2e: ## Playwright smoke tests against a running compose stack (in Docker; CIVICRM_BASE_URL)
-	scaffold/ck playwright npm run test:e2e
+	php toolbelt/bin/ck playwright npm run test:e2e
 
 # --- fetched inputs ----------------------------------------------------------
 
@@ -542,9 +518,9 @@ tools: $(PHPUNIT) $(MAGO) $(CACHE)/actionlint $(SHELLCHECK) $(COMPOSER) $(UVX) $
 $(SHELLCHECK):
 	@mkdir -p $(CACHE)
 	@[ -n "$(SHELLCHECK_SHA256)" ] || { \
-	  echo "no shellcheck hash pinned for $(SHELLCHECK_PLATFORM) — add CK_SHELLCHECK_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)) to the Makefile" >&2; exit 1; }
+	  echo "no shellcheck hash pinned for $(PLATFORM) — add CK_SHELLCHECK_SHA256_$(PLATFORM) to the Makefile" >&2; exit 1; }
 	curl -fsSLo $@.tar.xz \
-	  "https://github.com/koalaman/shellcheck/releases/download/v$(CK_SHELLCHECK_VERSION)/shellcheck-v$(CK_SHELLCHECK_VERSION).$(SHELLCHECK_PLATFORM).tar.xz"
+	  "https://github.com/koalaman/shellcheck/releases/download/v$(CK_SHELLCHECK_VERSION)/shellcheck-v$(CK_SHELLCHECK_VERSION).linux.$(ARCH).tar.xz"
 	echo "$(SHELLCHECK_SHA256)  $@.tar.xz" | sha256sum -c --strict -
 	tar -xJf $@.tar.xz -C $(CACHE) --strip-components=1 shellcheck-v$(CK_SHELLCHECK_VERSION)/shellcheck
 	mv $(CACHE)/shellcheck $@
@@ -552,8 +528,8 @@ $(SHELLCHECK):
 
 $(MAGO):
 	@mkdir -p $(CACHE)
-	@[ -n "$(MAGO_SHA256)" ] && [ -n "$(TRIPLE)" ] || { \
-	  echo "no mago pin for $(SHELLCHECK_PLATFORM) — it needs CK_MAGO_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)) in toolbelt/versions.env and TRIPLE_$(subst .,_,$(SHELLCHECK_PLATFORM)) in the Makefile" >&2; exit 1; }
+	@[ -n "$(MAGO_SHA256)" ] || { \
+	  echo "no mago pin for $(PLATFORM) — it needs CK_MAGO_SHA256_$(PLATFORM) in toolbelt/versions.env" >&2; exit 1; }
 	curl -fsSLo $@.tar.gz \
 	  "https://github.com/carthage-software/mago/releases/download/$(CK_MAGO_VERSION)/mago-$(CK_MAGO_VERSION)-$(TRIPLE).tar.gz"
 	echo "$(MAGO_SHA256)  $@.tar.gz" | sha256sum -c --strict -
@@ -570,8 +546,8 @@ $(COMPOSER):
 	mv $@.tmp $@
 
 $(UVX):
-	@[ -n "$(UV_SHA256)" ] && [ -n "$(TRIPLE)" ] || { \
-	  echo "no uv pin for $(SHELLCHECK_PLATFORM) — it needs CK_UV_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)) and TRIPLE_$(subst .,_,$(SHELLCHECK_PLATFORM)) in the Makefile" >&2; exit 1; }
+	@[ -n "$(UV_SHA256)" ] || { \
+	  echo "no uv pin for $(PLATFORM) — it needs CK_UV_SHA256_$(PLATFORM) in the Makefile" >&2; exit 1; }
 	@mkdir -p $(@D)
 	curl -fsSLo $(@D).tar.gz "https://github.com/astral-sh/uv/releases/download/$(CK_UV_VERSION)/uv-$(TRIPLE).tar.gz"
 	echo "$(UV_SHA256)  $(@D).tar.gz" | sha256sum -c --strict -
@@ -579,8 +555,8 @@ $(UVX):
 	rm $(@D).tar.gz
 
 $(NODE):
-	@[ -n "$(NODE_SHA256)" ] && [ -n "$(NODE_PLATFORM)" ] || { \
-	  echo "no Node pin for $(SHELLCHECK_PLATFORM) — it needs CK_NODE_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)) and NODE_PLATFORM_$(subst .,_,$(SHELLCHECK_PLATFORM)) in the Makefile" >&2; exit 1; }
+	@[ -n "$(NODE_SHA256)" ] || { \
+	  echo "no Node pin for $(PLATFORM) — it needs CK_NODE_SHA256_$(PLATFORM) in the Makefile" >&2; exit 1; }
 	rm -rf $(NODE_DIR).tmp && mkdir -p $(NODE_DIR).tmp
 	curl -fsSLo $(NODE_DIR).tar.xz "https://nodejs.org/dist/v$(CK_NODE_VERSION)/node-v$(CK_NODE_VERSION)-$(NODE_PLATFORM).tar.xz"
 	echo "$(NODE_SHA256)  $(NODE_DIR).tar.xz" | sha256sum -c --strict -
@@ -608,7 +584,7 @@ $(CACHE)/actionlint:
 $(CORE):
 	@set -eu; \
 	ver="$(CORE_VERSION)"; \
-	[ -n "$$ver" ] || { echo "could not read HookCatalog::CORE_VERSION (is php installed?)" >&2; exit 1; }; \
+	[ -n "$$ver" ] || { echo "could not read HookCatalog::CORE_VERSION" >&2; exit 1; }; \
 	nsver=$$(php -r 'require "toolbelt/phpstan/src/CoreNamespaceCatalog.php"; echo CiviKitchen\PHPStan\CoreNamespaceCatalog::CORE_VERSION;'); \
 	apiver=$$(php -r 'require "toolbelt/phpstan/src/Api4Catalog.php"; echo CiviKitchen\PHPStan\Api4Catalog::CORE_VERSION;'); \
 	schemaver=$$(php -r 'require "toolbelt/phpstan/src/SchemaCatalog.php"; echo CiviKitchen\PHPStan\SchemaCatalog::CORE_VERSION;'); \

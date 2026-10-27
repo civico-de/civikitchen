@@ -8,10 +8,11 @@ set -euo pipefail
 
 image="${1:?usage: $0 <image>}"
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-# Bind mounts must sit where Docker's VM can see them, so not in the temp dir.
-work="$HOME/.cache/civikitchen/e2e-ckcreate.$$"
+# Bind mounts must sit where Docker's VM can see them: in the checkout, not in the
+# temp dir or the toolchain container's HOME. ckcreate mounts from below HOME.
+work="$root/.cache/e2e-ckcreate.$$"
 ext="$work/ckprobe"
-mkdir -p "$work/conf"
+mkdir -p "$work/conf" "$work/home"
 
 cleanup() {
   if [ "${CK_E2E_KEEP:-0}" = "1" ]; then
@@ -25,7 +26,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-export CIVIKITCHEN_IMAGE="$image" CKCREATE_IMAGE="$image" XDG_CONFIG_HOME="$work/conf"
+export CIVIKITCHEN_IMAGE="$image" CKCREATE_IMAGE="$image" XDG_CONFIG_HOME="$work/conf" HOME="$work/home"
 "$root/scaffold/ckcreate" ckprobe --dir "$ext" \
   --author "Example Maintainer" --email dev@example.org --copyright "Example Org"
 

@@ -35,7 +35,7 @@ jobs:
       # Builds the site, then checks it against WCAG 2.1 AA in light and dark mode,
       # with the browser and the npm tree in the Playwright image (ck playwright).
       - name: Build and check the site
-        run: make docs-a11y
+        run: scaffold/ck make docs-a11y
 
       - name: Upload the site
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
