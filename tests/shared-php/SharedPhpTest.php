@@ -51,7 +51,7 @@ final class SharedPhpTest extends TestCase
     public function testApplicationRoutesHelpForEveryCommandThatOffersIt(): void
     {
         $application = new Application(dirname(__DIR__, 2) . '/toolbelt/bin', dirname(__DIR__, 2));
-        foreach (['ci', 'civix', 'compatibility', 'coverage', 'dependencies', 'format', 'javascript', 'lifecycle',
+        foreach (['ci', 'civix', 'compatibility', 'coverage', 'demo', 'dependencies', 'format', 'javascript', 'lifecycle',
             'lint', 'mutate', 'profile', 'release', 'schema', 'smarty', 'test'] as $command) {
             ob_start();
             $status = $application->run([$command, '--help'], 'ck');

@@ -1,6 +1,6 @@
-# ADR-0015: PHP for logic, shell for bootstrapping, TypeScript for browser tests
+# ADR-0015: PHP for logic, shell for bootstrapping, TypeScript for the browser
 
-*Status: accepted · 2026-08-31*
+*Status: accepted · 2026-08-31 · amended 2026-10-27*
 
 ## Context
 
@@ -21,9 +21,11 @@ container entrypoints, user switching, environment export, pipes and the final
 exec. Shell does not embed PHP programs or implement a second parser for a
 structured format.
 
-TypeScript owns browser tests only, and the repository's TypeScript is the
-Playwright suite. JavaScript appears only where a tool demands it, such as the
-oxlint plugin that carries the APIv4 contract rule (ADR-0008).
+TypeScript owns browser automation only: the Playwright suite and the script
+that `ck demo` runs in Playwright's image to record a page. The PHP side starts
+that container and reads its result. JavaScript appears only where a tool
+demands it, such as the oxlint plugin that carries the APIv4 contract rule
+(ADR-0008).
 
 ## Rationale
 

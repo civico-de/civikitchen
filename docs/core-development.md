@@ -88,3 +88,67 @@ services:
 Run `cv flush` after each toggle, or the Angular and asset caches keep the old
 files. A change to composer dependencies, or to anything outside the mounted
 directory, needs a rebuilt image.
+
+## Recording a change before and after: `ck demo`
+
+`ck demo` shows what a civicrm-core change does on screen. It boots a fresh
+site, records a video without the change and one with it, and writes both side
+by side into a single HTML page. It runs on the host and needs only Docker and
+PHP; the browser runs in a container.
+
+```bash
+ck demo 12345 --page civicrm/admin/search                 # a civicrm-core PR
+ck demo https://github.com/civicrm/civicrm-core/pull/12345 --page civicrm/admin/search --cms all
+ck demo ./fix.diff --page 'civicrm/contact/search?reset=1' --cms standalone,joomla
+```
+
+`--cms` takes a list of `standalone` (the default), `wordpress`, `drupal10`,
+`drupal11` and `joomla`, or `all`. Every CMS boots from its image in a compose
+project of its own, on a free port from 8300 up; `--image <cms>=<ref>` boots
+one from another image. Before anything is recorded, the change is checked
+against the core of every site. If it does not apply to one of them, the run
+names the failed hunks and stops without recording, rather than writing a page
+that leaves that CMS out.
+
+Then, per site, `ck demo` runs each `--cv` command, for example
+`--cv 'en -q riverlea'`, and records the `--page` routes logged in as
+admin/admin. It applies the change with `patch`, flushes the caches (and
+publishes the assets on Drupal), and records again. The output directory
+(`--out`, default `./ck-demo-pr<number>` or the diff file's name) receives
+`<cms>-before.webm`, `<cms>-after.webm` and `index.html`, which embeds the
+videos and lists the script errors each page logged.
+
+The change is applied as files only: no `composer install`, no database
+upgrade. A change to dependencies or the schema needs an image built from the
+branch ([Standalone on an unreleased branch](#standalone-on-an-unreleased-branch)).
+
+For more than page views, `--steps` takes a self-contained ES module that
+drives the page after the routes; it can import `@playwright/test`, but no
+files next to it. `url()` turns a CiviCRM route into the URL of the CMS being
+recorded, `cms` names that CMS, and `phase` is `before` or `after`:
+
+```ts
+export default async ({ page, url, cms, phase }) => {
+  await page.goto(url('civicrm/contact/search?reset=1'));
+  await page.locator('#sort_name').fill('admin');
+  await page.keyboard.press('Enter');
+  await page.waitForLoadState('networkidle');
+};
+```
+
+Both phases run against the same database, so a step that changes data leaves
+that change for the after run. A step that shows a state-changing action must
+create its own starting conditions in each phase, such as a fresh record, or
+the after run may succeed only because the before run already did the work.
+
+`--keep` leaves the stacks running with the change applied and prints their
+URLs. A later run with the same `--out` and the same images finds them on
+their ports and reverts the change before it records. Without `--keep`, the
+stacks and their volumes are removed at the end, also after a failure.
+
+The recorder is Playwright's official image at the version `package-lock.json`
+locks, plus the repository's npm dependencies. It is built once per lockfile
+as `civikitchen-demo-recorder:<hash>`. It joins the host network, so it opens
+each site under the same `localhost` URL the site was installed with. Docker
+writes the videos into the output directory, so keep that directory under
+`$HOME`, which colima mounts by default.

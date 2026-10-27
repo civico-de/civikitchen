@@ -14,9 +14,10 @@ export, pipes and the final exec stay in shell, because there the operating
 system is the API. Shell must not embed PHP programs or implement a second
 parser for a structured format.
 
-TypeScript owns browser tests only. The repository's TypeScript is the
-Playwright suite. Bun remains a supported package-manager choice for consuming
-extensions, but CiviKitchen's implementation does not depend on it.
+TypeScript owns browser automation only: the Playwright suite and the
+recording script that `ck demo` runs in Playwright's image. Bun remains a
+supported package-manager choice for consuming extensions, but CiviKitchen's
+implementation does not depend on it.
 
 ## Command layout
 

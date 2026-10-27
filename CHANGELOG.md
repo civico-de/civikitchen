@@ -14,6 +14,13 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- `ck demo <PR|diff>` records a civicrm-core change before and after on fresh
+  sites of one or more CMS and writes the videos side by side into one HTML
+  page. It runs on the host with Docker and PHP; the browser runs in
+  Playwright's image ([Core development](docs/core-development.md#recording-a-change-before-and-after-ck-demo)).
+
 ### Fixed
 
 - `CIVIKITCHEN_LOCALES` no longer hangs on a stalled download of the core
