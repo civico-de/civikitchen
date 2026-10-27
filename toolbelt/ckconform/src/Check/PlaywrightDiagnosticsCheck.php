@@ -31,6 +31,8 @@ use CiviKitchen\Ckconform\Suppressions;
  *     nothing. A global "some workflow runs playwright, some workflow uploads"
  *     lets two unrelated workflows satisfy each other.
  *
+ * A job is judged when it runs `playwright test`, directly or through a package
+ * script; naming Playwright in an input, a make target or a lint plugin runs no suite.
  * A job that delegates to a reusable workflow (`uses:` at job level) is exempt:
  * it has no steps of its own, so `playwright: true` there is an input to the
  * callee, and the callee is where the upload has to live.
@@ -38,6 +40,9 @@ use CiviKitchen\Ckconform\Suppressions;
 final class PlaywrightDiagnosticsCheck implements Check
 {
     private const FAILURE_TOLERANT = ['always(', '!cancelled(', 'failure('];
+
+    /** The CLI's test command, also behind npx, a path or `ck playwright`; not `@playwright/test`. */
+    private const SUITE_RUN = '/(?<![\w@.-])playwright\s+test(?![\w-])/';
 
     public function name(): string
     {
@@ -142,7 +147,7 @@ final class PlaywrightDiagnosticsCheck implements Check
 
     private function runsPlaywright(string $text, Context $context): bool
     {
-        if (str_contains($text, 'playwright')) {
+        if (preg_match(self::SUITE_RUN, $text) === 1) {
             return true;
         }
         preg_match_all('/(?:npm|yarn|pnpm|bun)\s+(?:run\s+)?([A-Za-z0-9:_-]+)/', $text, $matches);
@@ -174,7 +179,7 @@ final class PlaywrightDiagnosticsCheck implements Check
         }
         $visiting[$name] = true;
         $command = $scripts[$name];
-        if (str_contains($command, 'playwright')) {
+        if (preg_match(self::SUITE_RUN, $command) === 1) {
             unset($visiting[$name]);
             return true;
         }

@@ -356,6 +356,52 @@ final class PlaywrightDiagnosticsCheckTest extends CheckTestCase
         $this->assertPasses($this->run_(new PlaywrightDiagnosticsCheck(), $context));
     }
 
+    /** An input, a make target, a lint plugin or a browser install runs no suite, so no report is owed. */
+    public function testAJobThatOnlyNamesPlaywrightIsNotJudged(): void
+    {
+        $workflow = <<<'YML'
+            jobs:
+              images:
+                if: inputs.playwright
+                steps:
+                  - name: Run the Playwright tests elsewhere
+                    run: echo "playwright_images=[]" >> "$GITHUB_OUTPUT"
+              lint:
+                steps:
+                  - run: make test-playwright-network
+                  - run: npm install @playwright/test
+                  - run: npx playwright install --with-deps
+                  - run: npm run lint
+            YML;
+        $context = $this->repo([
+            'playwright.config.ts' => self::GOOD,
+            'package.json' => '{"scripts":{"lint":"eslint --plugin playwright tests/"}}',
+            '.github/workflows/ci.yml' => $workflow . "\n",
+        ], git: true);
+        $this->assertPasses($this->run_(new PlaywrightDiagnosticsCheck(), $context));
+    }
+
+    /** @return array<string, array{0: string}> */
+    public static function suiteRuns(): array
+    {
+        return [
+            'npx with options' => ['npx playwright test --project=chromium'],
+            'bin path' => ['./node_modules/.bin/playwright test'],
+            'ck playwright' => ['php "$CK" playwright playwright test'],
+            'at line end' => ["bunx playwright test\n"],
+        ];
+    }
+
+    /** @dataProvider suiteRuns */
+    public function testEveryFormOfTheTestCommandIsJudged(string $run): void
+    {
+        $context = $this->repo([
+            'playwright.config.ts' => self::GOOD,
+            '.github/workflows/ci.yml' => "jobs:\n  e2e:\n    steps:\n      - run: " . trim($run) . "\n",
+        ], git: true);
+        $this->assertFails($this->run_(new PlaywrightDiagnosticsCheck(), $context), 'does not upload its report');
+    }
+
     public function testQuotedUseAndReporterKeysPass(): void
     {
         $context = $this->repo([

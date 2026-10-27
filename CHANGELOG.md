@@ -64,6 +64,10 @@ except that a break the consumers are adjusted for ships as a minor, marked
   `cklifecycle` and `ckmigrate` read it before they change anything.
 - `ckconform --policy <key>` rejects a key that is not a policy key instead of
   printing nothing for it.
+- ckconform's `playwright-diagnostics` check demands a report upload only from
+  a job that runs `playwright test`, directly or through a package script. A
+  job that names Playwright in an input, a make target or a lint plugin had
+  failed it.
 - `ckmigrate` names a `phpcs.xml.dist` entry in `policy.template_custom`
   wherever it stands in the list, and no longer mistakes a path such as
   `phpcs.xml.dist.bak` for one.
