@@ -52,6 +52,12 @@ except that a break the consumers are adjusted for ships as a minor, marked
   maildev's list with the app container's jq, so the bash suites need no
   python3 on the host. `ckinit --update` brings the file forward.
 
+### Removed
+
+- The standalone core patch for the SearchKit smart group panel. Every
+  standalone image the build publishes either predates the bug (6.16 to 6.18)
+  or carries the upstream fix (6.19.2 and later).
+
 ### Fixed
 
 - `CIVIKITCHEN_LOCALES` no longer hangs on a stalled download of the core
