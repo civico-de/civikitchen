@@ -32,6 +32,7 @@
 #   8. Xdebug toggle: php -m has no xdebug by default; setting XDEBUG_MODE
 #      via the entrypoint enables it
 #   9. The scaffold template, as ckinit stamps it, passes cklint and ckfmt
+#   9b. The Playwright starter's config and tests pass ckeslint and ckfmt
 set -euo pipefail
 
 PASS=0
@@ -1892,6 +1893,36 @@ else
         fi
     else
         fail "ckinit could not stamp the template: ${TPL_OUT}"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# 9b. The Playwright starter passes the same gates
+# The docs tell consumers to copy its config and tests into their repository,
+# where ck ci runs ckeslint and ckfmt over them.
+echo "== Playwright starter vs. ckeslint/ckfmt =="
+PW_SRC="${CK_SRC}/examples/extension-with-playwright"
+if [[ ! -f "${PW_SRC}/playwright.config.ts" ]]; then
+    fail "no Playwright starter at ${PW_SRC} — the starter gate cannot run"
+else
+    PW_EXT="${WORKDIR}/playwright_gate"
+    mkdir -p "${PW_EXT}"
+    cp -R "${PW_SRC}/playwright.config.ts" "${PW_SRC}/tests" "${PW_EXT}/"
+    printf '%s\n' '<extension key="org.acme.pw_ext" type="module"><file>pw_ext</file></extension>' \
+        > "${PW_EXT}/info.xml"
+    git -C "${PW_EXT}" init -q
+    git -C "${PW_EXT}" add -A
+    if PW_LINT="$(cd "${PW_EXT}" && ckeslint 2>&1)"; then
+        ok "Playwright starter passes ckeslint"
+    else
+        fail "Playwright starter fails ckeslint"
+        echo "${PW_LINT}"
+    fi
+    if PW_FMT="$(cd "${PW_EXT}" && ckfmt --check 2>&1)"; then
+        ok "Playwright starter passes ckfmt --check"
+    else
+        fail "Playwright starter fails ckfmt --check"
+        echo "${PW_FMT}"
     fi
 fi
 
