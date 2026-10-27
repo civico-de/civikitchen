@@ -82,8 +82,16 @@ $policyRaw = static function () use ($root): string {
         throw new RuntimeException(Policy::LEGACY_FILE . ' is no longer supported; migrate its policy to ' . Policy::CONFIG_FILE);
     }
     $file = $base . '/' . Policy::CONFIG_FILE;
+    if (!is_file($file)) {
+        return '';
+    }
+    // A file that is there but cannot be read is no empty policy.
+    $raw = is_readable($file) ? file_get_contents($file) : false;
+    if ($raw === false) {
+        throw new RuntimeException('cannot read ' . Policy::CONFIG_FILE);
+    }
 
-    return is_file($file) ? (string) file_get_contents($file) : '';
+    return $raw;
 };
 try {
 switch ($argv[1] ?? '') {

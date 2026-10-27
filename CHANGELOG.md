@@ -57,8 +57,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - Every `make` target is phony, so a file named like one, such as
   `test-provision`, no longer skips its suite.
 - `ckcoverage`, `ckmutate`, `cksmarty` and `ckmigrate` stop with an error
-  when `civikitchen.yaml` cannot be read. A broken file no longer reads as
-  unset, which had turned a coverage or mutation floor into "reporting only".
+  when `civikitchen.yaml` cannot be read. A broken or unreadable file no longer
+  reads as unset, which had turned a coverage or mutation floor into "reporting only".
   `cklifecycle` and `ckmigrate` read it before they change anything.
 - `ckconform --policy <key>` rejects a key that is not a policy key instead of
   printing nothing for it.

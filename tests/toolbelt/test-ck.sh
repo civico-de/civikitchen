@@ -17,6 +17,19 @@ if [ "${status}" -ne 2 ] || ! grep -q 'min_covrage: not a policy key' <<<"${out}
   echo "ckconform --policy accepted an unknown key (exit ${status}): ${out}" >&2
   exit 1
 fi
+# A policy file it cannot read is an error too, for both read-outs.
+refuses_unreadable() {
+  local status=0 out
+  out=$(cd "${work}" && "${root}/toolbelt/bin/ckconform" "$@" 2>&1) || status=$?
+  if [ "${status}" -ne 2 ] || ! grep -q 'cannot read civikitchen.yaml' <<<"${out}"; then
+    echo "ckconform $* read an unreadable civikitchen.yaml as empty (exit ${status}): ${out}" >&2
+    exit 1
+  fi
+}
+chmod 000 "${work}/civikitchen.yaml"
+refuses_unreadable --policy min_coverage
+refuses_unreadable --policy-env
+chmod 644 "${work}/civikitchen.yaml"
 cat > "${work}/info.xml" <<'XML'
 <?xml version="1.0"?>
 <extension key="demo" type="module">
