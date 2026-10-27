@@ -93,8 +93,8 @@ directory, needs a rebuilt image.
 
 `ck demo` shows what a civicrm-core change does on screen. It boots a fresh
 site, records a video without the change and one with it, and writes both side
-by side into a single HTML page. It runs on the host and needs only Docker and
-PHP; the browser runs in a container.
+by side into a single HTML page. It runs on the host through `scaffold/ck`,
+which needs only Docker; PHP and the browser run in containers.
 
 ```bash
 ck demo 12345 --page civicrm/admin/search                 # a civicrm-core PR
@@ -105,7 +105,9 @@ ck demo ./fix.diff --page 'civicrm/contact/search?reset=1' --cms standalone,joom
 `--cms` takes a list of `standalone` (the default), `wordpress`, `drupal10`,
 `drupal11` and `joomla`, or `all`. Every CMS boots from its image in a compose
 project of its own, on a free port from 8300 up; `--image <cms>=<ref>` boots
-one from another image. Before anything is recorded, the change is checked
+one from another image. The docker CLI in `scaffold/ck` has no registry login,
+so pull an image from a private registry on the host first; a stack boots from
+an image that is already there. Before anything is recorded, the change is checked
 against the core of every site. If it does not apply to one of them, the run
 names the failed hunks and stops without recording, rather than writing a page
 that leaves that CMS out.
@@ -116,7 +118,9 @@ admin/admin. It applies the change with `patch`, flushes the caches (and
 publishes the assets on Drupal), and records again. The output directory
 (`--out`, default `./ck-demo-pr<number>` or the diff file's name) receives
 `<cms>-before.webm`, `<cms>-after.webm` and `index.html`, which embeds the
-videos and lists the script errors each page logged.
+videos and lists the script errors each page logged. `scaffold/ck` mounts
+`$HOME`, the civikitchen checkout and the current git work tree, so a diff file
+and a `--steps` module must lie below one of them.
 
 The change is applied as files only: no `composer install`, no database
 upgrade. A change to dependencies or the schema needs an image built from the
@@ -151,5 +155,6 @@ Playwright's official image at the version `package-lock.json` locks, plus the
 repository's npm dependencies, built once per lockfile as
 `civikitchen-playwright:<hash>`. It joins the host network, so it opens
 each site under the same `localhost` URL the site was installed with. Docker
-writes the videos into the output directory, so keep that directory under
-`$HOME`, which colima mounts by default.
+writes the videos into the output directory, so Docker must share it: on colima
+and Docker Desktop, keep it under `$HOME`. `ck demo` checks this before it
+boots a stack.

@@ -9,14 +9,14 @@ setup project and shared across all tests.
 ```bash
 cd examples/extension-with-playwright
 docker compose up -d                              # CiviCRM on http://localhost:8080
-../../toolbelt/bin/ck playwright npm run test:e2e # runs the example tests
+../../scaffold/ck playwright npm run test:e2e    # runs the example tests
 ```
 
 `ck playwright` builds an image with the browsers of the Playwright version
 `package-lock.json` resolves and the npm tree, once per lockfile, and runs the
-command in it on the host network. The host needs Docker and PHP, no Node and
-no browsers. In your own extension, call `ck` from your civikitchen checkout,
-for example `../civikitchen/toolbelt/bin/ck`.
+command in it on the host network. The host needs only Docker: no PHP, no Node
+and no browsers. In your own extension, call `ck` from your civikitchen
+checkout, for example `../civikitchen/scaffold/ck`.
 
 The script is called `test:e2e`, not `test`, because that is the name the
 shared `extension-ci.yml` runs when you switch its `playwright` input on —

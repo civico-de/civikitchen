@@ -504,15 +504,16 @@ tree, so the host needs neither Node nor browsers
 ```bash
 cd examples/extension-with-playwright
 docker compose up -d
-../../toolbelt/bin/ck playwright npm run test:e2e
+../../scaffold/ck playwright npm run test:e2e
 ```
 
-`ck` is `toolbelt/bin/ck` of a civikitchen checkout. The image is built once
-per lockfile, which takes a few minutes the first time. It mounts the git work
-tree at its own path and shares the host network, so the suite reaches the
-stack on localhost and can call `docker compose`. A `node_modules` on the host
-is hidden from it. There is no headed browser; UI mode, the HTML report and
-the trace viewer serve on localhost instead:
+`ck` is `scaffold/ck` of a civikitchen checkout, which runs ck itself in a
+container, so the host needs no PHP. The image is built once per lockfile,
+which takes a few minutes the first time. It mounts the git work tree at its
+own path and shares the host network, so the suite reaches the stack on
+localhost and can call `docker compose`. A `node_modules` on the host is hidden
+from it. There is no headed browser; UI mode, the HTML report and the trace
+viewer serve on localhost instead:
 
 ```bash
 ck playwright playwright test --ui-host=127.0.0.1 --ui-port=9323

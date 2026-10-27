@@ -234,7 +234,7 @@ jobs:
           CIVIKITCHEN_E2E_TARGET: ${{ matrix.variant.name }}
           CIVICRM_BASE_URL: http://localhost:8080
           CIVICRM_E2E_PATH: ${{ matrix.variant.path }}
-        run: toolbelt/bin/ck playwright playwright test
+        run: scaffold/ck playwright playwright test
 
       - name: Upload Playwright report on failure
         if: failure()

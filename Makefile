@@ -208,11 +208,12 @@ test-rector: $(PHPUNIT) $(COMPOSER) ## The rector rules' fixture tests
 # ckinit stamps the template into every extension repo and its --check mode
 # gates those repos' CI, so a silent regression here either rewrites files it
 # must not touch or waves drift through.
-test-ckinit: $(SCENARIO_YAML_STAMP) ## ckinit seed/update/check integration checks, ckup port picking
+test-ckinit: $(SCENARIO_YAML_STAMP) ## ckinit seed/update/check integration checks, ckup port picking, the ckx and ck wrappers
 	bash tests/ckinit/test-ckinit.sh
 	bash tests/ckinit/test-ckinit-wrapper.sh
 	bash tests/ckinit/test-ckup.sh
 	bash tests/ckinit/test-ckx.sh
+	bash tests/ckinit/test-ck.sh
 
 test-example-template: $(SCENARIO_YAML_STAMP) ## The monorepo examples carry the current template files and pass ckconform
 	set -e; for info in examples/monorepo/*/info.xml; do php scaffold/ckinit.php --check "$$(dirname "$$info")"; (cd "$$(dirname "$$info")" && ../../../toolbelt/bin/ckconform >/dev/null) || { echo "ckconform fails in $$(dirname "$$info")" >&2; exit 1; }; done
@@ -469,7 +470,7 @@ docs-serve: $(UVX) ## Serve the documentation site locally with live reload
 	$(call pyrun_pinned,zensical,$(CK_ZENSICAL_VERSION)) serve
 
 docs-a11y: docs ## WCAG 2.1 AA checks of the site in light and dark mode (in Docker)
-	toolbelt/bin/ck playwright playwright test -c playwright.docs.config.ts
+	scaffold/ck playwright playwright test -c playwright.docs.config.ts
 
 # Advisory token-level clone report, not part of `lint`. Duplicated on purpose:
 # check run() skeletons, parallel test fixtures, clones across composer packages.
@@ -524,7 +525,7 @@ test-images: ## Boot tests + dev-tool tests against the published images (~1 h)
 	bash tests/images/run-local.sh
 
 e2e: ## Playwright smoke tests against a running compose stack (in Docker; CIVICRM_BASE_URL)
-	toolbelt/bin/ck playwright npm run test:e2e
+	scaffold/ck playwright npm run test:e2e
 
 # --- fetched inputs ----------------------------------------------------------
 

@@ -1,0 +1,59 @@
+#!/bin/bash
+#
+# ck — run ck's host commands in a container with PHP and the docker CLI, so the
+# host needs only bash and Docker:
+#
+#   ck playwright npm run test:e2e     ck demo 12345 --page civicrm/admin/search
+#
+# Every other ck command runs in the dev stack: ckx ck <command>.
+set -euo pipefail
+
+die() { echo "ck: $*" >&2; exit 2; }
+
+case "${1:-}" in
+  playwright|demo) ;;
+  -h|--help) sed -n '3,8s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"; exit 0 ;;
+  "") die "which command? ck playwright <command> or ck demo <change> (ck --help)" ;;
+  *) die "$1 runs in the dev stack: ckx ck $1 (here only playwright and demo)" ;;
+esac
+command -v docker >/dev/null 2>&1 || die "docker is required"
+
+checkout="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+dockerfile="$checkout/scaffold/ck.Dockerfile"
+image="civikitchen-ck:$(cksum < "$dockerfile" | cut -d' ' -f1)"
+if ! docker image inspect "$image" >/dev/null 2>&1; then
+  docker build -t "$image" - < "$dockerfile" >&2
+fi
+
+# Docker resolves bind mounts on its own side, so every path ck hands a container
+# is mounted at its own path: $HOME (what colima and Docker Desktop share), this
+# checkout and the current git work tree.
+cwd="$(pwd -P)"
+tree="$cwd"
+while [ "$tree" != / ] && [ ! -e "$tree/.git" ]; do tree="$(dirname "$tree")"; done
+[ "$tree" != / ] || tree="$cwd"
+mounts=()
+for dir in "$(cd "$HOME" && pwd -P)" "$checkout" "$tree"; do
+  for mounted in ${mounts[@]+"${mounts[@]}"}; do
+    case "$dir/" in "$mounted"/*) continue 2 ;; esac
+  done
+  mounts+=("$dir")
+done
+
+# The socket's group as the Docker daemon sees it, which the host may not (colima, Docker Desktop).
+socket=/var/run/docker.sock
+group="$(docker run --rm --entrypoint stat -v "$socket:$socket" "$image" -c %g "$socket")" \
+  || die "cannot read the group of the Docker socket $socket"
+
+run=(docker run --rm --init -i --network host -u "$(id -u):$(id -g)" --group-add "$group"
+     -e HOME=/tmp -v "$socket:$socket" -w "$cwd")
+for dir in "${mounts[@]}"; do run+=(-v "$dir:$dir"); done
+# The rest of the environment reaches ck, which passes it on to the Playwright container.
+while IFS= read -r name; do
+  case "$name" in
+    PATH|HOME|TMPDIR|TMP|TEMP|DOCKER_CERT_PATH|DOCKER_CONFIG|DOCKER_CONTEXT|DOCKER_HOST|DOCKER_TLS_VERIFY) ;;
+    *) run+=(-e "$name") ;;
+  esac
+done < <(compgen -e)
+if [[ -t 0 && -t 1 ]]; then run+=(-t); fi
+exec "${run[@]}" "$image" php "$checkout/toolbelt/bin/ck" "$@"

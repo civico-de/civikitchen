@@ -37,8 +37,9 @@ ck demo — record a civicrm-core change before and after, on one or more CMS
   --dwell <seconds>    how long each route stays on screen (default: 2.5)
   --keep               leave the stacks running, with the change applied
 
-Runs on the host and needs Docker and PHP. Every CMS boots in a stack of its own;
-the change is checked against all of them before anything is recorded.
+Runs on the host. scaffold/ck runs it in a container, so the host needs only
+Docker. Every CMS boots in a stack of its own; the change is checked against all
+of them before anything is recorded.
 TXT;
 
     /** @param (Closure(int): bool)|null $portFree */
@@ -70,6 +71,8 @@ TXT;
         if (is_file("{$out}/index.html")) {
             unlink("{$out}/index.html");
         }
+        $image = (new Image($this->checkoutRoot, $this->runner))->for($this->checkoutRoot);
+        $this->assertShared($image, $out);
 
         $stacks = [];
         try {
@@ -79,7 +82,7 @@ TXT;
                 $cms = Cms::named($name, $options['images'][$name] ?? null);
                 $stacks[] = Stack::prepare($cms, "ck-demo-{$diff->label}-{$name}", $file, $port, $this->runner);
             }
-            $this->record($diff, $stacks, $options, $out);
+            $this->record($image, $diff, $stacks, $options, $out);
         } finally {
             $this->finish($stacks, $options['keep'], $out);
         }
@@ -90,10 +93,9 @@ TXT;
      * @param list<Stack> $stacks
      * @param array{pages: list<string>, steps: ?string, cv: list<string>, size: array{width: int, height: int}, dwell: float} $options
      */
-    private function record(CoreDiff $diff, array $stacks, array $options, string $out): void
+    private function record(string $image, CoreDiff $diff, array $stacks, array $options, string $out): void
     {
         $recorder = new Recorder($this->checkoutRoot, $this->runner);
-        $image = (new Image($this->checkoutRoot, $this->runner))->for($this->checkoutRoot);
         foreach ($stacks as $stack) {
             echo "ck demo: starting {$stack->cms->label} at {$stack->siteUrl()}\n";
             $stack->up(false);
@@ -146,6 +148,21 @@ TXT;
         $size = "{$options['size']['width']}×{$options['size']['height']}";
         file_put_contents("{$out}/index.html", ComparisonPage::render($diff, $options['pages'], $size, $sections));
         echo "ck demo: {$out}/index.html\n";
+    }
+
+    /** The recorder writes into $out through Docker, so a directory Docker cannot see fails before any stack boots. */
+    private function assertShared(string $image, string $out): void
+    {
+        $marker = "{$out}/.ck-demo-shared";
+        file_put_contents($marker, '');
+        try {
+            $seen = $this->runner->capture(['docker', 'run', '--rm', '--entrypoint', 'test', '-v', "{$out}:/out:ro", $image, '-e', '/out/.ck-demo-shared']);
+        } finally {
+            unlink($marker);
+        }
+        if ($seen['status'] !== 0) {
+            throw new RuntimeException("Docker does not share {$out}: colima and Docker Desktop share \$HOME, and scaffold/ck mounts \$HOME, the checkout and the work tree");
+        }
     }
 
     /** @param list<Stack> $stacks */

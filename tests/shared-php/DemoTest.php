@@ -192,6 +192,22 @@ DIFF;
         $this->demo($runner, ['37671', '--page', 'civicrm/admin/search', '--out', $this->temporary . '/out']);
     }
 
+    public function testAnOutputDirectoryDockerCannotSeeStopsBeforeAnyStack(): void
+    {
+        $runner = new DemoRunner(self::DIFF);
+        $runner->shareStatus = 1;
+        $out = $this->temporary . '/out';
+
+        try {
+            $this->demo($runner, ['37671', '--page', 'civicrm/admin/search', '--out', $out]);
+            self::fail('an output directory Docker cannot see must stop the run');
+        } catch (RuntimeException $e) {
+            self::assertStringStartsWith('Docker does not share ' . realpath($out) . ':', $e->getMessage());
+        }
+        self::assertSame([], $runner->sites);
+        self::assertSame(['.', '..'], scandir($out));
+    }
+
     public function testASiteThatDoesNotBootStopsTheRunAndEveryStackIsRemoved(): void
     {
         $runner = new DemoRunner(self::DIFF);
@@ -411,6 +427,7 @@ final class DemoRunner extends Runner
     public bool $writeVideos = true;
     public int $recorderStatus = 0;
     public int $curlStatus = 0;
+    public int $shareStatus = 0;
 
     public function __construct(private readonly string $diff)
     {
@@ -442,6 +459,9 @@ final class DemoRunner extends Runner
         if (array_slice($command, 0, 2) === ['docker', 'ps']) {
             $project = substr((string) end($command), strlen('label=com.docker.compose.project='));
             return ['status' => 0, 'output' => in_array($project, $this->existingProjects, true) ? "abc123\n" : ''];
+        }
+        if (in_array('--entrypoint', $command, true) && in_array('test', $command, true)) {
+            return ['status' => $this->shareStatus, 'output' => ''];
         }
         if (array_slice($command, 0, 2) === ['docker', 'compose'] && $command[4] === 'logs') {
             return ['status' => 0, 'output' => "[civikitchen] ERROR: provisioning failed\n"];

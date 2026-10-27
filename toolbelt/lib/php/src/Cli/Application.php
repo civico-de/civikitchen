@@ -181,8 +181,8 @@ ck — CiviKitchen extension-development toolbelt
   ck civix [args]         civix scaffold drift
   ck core-test [args]     CiviCRM core PHPUnit suites
   ck test-reset [args]    reset the standalone scratch DB
-  ck demo [args]          record a core change before and after (host only)
-  ck playwright [args]    run a command with the project's Playwright in Docker (host only)
+  ck demo [args]          record a core change before and after (on the host: scaffold/ck)
+  ck playwright [args]    run a command with the project's Playwright in Docker (on the host: scaffold/ck)
 
 Use `ck <command> --help` for command-specific help.
 TXT;

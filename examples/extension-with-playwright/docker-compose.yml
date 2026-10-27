@@ -10,7 +10,7 @@
 # 3. Enable your extension:
 #      docker compose exec app cv ext:enable myextension
 # 4. Run the Playwright tests in Docker (see README.md):
-#      ../../toolbelt/bin/ck playwright npm run test:e2e
+#      ../../scaffold/ck playwright npm run test:e2e
 #
 # URLs:
 #   CiviCRM:    http://localhost:8080

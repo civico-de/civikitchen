@@ -38,7 +38,8 @@ the Docker socket and passes every environment variable but the host's paths,
 identity and locale. The network is the host's by default; the extension
 workflow passes the app container's.
 
-The host needs Docker with the buildx plugin, and PHP. `make docs-a11y`,
+On a developer host `scaffold/ck` runs `ck playwright` in a container with PHP
+and the docker CLI, so the host needs only Docker. `make docs-a11y`,
 `make e2e` and the browser jobs of `extension-ci.yml`, `docs.yml`,
 `extension-docs.yml` and the image builds run this way, and `ck demo` records
 in the same image.

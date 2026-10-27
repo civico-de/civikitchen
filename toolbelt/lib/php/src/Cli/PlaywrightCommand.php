@@ -33,7 +33,7 @@ LC_*, …) reaches the command.
   --network <mode>   the container's network, as `docker run --network` takes it
                      (default: host)
 
-Runs on the host and needs Docker and PHP.
+Runs on the host. scaffold/ck runs it in a container, so the host needs only Docker.
 TXT;
 
     private const SOCKET = '/var/run/docker.sock';

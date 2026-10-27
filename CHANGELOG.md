@@ -18,15 +18,17 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 - `ck demo <PR|diff>` records a civicrm-core change before and after on fresh
   sites of one or more CMS and writes the videos side by side into one HTML
-  page. It runs on the host with Docker and PHP; the browser runs in
+  page. It runs on the host through `scaffold/ck`; the browser runs in
   Playwright's image ([Core development](docs/core-development.md#recording-a-change-before-and-after-ck-demo)).
 - `ck playwright [--network <mode>] <command>` runs a command in an image with
   the browsers of the Playwright version the project's lockfile resolves, its
   npm or Bun tree (installed with its `.npmrc` or `bunfig.toml`) and the
-  docker CLI, built once per lockfile. The host needs
-  Docker with the buildx plugin and PHP, no Node and no browsers
+  docker CLI, built once per lockfile. The host needs no Node and no browsers
   ([ADR-0019](docs/adr/0019-browser-suites-run-in-the-projects-playwright-image.md)).
   `playwright-e2e.yml` offers it to its commands as `$CK`.
+- `scaffold/ck playwright|demo` runs those two host commands in a container
+  with PHP and the docker CLI, so a developer host needs only Docker: no PHP
+  and no buildx plugin.
 
 ### Changed
 

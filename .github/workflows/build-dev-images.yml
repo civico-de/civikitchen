@@ -267,7 +267,7 @@ jobs:
       - name: Run Playwright e2e
         env:
           CIVICRM_BASE_URL: http://localhost:8080
-        run: toolbelt/bin/ck playwright playwright test
+        run: scaffold/ck playwright playwright test
 
       - name: Upload Playwright report on failure
         if: failure()
