@@ -531,6 +531,14 @@ else
     fail "ck_xml_field returned '$(ck_xml_field "${XMLDIR}/single-quoted.xml" key)' for a single-quoted key"
 fi
 
+printf '%s\n' '<extension key="org.example.nested"><civix><namespace>CRM/Nested</namespace></civix></extension>' \
+    > "${XMLDIR}/nested.xml"
+if [ "$(ck_xml_field "${XMLDIR}/nested.xml" civix/namespace)" = "CRM/Nested" ]; then
+    ok "ck_xml_field reads a nested element by path"
+else
+    fail "ck_xml_field returned '$(ck_xml_field "${XMLDIR}/nested.xml" civix/namespace)' for civix/namespace"
+fi
+
 {
     printf '%s\n' '<?xml version="1.0"?>'
     printf '%s\n' '<!-- <extension key="org.example.decoy" type="module"> -->'

@@ -57,7 +57,14 @@ final class InternalRuntimeCommand implements Command
                 if ($xml === false) {
                     throw new \RuntimeException("cannot parse {$arguments[0]}");
                 }
-                echo trim($arguments[1] === 'key' ? (string) $xml['key'] : (string) $xml->{$arguments[1]});
+                if ($arguments[1] === 'key') {
+                    echo trim((string) $xml['key']);
+                    return 0;
+                }
+                foreach (explode('/', $arguments[1]) as $child) {
+                    $xml = $xml->{$child};
+                }
+                echo trim((string) $xml);
                 return 0;
             }
             if ($operation === 'xml-has-child' && count($arguments) === 2) {

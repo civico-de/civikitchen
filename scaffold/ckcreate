@@ -239,8 +239,10 @@ ck internal scaffold-policy /civikitchen/packages/civikitchen-scenario-schema/sc
 echo "$tool: wrote civikitchen.yaml policy (license, copyright)"
 
 # A suite with no test fails ckcoverage, so the scaffold starts with one.
-namespace="$(sed -n 's:.*<namespace>CRM/\([A-Za-z0-9_]*\)</namespace>.*:\1:p' "$generated/info.xml")"
-[ -n "$namespace" ] || die "civix wrote no <civix><namespace>CRM/...</namespace> into info.xml"
+namespace="$(ck internal xml-field "$out/info.xml" civix/namespace)"
+[[ "$namespace" =~ ^CRM/([A-Za-z0-9_]+)$ ]] \
+  || die "civix wrote no <civix><namespace>CRM/...</namespace> into info.xml"
+namespace="${BASH_REMATCH[1]}"
 mkdir -p "$generated/tests/phpunit/Civi/$namespace"
 cat > "$generated/tests/phpunit/Civi/$namespace/InstallTest.php" <<EOF
 <?php
