@@ -68,6 +68,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
   a job that runs `playwright test`, directly or through a package script. A
   job that names Playwright in an input, a make target or a lint plugin had
   failed it.
+- `extension-docs.yml` uploads the WCAG check's HTML report with a trace of
+  each failing page (`docs-wcag-report`) when the check fails.
 - `ckmigrate` names a `phpcs.xml.dist` entry in `policy.template_custom`
   wherever it stands in the list, and no longer mistakes a path such as
   `phpcs.xml.dist.bak` for one.
