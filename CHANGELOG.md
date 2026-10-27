@@ -20,6 +20,29 @@ except that a break the consumers are adjusted for ships as a minor, marked
   sites of one or more CMS and writes the videos side by side into one HTML
   page. It runs on the host with Docker and PHP; the browser runs in
   Playwright's image ([Core development](docs/core-development.md#recording-a-change-before-and-after-ck-demo)).
+- `ck playwright [--network <mode>] <command>` runs a command in an image with
+  the browsers of the Playwright version the project's lockfile resolves, its
+  npm or Bun tree (installed with its `.npmrc` or `bunfig.toml`) and the
+  docker CLI, built once per lockfile. The host needs
+  Docker with the buildx plugin and PHP, no Node and no browsers
+  ([ADR-0019](docs/adr/0019-browser-suites-run-in-the-projects-playwright-image.md)).
+  `playwright-e2e.yml` offers it to its commands as `$CK`.
+
+### Changed
+
+- **Breaking:** the `playwright` job of `extension-ci.yml` runs the suite and
+  the `bun run build` before it through `ck playwright`, inside the app
+  container's network namespace. The site is `http://localhost`
+  (`CIVICRM_BASE_URL` and `BASE_URL`), no port is published, and the suite
+  sees the work tree and the Docker socket but no file outside the work tree.
+  The job no longer installs Node, Bun or browsers on the runner, so
+  `node_version` does not apply to it; the runner needs php-cli 8.1 with posix.
+  It copies the image's tree into the checkout, where the app serves it.
+- The browser checks of the docs site, the extension docs and the image builds
+  run through `ck playwright`; `make docs-a11y` and `make e2e` do too.
+- The docs site uses system fonts. A web font arriving after the theme
+  measured code blocks left them without keyboard focus.
+- `ck demo` records in the `ck playwright` image (`civikitchen-playwright:<hash>`).
 
 ### Fixed
 

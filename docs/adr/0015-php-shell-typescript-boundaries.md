@@ -21,9 +21,10 @@ container entrypoints, user switching, environment export, pipes and the final
 exec. Shell does not embed PHP programs or implement a second parser for a
 structured format.
 
-TypeScript owns browser automation only: the Playwright suite and the script
-that `ck demo` runs in Playwright's image to record a page. The PHP side starts
-that container and reads its result. JavaScript appears only where a tool
+TypeScript owns browser automation only: the Playwright suites and the script
+that `ck demo` runs to record a page, both in the project's Playwright image
+(ADR-0019). The PHP side builds that image, starts the container and reads
+its result. JavaScript appears only where a tool
 demands it, such as the oxlint plugin that carries the APIv4 contract rule
 (ADR-0008).
 

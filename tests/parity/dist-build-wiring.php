@@ -31,7 +31,7 @@ function ck_builds(array $step): bool
         return false;
     }
     return str_contains((string) ($step['uses'] ?? ''), '/release-build')
-        || preg_match('/^\s*bun run build\s*$/m', (string) ($step['run'] ?? '')) === 1;
+        || preg_match('/^\s*(php "\$CK" playwright )?bun run build\s*$/m', (string) ($step['run'] ?? '')) === 1;
 }
 
 $problems = [];

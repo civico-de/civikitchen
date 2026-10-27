@@ -41,7 +41,7 @@ jobs:
       - name: Test suites
         run: make test
 
-      # Need the docker CLI (and node), which the runner has and `make test`
+      # Need the docker CLI and jq, which the runner has and `make test`
       # does not assume.
       - name: Compose files
-        run: make test-compose-config test-playwright-port
+        run: make test-compose-config test-playwright-network

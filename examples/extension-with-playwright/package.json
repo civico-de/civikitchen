@@ -4,9 +4,7 @@
   "description": "Playwright UI test starter for CiviCRM extensions. Copy into your own extension.",
   "scripts": {
     "test:e2e": "playwright test",
-    "test:ui": "playwright test --ui",
-    "test:headed": "playwright test --headed",
-    "test:debug": "playwright test --debug"
+    "test:ui": "playwright test --ui-host=127.0.0.1 --ui-port=9323"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"

@@ -907,10 +907,10 @@ on extension-ci.yml add these, all off by default:
 |---|---|
 | `npm_ci` | `npm ci --ignore-scripts` on the runner before the stack boots. The stack bind-mounts the checkout, so node_modules/ is there for PHP code that reads an asset bundle. |
 | `js_tests` | Runs npm test. Implies npm_ci. Fails when package.json has no test script. |
-| `bun` | Uses Bun instead of npm for all of the above. Implies the install. Needs a committed bun.lock and a packageManager entry pinning the Bun version, which is the Bun the jobs install. |
-| `playwright` | Own job: boots the stack on a free host port with an admin/admin demo user and runs npm run test:e2e from the runner, on image. The fixtures' browser runs in its own container matching the checkout's playwright-core, with localhost tunnelled to the runner. A browser the suite launches itself stays on the runner. Report and traces are uploaded on failure. |
+| `bun` | Uses Bun instead of npm for all of the above. Implies the install. Needs a committed bun.lock and a packageManager entry pinning the Bun version, which is the Bun the jobs use. |
+| `playwright` | Own job: boots the stack with an admin/admin demo user and runs npm run test:e2e in the repository's Playwright image (`ck playwright`), inside the app container's network, on image. Report and traces are uploaded on failure. |
 | `matrix_playwright` | Runs that job on every matrix_images entry as well. Needs playwright and matrix_images. |
-| `node_version` | Node for all of the above. Default '24', the major the dev images ship. Still applies under bun. |
+| `node_version` | Node for all of the above but the browser job, which runs on its Playwright image's Node. Default '24', the major the dev images ship. Still applies under bun. |
 
 Playwright keeps traces on failure, and traces can contain request data,
 tokens, cookies and authenticated state. A manual live-provider suite with
@@ -1002,7 +1002,8 @@ install, js_tests and the Playwright job), so no repo tests two different
 dependency trees. The install is `bun install --frozen-lockfile`, which needs
 the committed bun.lock; the npm dependency cache is off on this path.
 
-Node is still installed at node_version for the tools your scripts call. Bun
+Node is still installed at node_version for the tools your scripts call; the
+browser job uses the Node of its Playwright image. Bun
 runs no dependency lifecycle scripts
 unless listed as trusted, which matches --ignore-scripts, but it does run your
 own package's install scripts. Keep the build in the test script and both
@@ -1014,23 +1015,30 @@ The browser job is the slowest thing in the pipeline, so put
 `playwright: true` in the scheduled compat.yml caller below, not the push run.
 It assumes the following.
 
-The stack is the template's standalone CI stack. The job publishes it on a
-free runner port, dropping any port the compose file publishes (Docker Compose
-2.24.4 or later), and sets CIVIKITCHEN_SITE_URL to that localhost URL, because
-CiviCRM bakes the URL into assets and redirects. A CMS compose file boots, but
-the suite has to handle the CMS login itself; the demo user is a Standalone
-user.
+The stack is the template's standalone CI stack, with no port published: the
+job drops any port the compose file publishes (Docker Compose 2.24.4 or
+later). The suite runs through `ck playwright` in the repository's Playwright
+image, inside the app container's network namespace, so the site is
+`http://localhost` and CIVIKITCHEN_SITE_URL says so, because CiviCRM bakes the
+URL into assets and redirects. A CMS compose file boots, but the suite has to
+handle the CMS login itself; the demo user is a Standalone user.
 
-The suite reads CIVICRM_BASE_URL, DEMO_USER and DEMO_PASS from the
-environment; a hardcoded `localhost:8080` reaches nothing. All browsers are
-installed, with system dependencies on GitHub-hosted runners. Self-hosted
-runner images must provide those libraries, because CI has no passwordless
-sudo. A starter to copy is
+The suite reads CIVICRM_BASE_URL (also exported as BASE_URL for
+tests/e2e/lib.sh), DEMO_USER and DEMO_PASS from the environment; a hardcoded
+`localhost:8080` reaches nothing. The image holds the browsers of the
+Playwright version the lockfile resolves, the dependency tree installed with
+the repository's `.npmrc` or `bunfig.toml`, Bun when the repository uses it,
+bash, curl, python3 and the docker CLI. The job copies that tree into the
+checkout before the build, so the app container serves node_modules/ too.
+The work tree is mounted at its own path, so `docker compose` calls from the
+suite reach the job's stack; files outside the work tree, such as
+`$RUNNER_TEMP`, are not there. The runner needs Docker and php-cli 8.1 or newer, no
+Node and no browsers. A starter to copy is
 [`examples/extension-with-playwright/`](https://github.com/civico-de/civikitchen/tree/main/examples/extension-with-playwright/).
 
 By default the job runs once, on image. `matrix_playwright: true` together
 with playwright and a non-empty matrix_images adds one leg per image, each on
-its own stack and port. If either is missing, the run fails instead of testing
+its own stack. If either is missing, the run fails instead of testing
 nothing. Each leg is named `playwright (<image>)`, and every report artifact
 after the first carries its index.
 

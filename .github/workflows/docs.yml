@@ -32,12 +32,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install Playwright
-        run: |
-          npm ci --no-audit --no-fund
-          npx playwright install chromium --with-deps
-
-      # Builds the site, then checks it against WCAG 2.1 AA in light and dark mode.
+      # Builds the site, then checks it against WCAG 2.1 AA in light and dark mode,
+      # with the browser and the npm tree in the Playwright image (ck playwright).
       - name: Build and check the site
         run: make docs-a11y
 

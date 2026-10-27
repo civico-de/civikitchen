@@ -95,16 +95,16 @@ final class Files
      */
     public function gitCommand(array $arguments): array
     {
-        return ['git', '-c', 'safe.directory=' . $this->worktreeRoot(), ...$arguments];
+        return ['git', '-c', 'safe.directory=' . self::worktreeRoot(), ...$arguments];
     }
 
     /**
-     * The directory git must be told to trust: the worktree root, not the cwd,
-     * which in an extension subdirectory would leave dubious ownership standing.
+     * The worktree root around the cwd, which git must be told to trust: the cwd
+     * itself, in an extension subdirectory, would leave dubious ownership standing.
      * Walked rather than asked, because `rev-parse --show-toplevel` is itself
      * refused under it; the cwd stands in when nothing above is a checkout.
      */
-    private function worktreeRoot(): string
+    public static function worktreeRoot(): string
     {
         $directory = (string) getcwd();
         while ($directory !== '' && $directory !== dirname($directory)) {

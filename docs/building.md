@@ -43,7 +43,9 @@ Everything else is fetched pinned. `make doctor` reports what is missing.
 
 The slow loop also needs Docker. It consists of `make build`, which builds the
 standalone image as `civikitchen:standalone`, plus `make test-images`,
-`make e2e` and `make e2e-ckcreate`. `make e2e-ckcreate IMAGE=civikitchen:standalone`
+`make e2e`, `make docs-a11y` and `make e2e-ckcreate`. The browser checks run in
+the repository's Playwright image, so the host needs no Node and no browsers
+for them. `make e2e-ckcreate IMAGE=civikitchen:standalone`
 creates an extension with real civix and runs `ck ci` on it in the template's
 dev stack. The image workflow runs the same check before promoting.
 

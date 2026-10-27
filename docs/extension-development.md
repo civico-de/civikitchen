@@ -495,14 +495,28 @@ workflows and renovate.json and align the versions.
 For browser tests of forms, Angular or React widgets and JS behaviour, start
 from
 [`examples/extension-with-playwright/`](https://github.com/civico-de/civikitchen/tree/main/examples/extension-with-playwright/).
-It boots the standalone stack and runs Playwright on the host against
-localhost:8080 with one shared login.
+It boots the standalone stack and runs the suite against localhost:8080 with
+one shared login. `ck playwright` runs it in an image with the browsers of
+the Playwright version the lockfile resolves and the repository's npm or Bun
+tree, so the host needs neither Node nor browsers
+([ADR-0019](adr/0019-browser-suites-run-in-the-projects-playwright-image.md)):
 
 ```bash
 cd examples/extension-with-playwright
 docker compose up -d
-npm install && npx playwright install chromium
-npm run test:e2e
+../../toolbelt/bin/ck playwright npm run test:e2e
+```
+
+`ck` is `toolbelt/bin/ck` of a civikitchen checkout. The image is built once
+per lockfile, which takes a few minutes the first time. It mounts the git work
+tree at its own path and shares the host network, so the suite reaches the
+stack on localhost and can call `docker compose`. A `node_modules` on the host
+is hidden from it. There is no headed browser; UI mode, the HTML report and
+the trace viewer serve on localhost instead:
+
+```bash
+ck playwright playwright test --ui-host=127.0.0.1 --ui-port=9323
+ck playwright playwright show-report --host 127.0.0.1
 ```
 
 The

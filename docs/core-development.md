@@ -146,9 +146,10 @@ URLs. A later run with the same `--out` and the same images finds them on
 their ports and reverts the change before it records. Without `--keep`, the
 stacks and their volumes are removed at the end, also after a failure.
 
-The recorder is Playwright's official image at the version `package-lock.json`
-locks, plus the repository's npm dependencies. It is built once per lockfile
-as `civikitchen-demo-recorder:<hash>`. It joins the host network, so it opens
+The recorder runs in the image `ck playwright` builds for this repository:
+Playwright's official image at the version `package-lock.json` locks, plus the
+repository's npm dependencies, built once per lockfile as
+`civikitchen-playwright:<hash>`. It joins the host network, so it opens
 each site under the same `localhost` URL the site was installed with. Docker
 writes the videos into the output directory, so keep that directory under
 `$HOME`, which colima mounts by default.

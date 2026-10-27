@@ -3,7 +3,8 @@
 CiviCRM Docker images with the development toolchain built in, an extension
 template, and reusable GitHub workflows that test, check and release CiviCRM
 extensions. The host needs Docker with the compose plugin and bash. Everything
-else runs in the image.
+else runs in the image; browser suites and `ck demo` also need PHP 8.1 or newer
+and the buildx plugin.
 
 | You want to … | Read |
 |---------------|------|

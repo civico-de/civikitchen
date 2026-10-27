@@ -263,23 +263,11 @@ jobs:
           EXT_KEYS: mjwshared org.project60.sepa legacycustomsearches de.systopia.xcm
         run: .github/scripts/verify-extra-extensions.sh
 
-      # Same major the images ship (docker/*/Dockerfile). A browser job on a
-      # different Node than the image serves tests something nobody runs.
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-          cache: 'npm'
-
-      - name: Install Playwright + Chromium
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
-
+      # The browser and the npm tree come from the Playwright image (ck playwright).
       - name: Run Playwright e2e
         env:
           CIVICRM_BASE_URL: http://localhost:8080
-        run: npx playwright test
+        run: toolbelt/bin/ck playwright playwright test
 
       - name: Upload Playwright report on failure
         if: failure()

@@ -177,8 +177,8 @@ DIFF;
             '--out', $this->temporary . '/out']);
 
         $recording = $runner->recordings[0];
-        self::assertSame('/civikitchen/demo/steps.mts', $recording['script']['steps']);
-        self::assertContains(realpath($steps) . ':/civikitchen/demo/steps.mts:ro', $recording['command']);
+        self::assertSame('/ck-demo/steps.mts', $recording['script']['steps']);
+        self::assertContains(realpath($steps) . ':/ck-demo/steps.mts:ro', $recording['command']);
         self::assertSame(['width' => 1024, 'height' => 768], $recording['script']['size']);
         self::assertSame(0, $recording['script']['dwellMs']);
         self::assertSame('ghcr.io/civico-de/civikitchen:standalone-beta', $runner->images['ck-demo-pr37671-standalone']);
@@ -340,28 +340,6 @@ DIFF;
         Stack::prepare(Cms::named('joomla'), 'x', $file, 8300, new DemoRunner(''));
     }
 
-    public function testTheRecorderImageIsBuiltOnceFromTheLockedPlaywright(): void
-    {
-        $runner = new DemoRunner('');
-        $runner->recorderImageExists = false;
-        $tag = (new Recorder(dirname(__DIR__, 2), $runner))->image();
-
-        self::assertMatchesRegularExpression('/^civikitchen-demo-recorder:[0-9a-f]{12}$/', $tag);
-        $build = array_values(array_filter($runner->commands, static fn(array $command): bool => array_slice($command, 0, 2) === ['docker', 'build']))[0];
-        $lock = json_decode((string) file_get_contents(dirname(__DIR__, 2) . '/package-lock.json'), true);
-        self::assertContains('PLAYWRIGHT_VERSION=' . $lock['packages']['node_modules/@playwright/test']['version'], $build);
-        self::assertSame(['Dockerfile', 'package-lock.json', 'package.json'], $runner->buildContext);
-    }
-
-    public function testAFailedRecorderBuildIsAnError(): void
-    {
-        $runner = new DemoRunner('');
-        $runner->recorderImageExists = false;
-        $runner->buildStatus = 1;
-        $this->expectExceptionMessageMatches('/^could not build the recorder image civikitchen-demo-recorder:[0-9a-f]{12}$/');
-        (new Recorder(dirname(__DIR__, 2), $runner))->image();
-    }
-
     public function testARecordingWithoutAVideoOnTheHostIsAnError(): void
     {
         $runner = new DemoRunner('');
@@ -426,15 +404,10 @@ final class DemoRunner extends Runner
     /** @var array<string, list<string>> script errors per recording */
     public array $errors = [];
 
-    /** @var list<string> */
-    public array $buildContext = [];
-
     /** @var list<string> steps that exit 1, as "<project> <entry>" with the entry siteLog() records */
     public array $failing = [];
 
     public bool $docker = true;
-    public bool $recorderImageExists = true;
-    public int $buildStatus = 0;
     public bool $writeVideos = true;
     public int $recorderStatus = 0;
     public int $curlStatus = 0;
@@ -451,11 +424,6 @@ final class DemoRunner extends Runner
     public function passthrough(array $command, ?array $environment = null, ?string $workingDirectory = null): int
     {
         $this->commands[] = $command;
-        if (array_slice($command, 0, 2) === ['docker', 'build']) {
-            $context = (string) end($command);
-            $this->buildContext = array_values(array_diff(scandir($context) ?: [], ['.', '..']));
-            return $this->buildStatus;
-        }
         if (array_slice($command, 0, 2) === ['docker', 'compose']) {
             $project = $this->project($command);
             $this->images[$project] = json_decode((string) file_get_contents($command[3]), true)['services']['app']['image'];
@@ -477,9 +445,6 @@ final class DemoRunner extends Runner
         }
         if (array_slice($command, 0, 2) === ['docker', 'compose'] && $command[4] === 'logs') {
             return ['status' => 0, 'output' => "[civikitchen] ERROR: provisioning failed\n"];
-        }
-        if (array_slice($command, 0, 3) === ['docker', 'image', 'inspect']) {
-            return ['status' => $this->recorderImageExists ? 0 : 1, 'output' => ''];
         }
         return ['status' => 0, 'output' => ''];
     }

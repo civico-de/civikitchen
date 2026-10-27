@@ -123,8 +123,9 @@ on:
           Drive all frontend steps with Bun (`bun install --frozen-lockfile`,
           `bun run test` / `test:e2e`) instead of npm — whole pipeline or
           none. Needs a committed bun.lock and a `packageManager` pin
-          ("bun@x.y.z") in package.json, which is the Bun the jobs install.
-          node_version still applies: the installed binaries run on Node.
+          ("bun@x.y.z") in package.json, which is the Bun the jobs use.
+          node_version still applies to the ci job: the installed binaries
+          run on Node.
           See docs/extension-standards.md.
         type: boolean
         default: false
@@ -138,15 +139,16 @@ on:
         default: false
       playwright:
         description: >-
-          Browser tests as their own job: stack with published HTTP port and
-          demo login, then `npm run test:e2e`, on `image` (matrix_playwright
-          adds the matrix_images). Slow — scheduled caller only.
+          Browser tests as their own job: stack with demo login, then
+          `npm run test:e2e` (`bun run` under `bun`) in the repo's Playwright
+          image (`ck playwright`), on `image` (matrix_playwright adds the
+          matrix_images). Slow — scheduled caller only.
         type: boolean
         default: false
       matrix_playwright:
         description: >-
           With `playwright`, run the browser suite on every matrix_images
-          entry too, each leg on its own stack and port, side by side — for
+          entry too, each leg on its own stack, side by side — for
           UI that changes between CiviCRM versions. Fails without
           `playwright` or with empty matrix_images.
         type: boolean
@@ -165,17 +167,16 @@ on:
           CK_RUNS_ON repo/org variable, else 'ubuntu-latest' — one variable
           flips a whole fleet. NEVER attach self-hosted runners to a public
           repo (fork PRs run arbitrary code). Host needs Docker + php-cli with
-          SimpleXML.
+          SimpleXML and posix.
         type: string
         default: ''
       node_version:
         description: >-
-          Node version for every frontend step above and for the Playwright
-          job. Only read when one of them is switched on, and still read under
-          `bun`: Bun replaces the package manager, not the Node toolchain the
-          installed binaries run on. Tracks the Node the dev images ship
-          (docker/*/Dockerfile) — a browser job testing on a different major
-          than the image serves is a gap, not a safety margin.
+          Node version for every frontend step above; the Playwright job runs
+          on the Node of its Playwright image. Only read when one of them is
+          switched on, and still read under `bun`: Bun replaces the package
+          manager, not the Node toolchain the installed binaries run on.
+          Tracks the Node the dev images ship (docker/*/Dockerfile).
         type: string
         default: '24'
       composer_install:
@@ -2066,16 +2067,17 @@ jobs:
   # --- Browser tests (opt-in via playwright) --------------------------------
   #
   # examples/extension-with-playwright, promoted from a copy-paste starter to a
-  # job: CiviCRM in Docker, the browser on the runner, the suite talking to
-  # http://localhost on a free port. Skipped entirely when the input is off, so
+  # job: CiviCRM in Docker, the suite and its browser in the repo's Playwright
+  # image (`ck playwright`) inside the app container's network namespace, where
+  # the site is http://localhost. Skipped entirely when the input is off, so
   # callers that never set it keep exactly the run they have — same deal as the
   # compat matrix.
   #
-  # Its own job rather than more steps in `ci`: browsers, an npm tree and a
-  # published port on every push run is the opposite of what the standards ask
-  # of ci.yml, and a browser failure that also hides the PHPUnit result is a
-  # bad trade. One leg on `image`; matrix_playwright adds one per matrix_images
-  # entry, from the list compat-images computes — see docs/extension-standards.md.
+  # Its own job rather than more steps in `ci`: browsers and an npm tree on
+  # every push run is the opposite of what the standards ask of ci.yml, and a
+  # browser failure that also hides the PHPUnit result is a bad trade. One leg
+  # on `image`; matrix_playwright adds one per matrix_images entry, from the
+  # list compat-images computes — see docs/extension-standards.md.
   playwright:
     # Cancelled only by the same leg in a newer run of the same caller workflow,
     # ref, directory and image. Literal name: github.job is the caller's job id.
@@ -2103,6 +2105,7 @@ jobs:
       CIVIKITCHEN_IMAGE: ${{ matrix.image }}
       # One compose project per job — see the note in `ci`.
       COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.key.outputs.key_slug }}-playwright-${{ strategy.job-index }}
+      CK: ${{ github.workspace }}/.civikitchen-siblings/ci/toolbelt/bin/ck
     defaults:
       run:
         working-directory: ${{ inputs.working_directory }}
@@ -2117,8 +2120,8 @@ jobs:
             || { echo "invalid extension key: $CK_EXT_KEY" >&2; exit 1; }
 
       # Private dependencies — see the note on the same pair of steps in `ci`.
-      - name: Check out civikitchen for the shared private-dependency steps
-        if: ${{ inputs.composer_install || inputs.sibling_repo != '' }}
+      # The checkout also carries `ck playwright` and its Dockerfile.
+      - name: Check out civikitchen for ck playwright and the private-dependency steps
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -2131,6 +2134,7 @@ jobs:
             toolbelt/lib
             toolbelt/ckconform/bin
             toolbelt/ckconform/src
+            toolbelt/playwright
             packages
           path: .civikitchen-siblings/ci
 
@@ -2148,62 +2152,32 @@ jobs:
           ext_key: ${{ needs.key.outputs.key }}
           working_directory: ${{ inputs.working_directory }}
 
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          # Same cache reasoning as the ci job: no package-lock.json to key on
-          # when the repo is on Bun, and setup-node fails the step over it.
-          node-version: ${{ inputs.node_version }}
-          cache: ${{ !inputs.bun && 'npm' || '' }}
-          cache-dependency-path: |
-            ${{ inputs.working_directory }}/package-lock.json
-            ${{ inputs.working_directory }}/npm-shrinkwrap.json
-            ${{ inputs.working_directory }}/yarn.lock
-
-      - name: Set up Bun
-        if: ${{ inputs.bun }}
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          # The repo pins its Bun in package.json ("packageManager": "bun@x.y.z"),
-          # next to its lockfile; an unpinned setup would test whatever Bun
-          # shipped this week.
-          bun-version-file: ${{ inputs.working_directory }}/package.json
-
-      # Two things the CI stack deliberately lacks, added here instead of in
-      # the template compose file — that one is template-managed, and no repo
-      # should take drift (or a port, or a login user) for a job it may never
-      # switch on:
-      #   * a published port. The CI stack is only ever spoken to through
-      #     `docker compose exec`, so nothing on it is reachable from the
-      #     runner, where the browser lives.
-      #   * a login user. CIVIKITCHEN_DEMO_USER is opt-in in the image; without
-      #     it the site has an auth provider and no account to use it with.
-      # The port is any free one, not 8080: jobs on one self-hosted host share
-      # its ports. CiviCRM bakes CIVIKITCHEN_SITE_URL into every asset and
-      # redirect URL, so the override points it at the same port, and the
-      # suite reaches the site through CIVICRM_BASE_URL.
-      - name: Compose override — publish a free port, create the demo user
+      # A login user, which the CI stack deliberately lacks: CIVIKITCHEN_DEMO_USER
+      # is opt-in in the image, and the template-managed compose file should not
+      # carry one for a job a repo may never switch on. The suite runs in the app
+      # container's network namespace, so the site is http://localhost and nothing
+      # is published: jobs on one self-hosted host share its ports. CiviCRM bakes
+      # CIVIKITCHEN_SITE_URL into every asset and redirect URL.
+      - name: Compose override — no published port, create the demo user
         run: |
           set -euo pipefail
-          # Free when asked; `up` binds it after the image pull and the database's
-          # health check. A job taking it in between fails the start, never shares it.
-          port=$(node -e 'const s = require("node:net").createServer().listen(0, () => { console.log(s.address().port); s.close(); });')
           override="$RUNNER_TEMP/civikitchen-playwright-override.yml"
-          # `!override` drops ports the compose file publishes itself (a CMS one has
-          # 8080), which Compose would otherwise add to this one.
-          cat > "$override" <<YAML
+          # `!reset` drops ports the compose file publishes itself (a CMS one has 8080).
+          cat > "$override" <<'YAML'
           services:
             app:
-              ports: !override
-                - "$port:80"
+              ports: !reset []
               environment:
-                CIVIKITCHEN_SITE_URL: http://localhost:$port
+                CIVIKITCHEN_SITE_URL: http://localhost
                 CIVIKITCHEN_DEMO_USER: admin
                 CIVIKITCHEN_DEMO_PASS: admin
           YAML
-          echo "CK_PW_OVERRIDE=$override" >> "$GITHUB_ENV"
-          # Read by the example config's `baseURL` and auth.setup.ts.
-          echo "CIVICRM_BASE_URL=http://localhost:$port" >> "$GITHUB_ENV"
+          {
+            echo "CK_PW_OVERRIDE=$override"
+            # Read by the example config's `baseURL` and auth.setup.ts, and by tests/e2e/lib.sh.
+            echo "CIVICRM_BASE_URL=http://localhost"
+            echo "BASE_URL=http://localhost"
+          } >> "$GITHUB_ENV"
 
       # Seed snapshots (docs/seed-snapshots.md): a profile with a `snapshot`
       # block generates its data on the first run and restores it from this
@@ -2221,7 +2195,7 @@ jobs:
           CK_SIBLING_OVERRIDE: ${{ steps.deps.outputs.sibling_override }}
         run: |
           set -euo pipefail
-          # The port/demo-user override and the sibling one touch different
+          # The demo-user override and the sibling one touch different
           # keys; compose merges any number of -f files.
           compose=(-f "$CK_COMPOSE_FILE" -f "$CK_PW_OVERRIDE")
           if [ -n "${CK_SIBLING_OVERRIDE:-}" ]; then
@@ -2263,86 +2237,30 @@ jobs:
           path: ${{ runner.temp }}/ck-seed-store
           key: ck-seed-playwright-${{ inputs.working_directory }}-${{ matrix.image }}-${{ steps.seed-key.outputs.key }}-${{ github.run_id }}
 
-      # Same --ignore-scripts rule as the ci job: this job installs the
-      # extension's own tree, and a browser test repo is exactly where an
-      # install hook would go unnoticed. `bun` covers this job too — a repo
-      # that resolves its dependencies one way in `ci` and the other way here
-      # is testing two trees.
-      - name: Materialize JS dependencies (npm ci / bun install)
-        env:
-          CK_USE_BUN: ${{ inputs.bun }}
+      # The repo's Playwright image holds its tree, installed as the ci job installs
+      # it, and the browsers of the Playwright version that tree resolves. The app
+      # container serves the checkout, so pages that load from node_modules/ need
+      # the same tree there.
+      - name: Copy the JS dependencies into the checkout
         run: |
           set -euo pipefail
-          if [ "$CK_USE_BUN" = true ]; then
-            bun install --frozen-lockfile
-          else
-            npm ci --ignore-scripts
-          fi
+          # ck playwright hides an existing node_modules, so the copy would land in a tmpfs.
+          [ ! -e node_modules ] || { echo "node_modules is already in the checkout; the image's tree cannot replace it" >&2; exit 1; }
+          php "$CK" playwright cp -R /ck/node_modules .
 
       # The pages under test load it; the key job made sure Bun drives this job.
       - name: Build the declared release output (bun run build)
         if: ${{ needs.key.outputs.dist_build_tool == 'bun' }}
-        run: bun run build
-
-      # Browsers come from `playwright install`, never from the install hook
-      # --ignore-scripts just skipped. No browser argument: which projects the
-      # repo's playwright.config.ts declares is the repo's business, and a
-      # missing webkit surfaces as a failing suite minutes into the run.
-      #
-      # Stays `npx` on the Bun path: this is not a package-manager operation
-      # but the local node_modules/.bin/playwright binary, which either
-      # manager has just put there.
-      - name: Install Playwright browsers
-        env:
-          CK_RUNNER_ENVIRONMENT: ${{ runner.environment }}
-        run: |
-          set -euo pipefail
-          if [ "$CK_RUNNER_ENVIRONMENT" = github-hosted ]; then
-            npx playwright install --with-deps
-          else
-            # Self-hosted runners must provision system libraries as part of
-            # the runner image. Asking Playwright for --with-deps invokes sudo,
-            # which is deliberately unavailable on hardened runners.
-            npx playwright install
-          fi
+        run: php "$CK" playwright bun run build
 
       # Chromium aborts in-flight requests with ERR_NETWORK_CHANGED whenever an
       # interface appears in its netns, and other jobs on the same Docker host
-      # add and remove bridges and veths there all the time. The test fixtures'
-      # browser therefore runs in a container, reached through
-      # PW_TEST_CONNECT_WS_ENDPOINT; the test runner stays on the runner, so
-      # suites that call `docker compose` keep working. <loopback> tunnels the
-      # browser's localhost through the test runner, so the site's port and any
-      # `webServer` the suite starts answer as before. The browser server is the
-      # checkout's own playwright-core, in the Playwright image of that version.
-      - name: Start the browser in its own network namespace
-        run: |
-          set -euo pipefail
-          version=$(node -p 'require("playwright-core/package.json").version')
-          core=$(dirname "$(node -p 'require.resolve("playwright-core/package.json")')")
-          ws_port=$(node -e 'const s = require("node:net").createServer().listen(0, () => { console.log(s.address().port); s.close(); });')
-          # The project label puts the container under the teardown step's filters.
-          docker run -d --name "$COMPOSE_PROJECT_NAME-browser" --label "com.docker.compose.project=$COMPOSE_PROJECT_NAME" \
-            --init --ipc=host --user pwuser -p "127.0.0.1:$ws_port:3000" -v "$core:/opt/playwright-core:ro" \
-            "mcr.microsoft.com/playwright:v$version-noble" \
-            node /opt/playwright-core/cli.js run-server --port 3000 --host 0.0.0.0
-          for _ in $(seq 60); do
-            if node -e 'require("node:net").connect(Number(process.argv[1]), "127.0.0.1").on("connect", () => process.exit(0)).on("error", () => process.exit(1))' "$ws_port"; then
-              {
-                echo "PW_TEST_CONNECT_WS_ENDPOINT=ws://127.0.0.1:$ws_port/"
-                echo "PW_TEST_CONNECT_EXPOSE_NETWORK=<loopback>"
-              } >> "$GITHUB_ENV"
-              exit 0
-            fi
-            sleep 2
-          done
-          docker logs "$COMPOSE_PROJECT_NAME-browser" >&2
-          echo "the browser server did not come up within 120s" >&2
-          exit 1
-
+      # add and remove bridges and veths in the host's all the time. The app
+      # container's netns holds only its own; `docker compose` calls from the
+      # suite reach this job's stack through the socket ck playwright mounts.
       - name: Playwright (npm run test:e2e / bun run test:e2e)
         env:
-          # CIVICRM_BASE_URL comes from the override step, which picks the port.
+          # CIVICRM_BASE_URL comes from the override step.
           DEMO_USER: admin
           DEMO_PASS: admin
           CK_USE_BUN: ${{ inputs.bun }}
@@ -2350,11 +2268,10 @@ jobs:
           set -euo pipefail
           jq -e '.scripts["test:e2e"] // empty' package.json > /dev/null \
             || { echo "playwright is on but package.json declares no \"test:e2e\" script — that is the script this job runs" >&2; exit 1; }
-          if [ "$CK_USE_BUN" = true ]; then
-            bun run test:e2e
-          else
-            npm run test:e2e
-          fi
+          manager=npm
+          if [ "$CK_USE_BUN" = true ]; then manager=bun; fi
+          app=$(docker compose -f "$CK_COMPOSE_FILE" ps -q app)
+          php "$CK" playwright --network "container:$app" "$manager" run test:e2e
 
       # A browser failure without its trace is a screenshot of nothing. Both
       # directories are Playwright defaults; `ignore` keeps a config that

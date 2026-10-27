@@ -94,12 +94,23 @@ jobs:
   e2e:
     uses: civico-de/civikitchen/.github/workflows/playwright-e2e.yml@v1
     with:
-      install_command: npm ci
-      browser_install_command: npx playwright install --with-deps chromium
       prepare_command: bash setup.sh
-      test_command: npx playwright test
+      test_command: php "$CK" playwright npx playwright test
       cleanup_command: bash teardown.sh
 ```
+
+`$CK` is the `ck` of the civikitchen checkout the workflow makes.
+`ck playwright` runs the command in an image with the browsers of the
+Playwright version the lockfile resolves and the npm or Bun tree, so neither
+an install nor a browser install runs on the runner
+([ADR-0019](adr/0019-browser-suites-run-in-the-projects-playwright-image.md)).
+It uses the host network, so the suite reaches a published port on
+localhost. On a shared self-hosted Docker host, `--network container:<id>` of
+the stack's web container keeps other jobs' interfaces out of the browser's
+network. The image sees the work tree only, not `$RUNNER_TEMP`: layer
+`CK_SIBLING_OVERRIDE` on the stack in `prepare_command`, on the runner.
+`install_command` and `browser_install_command` remain for suites that install
+on the runner; an `install_command` also turns on the npm cache.
 
 When the suite uses the standard CiviKitchen compose stack, prefer the
 `playwright` input on `extension-ci.yml`. This standalone workflow is for

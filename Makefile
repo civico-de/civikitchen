@@ -120,7 +120,7 @@ endef
 .PHONY: help doctor release test test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario \
 	test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-promote-scanned test-promote-digest test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-vendored-paths test-ckeslint test-ckcoverage test-ckcommon-git test-missing-tool test-doctor test-tool-locks \
 	test-ck-headless test-ckcoretest test-phpstan-bootstrap test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-cms-families lint lint-shell lint-shell-portability \
-	test-database-matrix test-compose-config test-playwright-port test-demo-basic-auth test-release-retag test-release-steps test-ci-gates-step test-release-script test-release-verify-images \
+	test-database-matrix test-compose-config test-playwright-network test-demo-basic-auth test-release-retag test-release-steps test-ci-gates-step test-release-script test-release-verify-images \
         lint-actions lint-php lint-schema lint-changelog docs docs-serve docs-a11y test-changelog test-extension-docs build test-images e2e-ckcreate e2e tools clean
 
 help: ## Show this help
@@ -353,10 +353,10 @@ test-database-matrix: $(SCENARIO_YAML_STAMP) ## Supported database images gate s
 test-compose-config: ## Every shipped compose file passes `docker compose config`
 	bash tests/parity/test-compose-config.sh
 
-# Browser jobs on one self-hosted host share its ports; a fixed one fails the
-# second job. Needs node and the docker CLI, like test-compose-config.
-test-playwright-port: $(SCENARIO_YAML_STAMP) ## The browser job publishes a free port and points the site URL at it
-	bash tests/parity/test-playwright-port.sh
+# Browser jobs on one self-hosted host share its ports and its netns. Needs jq
+# and the docker CLI, like test-compose-config.
+test-playwright-network: $(SCENARIO_YAML_STAMP) ## The browser job publishes no port and runs its suite in the app's netns
+	bash tests/parity/test-playwright-network.sh
 
 test-demo-basic-auth: ## Demo smoke test delegates long Basic Auth credentials to curl
 	bash tests/parity/test-demo-basic-auth.sh
@@ -444,8 +444,8 @@ docs: ## Build the documentation site into site/, failing on broken links
 docs-serve: ## Serve the documentation site locally with live reload
 	$(call pyrun_pinned,zensical,$(CK_ZENSICAL_VERSION)) serve
 
-docs-a11y: docs ## WCAG 2.1 AA checks of the site in light and dark mode (needs npm ci and Playwright chromium)
-	npx playwright test -c playwright.docs.config.ts
+docs-a11y: docs ## WCAG 2.1 AA checks of the site in light and dark mode (in Docker)
+	toolbelt/bin/ck playwright playwright test -c playwright.docs.config.ts
 
 # Advisory token-level clone report, not part of `lint`. Duplicated on purpose:
 # check run() skeletons, parallel test fixtures, clones across composer packages.
@@ -490,8 +490,8 @@ e2e-ckcreate: ## A fresh ckcreate scaffold passes ck ci in its dev stack (Docker
 test-images: ## Boot tests + dev-tool tests against the published images (~1 h)
 	bash tests/images/run-local.sh
 
-e2e: ## Playwright smoke tests against a running compose stack
-	npm run test:e2e
+e2e: ## Playwright smoke tests against a running compose stack (in Docker; CIVICRM_BASE_URL)
+	toolbelt/bin/ck playwright npm run test:e2e
 
 # --- fetched inputs ----------------------------------------------------------
 

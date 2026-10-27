@@ -9,6 +9,7 @@ use CiviKitchen\Toolbelt\Demo\ComparisonPage;
 use CiviKitchen\Toolbelt\Demo\CoreDiff;
 use CiviKitchen\Toolbelt\Demo\Recorder;
 use CiviKitchen\Toolbelt\Demo\Stack;
+use CiviKitchen\Toolbelt\Playwright\Image;
 use CiviKitchen\Toolbelt\Process\Runner;
 use Closure;
 use RuntimeException;
@@ -92,7 +93,7 @@ TXT;
     private function record(CoreDiff $diff, array $stacks, array $options, string $out): void
     {
         $recorder = new Recorder($this->checkoutRoot, $this->runner);
-        $image = $recorder->image();
+        $image = (new Image($this->checkoutRoot, $this->runner))->for($this->checkoutRoot);
         foreach ($stacks as $stack) {
             echo "ck demo: starting {$stack->cms->label} at {$stack->siteUrl()}\n";
             $stack->up(false);

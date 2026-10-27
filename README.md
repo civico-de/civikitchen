@@ -17,6 +17,7 @@ extensions. Documentation: <https://civico-de.github.io/civikitchen/>
 | Try or demo CiviCRM | [Demo instances](#demo-instances) |
 
 The host needs Docker with the compose plugin and bash; the rest is in the image.
+Browser suites and `ck demo` also need PHP 8.1 or newer and the buildx plugin.
 
 ## Extension development
 
@@ -37,7 +38,10 @@ For an existing civix extension, `scaffold/ckinit <dir>` adds the same files.
 ckup starts CiviCRM Standalone with MariaDB and Maildev and enables the
 extension; phpMyAdmin is opt-in (`COMPOSE_PROFILES=pma` in `.docker/.env`). ckx runs a command in the stack, in the extension's
 directory. The image carries cv, civix, composer, node, phpunit, phpstan, mago,
-xdebug and the ck tools.
+xdebug and the ck tools. Browser suites run in Docker as well:
+`../civikitchen/toolbelt/bin/ck playwright npm run test:e2e` builds an image
+with the browsers and the repository's npm or Bun tree, so the host needs
+Docker and PHP, and no Node.
 
 → [Extension development](docs/extension-development.md): test loop, civix,
 analysis, Playwright, debugging, several extensions in one repository.

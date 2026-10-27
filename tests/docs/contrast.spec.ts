@@ -12,6 +12,8 @@ for (const [colorScheme, theme] of Object.entries(SCHEMES) as [keyof typeof SCHE
       await page.goto(path);
       // Without this the run would pass on whichever scheme happened to load.
       await expect(page.locator('body')).toHaveAttribute('data-md-color-scheme', theme);
+      // A web font arriving late leaves code blocks unfocusable; the check passed only while it was slow.
+      await expect(page.locator('link[href*="fonts.googleapis.com"]')).toHaveCount(0);
       const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
       expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
     });

@@ -53,11 +53,15 @@ nav = [
     "adr/0016-core-bugs-are-patched-into-the-standalone-image.md",
     "adr/0017-php-quality-tools-consolidate-on-mago.md",
     "adr/0018-seed-data-is-generated-once-and-restored.md",
+    "adr/0019-browser-suites-run-in-the-projects-playwright-image.md",
   ] },
 ]
 
 [project.theme]
 language = "en"
+# A web font swapping in late widens code blocks after the theme decided which scroll,
+# leaving them without tabindex; system fonts never swap.
+font = false
 features = [
   "content.code.copy",
   "navigation.footer",

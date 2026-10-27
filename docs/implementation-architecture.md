@@ -14,9 +14,12 @@ export, pipes and the final exec stay in shell, because there the operating
 system is the API. Shell must not embed PHP programs or implement a second
 parser for a structured format.
 
-TypeScript owns browser automation only: the Playwright suite and the
-recording script that `ck demo` runs in Playwright's image. Bun remains a
-supported package-manager choice for consuming extensions, but CiviKitchen's
+TypeScript owns browser automation only: the Playwright suites and the
+recording script that `ck demo` runs. Both run in the project's Playwright
+image, which `ck playwright` builds from the lockfile
+([ADR-0019](adr/0019-browser-suites-run-in-the-projects-playwright-image.md)),
+so the host needs neither Node nor browsers. Bun remains a supported
+package-manager choice for consuming extensions, but CiviKitchen's
 implementation does not depend on it.
 
 ## Command layout
