@@ -48,6 +48,9 @@ except that a break the consumers are adjusted for ships as a minor, marked
   and checks the PHP extensions, `zip` and `unzip` the suites use.
 - `make lint` runs phpstan over the repository's own PHP against the PHP 8.1
   floor, so a call to a method or function that does not exist fails there.
+- `mail_count` and `newest_mail_text` in the managed `tests/e2e/lib.sh` filter
+  maildev's list with the app container's jq, so the bash suites need no
+  python3 on the host. `ckinit --update` brings the file forward.
 
 ### Fixed
 

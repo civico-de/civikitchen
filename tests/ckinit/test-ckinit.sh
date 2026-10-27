@@ -970,6 +970,27 @@ out=$(TMPDIR="$work/scrtmp" in_image '. "$1"; cv_scr "$2"' _ "$lib" "$work/seed.
 rc=0; FAKE_CV_RC=3 TMPDIR="$work/scrtmp" in_image '. "$1"; cv_scr --user=admin "$2"' _ "$lib" "$work/seed.php" >/dev/null || rc=$?
 [ "$rc" = 3 ] || { echo "lib.sh cv_scr exit code: $rc" >&2; exit 1; }
 [ -z "$(ls -A "$work/scrtmp")" ] || { echo "lib.sh cv_scr left temp files: $(ls "$work/scrtmp")" >&2; exit 1; }
+# The maildev helpers filter maildev's list with the app's jq, a quote in the address included.
+printf '%s\n' '#!/bin/sh' 'printf "%s" "$FAKE_MAILS"' > "$work/fakebin/curl"
+chmod +x "$work/fakebin/curl"
+export FAKE_MAILS='[{"to":[{"address":"a@example.org"}],"text":"first"},{"to":[{"address":"b@example.org"},{"address":"o'"'"'b@example.org"}],"text":"other"},{"to":[{"address":"a@example.org"}],"text":"second"},{"to":[{"address":"o'"'"'b@example.org"}],"text":null}]'
+out=$(in_image '. "$1"; mail_count a@example.org; newest_mail_text a@example.org; mail_count "o'"'"'b@example.org"; echo "[$(newest_mail_text "o'"'"'b@example.org")]"; mail_count c@example.org; echo "[$(newest_mail_text c@example.org)]"' _ "$lib")
+[ "$out" = $'2\nsecond\n2\n[]\n0\n[]' ] || { echo "lib.sh maildev helpers: $out" >&2; exit 1; }
+out=$(via_compose '. "$1"; mail_count a@example.org' _ "$lib")
+if ! grep -q '^compose:compose exec -T -u www-data -w /var/www/html app bash -c jq -nr --arg to a@example.org ' <<<"$out" \
+  || ! grep -qxF "$FAKE_MAILS" <<<"$out"; then
+  echo "lib.sh mail_count via compose: $out" >&2
+  exit 1
+fi
+# A maildev that does not answer is an error, not zero mails or an empty body.
+for helper in mail_count newest_mail_text; do
+  if out=$(FAKE_MAILS='' in_image '. "$1"; '"$helper"' a@example.org' _ "$lib" 2>&1) \
+    || ! grep -q 'maildev sent no mail list' <<<"$out"; then
+    echo "lib.sh $helper on an empty maildev response: $out" >&2
+    exit 1
+  fi
+done
+unset FAKE_MAILS
 
 # hit hands curl its configuration on stdin, so a credential reaches no argv.
 printf '%s\n' '#!/bin/sh' 'echo "argv:$*"' 'cat' > "$work/fakebin/curl"
