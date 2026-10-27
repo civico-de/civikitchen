@@ -38,6 +38,12 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - `ckmutate` leaves the coverage-driver check to infection, so an existing
   report passed with `--coverage`, `--initial-tests-php-options` and phpdbg
   work through it. It had refused any run without pcov or xdebug loaded.
+- `ckphpunit` resolves every path in the phpunit config against the config's
+  directory, as phpunit does: report and log outputs, listener and extension
+  files, `includePath`. They had resolved against its temporary copy, so a
+  junit or clover report configured there landed in the temp directory. The
+  copy lives in a directory of its own, so extensions no longer share one
+  phpunit result cache in the system temp directory.
 
 ## [1.53.0] - 2026-10-25
 

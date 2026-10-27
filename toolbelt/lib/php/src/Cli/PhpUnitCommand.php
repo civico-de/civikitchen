@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Toolbelt\Cli;
 
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
+use DOMAttr;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
@@ -32,12 +34,18 @@ final class PhpUnitCommand implements Command
         if (getenv('CK_TX_CANARY') === '0' || $config === '') {
             return $this->runner->passthrough(['phpunit', ...$arguments]);
         }
-        $generated = tempnam(sys_get_temp_dir(), 'ckphpunit-canary-');
-        if ($generated === false) {
-            fwrite(STDERR, "ckphpunit: cannot create generated config\n");
-            return 2;
+        // phpunit keeps its result cache and looks up listener files next to the config.
+        $directory = Directory::temporary('ckphpunit-canary');
+        try {
+            return $this->runWith($arguments, $config, "{$directory}/phpunit.xml", $canary);
+        } finally {
+            Directory::remove($directory);
         }
-        register_shutdown_function(static fn() => @unlink($generated));
+    }
+
+    /** @param list<string> $arguments */
+    private function runWith(array $arguments, string $config, string $generated, string $canary): int
+    {
         if (!$this->generateConfig($config, $generated, $canary)) {
             return 2;
         }
@@ -70,14 +78,17 @@ final class PhpUnitCommand implements Command
                 $config = substr($arguments[$index], 16);
             }
         }
-        if ($config === '') {
-            foreach (['phpunit.xml', 'phpunit.xml.dist'] as $candidate) {
-                if (is_file($candidate)) {
-                    return $candidate;
-                }
+        if ($config !== '' && !is_dir($config)) {
+            return $config;
+        }
+        // Where phpunit looks: the current directory, or the one -c names.
+        $directory = $config === '' ? '.' : $config;
+        foreach (['phpunit.xml', 'phpunit.xml.dist'] as $candidate) {
+            if (is_file("{$directory}/{$candidate}")) {
+                return "{$directory}/{$candidate}";
             }
         }
-        return $config;
+        return '';
     }
 
     private function generateConfig(string $source, string $destination, string $canary): bool
@@ -92,20 +103,20 @@ final class PhpUnitCommand implements Command
         $root = $document->documentElement;
         $real = realpath($source);
         $base = dirname($real === false ? $source : $real);
-        $absolute = static fn(string $path): string => $path === '' || str_starts_with($path, '/') || str_starts_with($path, 'phar://')
+        $absolute = static fn(string $path): string => $path === '' || str_starts_with($path, '/') || str_contains($path, '://')
             ? $path : $base . '/' . $path;
-        foreach (['bootstrap', 'cacheResultFile', 'extensionsDirectory', 'cacheDirectory'] as $attribute) {
-            if ($root->hasAttribute($attribute)) {
-                $root->setAttribute($attribute, $absolute($root->getAttribute($attribute)));
-            }
-        }
+        // Every path phpunit resolves against the config's directory; the copy lives in another one.
         $xpath = new DOMXPath($document);
-        $nodes = $xpath->query('//testsuite/directory|//testsuite/file|//testsuite/exclude'
-            . '|//coverage//directory|//coverage//file|//source//directory|//source//file'
-            . '|//whitelist//directory|//whitelist//file');
+        $nodes = $xpath->query('/*/@bootstrap|/*/@cacheResultFile|/*/@extensionsDirectory|/*/@cacheDirectory'
+            . '|/*/@testSuiteLoaderFile|/*/@printerFile|//coverage/@cacheDirectory|//@outputFile|//@outputDirectory|//log/@target'
+            . '|//listener/@file|//extension/@file|//directory|//file|//testsuite/exclude|//php/includePath');
         if ($nodes !== false) {
             foreach ($nodes as $node) {
-                $node->nodeValue = $absolute(trim($node->nodeValue ?? ''));
+                $path = $absolute(trim($node->nodeValue ?? ''));
+                // A listener or extension file missing there is looked up on the include path, so it stays as written.
+                if (!($node instanceof DOMAttr && $node->name === 'file' && !is_file($path))) {
+                    $node->nodeValue = $path;
+                }
             }
         }
         $listeners = $root->getElementsByTagName('listeners')->item(0);
