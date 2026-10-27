@@ -49,7 +49,7 @@ use CiviKitchen\Ckconform\Reporter;
 final class Api4SelfEntityCheck implements Check
 {
     /** Built artefacts restate the source; a finding there is the same one twice. */
-    private const SKIP = ['dist/', 'node_modules/', 'vendor/', 'packages/', 'build/'];
+    private const SKIP = ['dist', 'node_modules', 'vendor', 'packages', 'build'];
 
     private const EXTENSIONS = ['js', 'jsx', 'ts', 'tsx', 'mjs'];
 
@@ -961,15 +961,13 @@ final class Api4SelfEntityCheck implements Check
 
     private function scannable(string $file): bool
     {
-        foreach (self::SKIP as $directory) {
-            if (str_starts_with($file, $directory) || str_contains($file, '/' . $directory)) {
-                return false;
-            }
+        if (Context::isUnder($file, self::SKIP)) {
+            return false;
         }
         // Assertion DSLs put arbitrary strings in first-argument position —
         // `expect(text).not.toBe('TitleParagraph')` is not an API call. Only
         // shipped code can 500 in a browser, so that is what this reads.
-        if (preg_match('#(?:^|/)(tests?|__tests__)/#', $file) === 1
+        if (Context::isUnder($file, ['test', 'tests', '__tests__'])
             || preg_match('/\.(test|spec)\.[jt]sx?$/', $file) === 1) {
             return false;
         }

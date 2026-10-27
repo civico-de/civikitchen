@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Toolbelt\Cli;
 
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
 use CiviKitchen\Toolbelt\Repository\CiviCore;
 use CiviKitchen\Toolbelt\Repository\PhpFloor;
@@ -113,10 +114,7 @@ final class CompatibilityCommand implements Command
         echo "ckcompat: PHP {$floor} floor, deprecations up to {$newest} (from composer.json unless overridden)\n";
 
         // mago picks the config format by extension, so the file needs its .toml.
-        $directory = sys_get_temp_dir() . '/ckcompat-' . bin2hex(random_bytes(6));
-        if (!mkdir($directory, 0700)) {
-            return $this->error("cannot create {$directory}");
-        }
+        $directory = Directory::temporary('ckcompat');
         $config = $directory . '/mago.toml';
         $list = static fn(array $items): string => '[' . implode(', ', array_map(static fn(string $item): string => (string) json_encode($item, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), $items)) . ']';
         $vendor = CiviCore::vendor($core);
@@ -139,8 +137,7 @@ final class CompatibilityCommand implements Command
                 $this->runner->passthrough([...$mago, $floor, 'analyze', ...array_merge(...array_map(static fn(string $code): array => ['--retain-code', $code], self::ANALYZER_CODES))], $environment),
             ];
         } finally {
-            @unlink($config);
-            @rmdir($directory);
+            Directory::remove($directory);
         }
         return max($statuses) > 1 ? 2 : max($statuses);
     }

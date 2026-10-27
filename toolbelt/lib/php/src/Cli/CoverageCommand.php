@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Toolbelt\Cli;
 
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
 use SimpleXMLElement;
 
@@ -51,28 +52,18 @@ final class CoverageCommand implements Command
             return $this->error("phpunit config declares no <coverage> section{$hint} - nothing to measure.");
         }
 
-        $clover = tempnam(sys_get_temp_dir(), 'ckcoverage-');
-        $runLog = tempnam(sys_get_temp_dir(), 'ckcoverage-run-');
+        $work = Directory::temporary('ckcoverage');
+        register_shutdown_function(Directory::remove(...), $work);
+        $clover = "{$work}/clover.xml";
+        $runLog = "{$work}/run.log";
         // A --log-junit the caller passed comes after ours and wins in phpunit,
         // so read that file instead of adding a second flag - and leave it behind.
         $callerJunit = $this->junitArgument($arguments);
-        $junit = $callerJunit ?? tempnam(sys_get_temp_dir(), 'ckcoverage-junit-');
-        if ($clover === false || $runLog === false || $junit === false) {
-            return $this->error('could not create temporary files.');
-        }
+        $junit = $callerJunit ?? "{$work}/junit.xml";
         // pcov instruments only pcov.directory, which it guesses as ./src, ./lib or
         // ./app when one exists - in an extension with a JS src/ that is no PHP at all.
-        $iniDir = $clover . '.ini.d';
+        $iniDir = "{$work}/ini.d";
         $iniFile = $iniDir . '/zz-ckcoverage.ini';
-        register_shutdown_function(static function () use ($clover, $runLog, $junit, $callerJunit, $iniDir, $iniFile): void {
-            @unlink($clover);
-            @unlink($runLog);
-            @unlink($iniFile);
-            @rmdir($iniDir);
-            if ($callerJunit === null) {
-                @unlink($junit);
-            }
-        });
         $cwd = getcwd();
         if ($cwd === false || strpbrk($cwd, '"$') !== false) {
             return $this->error('the extension path must not contain " or $ - pcov.directory cannot be set to it.');
@@ -82,7 +73,7 @@ final class CoverageCommand implements Command
         }
 
         echo "ckcoverage: running the suite with coverage (this is slower than a plain run) ...\n";
-        $runner = $this->findExecutable('ckphpunit') ?? 'phpunit';
+        $runner = $this->runner->which('ckphpunit') ?? 'phpunit';
         $environment = getenv();
         $environment = is_array($environment) ? $environment : [];
         $environment['CIVICRM_UF'] = $environment['CIVICRM_UF'] ?? 'UnitTests';
@@ -212,13 +203,6 @@ final class CoverageCommand implements Command
         }
         $first = strtok($result['output'], "\n");
         return $first === false ? '' : trim($first);
-    }
-
-    private function findExecutable(string $name): ?string
-    {
-        $result = $this->runner->capture(['sh', '-c', 'command -v "$1"', 'sh', $name]);
-        $path = trim($result['output']);
-        return $result['status'] === 0 && $path !== '' ? $path : null;
     }
 
     private function error(string $message): int

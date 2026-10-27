@@ -7,6 +7,7 @@ namespace CiviKitchen\Ckconform\Tests\Check;
 use CiviKitchen\Ckconform\Check\ReleaseTagsCheck;
 use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Tests\CheckTestCase;
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 
 final class ReleaseTagsCheckTest extends CheckTestCase
 {
@@ -142,7 +143,7 @@ final class ReleaseTagsCheckTest extends CheckTestCase
         $source = $this->history(['0.1.0' => 'v0.1.0', '0.2.0' => null, '0.3.0' => null]);
         $this->assertFails($this->run_(new ReleaseTagsCheck(), $source), 'moved past 0.2.0');
 
-        $clone = sys_get_temp_dir() . '/ckconform-clone-' . bin2hex(random_bytes(6));
+        $clone = Directory::temporary('ckconform-clone');
         exec(sprintf(
             'GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git clone -q --depth 1 %s %s 2>/dev/null',
             escapeshellarg('file://' . $source->root),
@@ -156,7 +157,7 @@ final class ReleaseTagsCheckTest extends CheckTestCase
                 'release-tags not evaluated: shallow clone',
             );
         } finally {
-            exec('rm -rf ' . escapeshellarg($clone));
+            Directory::remove($clone);
         }
     }
 

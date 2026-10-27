@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Toolbelt\Cli;
 
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
 use CiviKitchen\Toolbelt\Repository\Files;
 use FilesystemIterator;
@@ -265,11 +266,7 @@ final class ReleaseCommand implements Command
                 . "\n  A tracked file ships from git already; declare only output the build writes.\n");
             return null;
         }
-        $directory = sys_get_temp_dir() . '/ckrelease-' . bin2hex(random_bytes(6));
-        if (!mkdir($directory, 0700)) {
-            $this->error("cannot create {$directory}");
-            return null;
-        }
+        $directory = Directory::temporary('ckrelease');
         $environment = [...getenv(), 'GIT_INDEX_FILE' => "{$directory}/index"];
         try {
             foreach ([$repository->gitCommand(['read-tree', $ref]),
@@ -287,12 +284,7 @@ final class ReleaseCommand implements Command
             }
             return trim($tree['output']);
         } finally {
-            foreach (["{$directory}/index", "{$directory}/index.lock"] as $file) {
-                if (is_file($file)) {
-                    unlink($file);
-                }
-            }
-            rmdir($directory);
+            Directory::remove($directory);
         }
     }
 

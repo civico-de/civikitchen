@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
-use CiviKitchen\Toolbelt\Runtime\ExtensionArchiveInstaller;
 
 /**
  * cv, curl and composer for a site whose $site learns a new ext dir directory only on a rescan, and
@@ -192,9 +192,12 @@ final class ProvisionSite extends Runner
         return ['status' => 0, 'output' => 'Generating autoload files'];
     }
 
-    public function available(string $program): bool
+    public function which(string $program): ?string
     {
-        return $program === 'composer' ? $this->composer : parent::available($program);
+        if ($program === 'composer') {
+            return $this->composer ? '/fake/composer' : null;
+        }
+        return parent::which($program);
     }
 
     /**
@@ -274,7 +277,7 @@ final class ProvisionSite extends Runner
                     return false;
                 }
             }
-            ExtensionArchiveInstaller::removeTree("{$this->extDir}/{$key}");
+            Directory::remove("{$this->extDir}/{$key}");
             $this->site[$key] = 'uninstalled';
             return $zip->extractTo($this->extDir);
         } finally {

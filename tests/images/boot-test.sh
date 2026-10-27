@@ -15,6 +15,7 @@
 #   bash tests/images/boot-test.sh civikitchen:wordpress wp-demo
 #   bash tests/images/boot-test.sh civikitchen:joomla    joomla-demo
 set -euo pipefail
+. "$(dirname "$0")/lib.sh"
 
 IMAGE="${1:?usage: boot-test.sh <image> <site_type>}"
 SITE_TYPE="${2:?usage: boot-test.sh <image> <site_type>}"
@@ -49,26 +50,8 @@ docker run -d --name "${APP}" --network "${NET}" \
     "${IMAGE}" >/dev/null
 
 echo "==> waiting for healthy (first-boot reinstall + provisioning)..."
-elapsed=0
-while :; do
-    health=$(docker inspect -f '{{.State.Health.Status}}' "${APP}" 2>/dev/null || echo gone)
-    state=$(docker inspect -f '{{.State.Status}}' "${APP}" 2>/dev/null || echo gone)
-    [ "${health}" = "healthy" ] && { echo "    healthy after ~${elapsed}s"; break; }
-    if [ "${state}" = "exited" ] || [ "${state}" = "gone" ]; then
-        echo "!! container ${state} before becoming healthy — last logs:"
-        docker logs --tail 40 "${APP}" 2>&1 || true
-        exit 1
-    fi
-    if [ "${elapsed}" -ge "${HEALTH_TIMEOUT}" ]; then
-        echo "!! not healthy within ${HEALTH_TIMEOUT}s — last logs:"
-        docker logs --tail 40 "${APP}" 2>&1 || true
-        exit 1
-    fi
-    sleep 5; elapsed=$((elapsed + 5))
-done
+wait_healthy "${APP}" "${HEALTH_TIMEOUT}" || exit 1
 
-fail=0
-check() { if eval "$2"; then echo "  ✓ $1"; else echo "  ✗ $1"; fail=1; fi; }
 
 # 1) HTTP: the CMS home page serves 200 (checked inside the container, no host port).
 code=$(docker exec "${APP}" curl -s -o /dev/null -w '%{http_code}' -L http://localhost/ 2>/dev/null || echo 000)
@@ -116,4 +99,4 @@ if [[ "${SITE_TYPE}" == joomla* ]]; then
         "[ '${jcode}' != '404' ] && [ '${jcode}' != '000' ]"
 fi
 
-if [ "${fail}" = 0 ]; then echo "==> PASS: ${IMAGE}"; else echo "==> FAIL: ${IMAGE}"; exit 1; fi
+verdict "${IMAGE}"

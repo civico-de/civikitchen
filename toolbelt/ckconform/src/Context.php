@@ -890,9 +890,33 @@ final class Context
             return $workflows;
         }
 
+        return $this->findFiles('.github/workflows', ['.yml', '.yaml']);
+    }
+
+    /**
+     * Whether a directory of the relative path $file is named one of $names.
+     *
+     * @param list<string> $names
+     */
+    public static function isUnder(string $file, array $names): bool
+    {
+        return array_intersect(array_slice(explode('/', $file), 0, -1), $names) !== [];
+    }
+
+    /**
+     * The repo's files (tracked, or all outside git) and its workflows, minus
+     * vendor/, node_modules/ and prose: a changelog naming an old value is history.
+     *
+     * @return list<string>
+     */
+    public function nonProseFiles(): array
+    {
+        $files = $this->isGitRepo() ? $this->trackedFiles() : $this->findFiles('');
+
         return array_values(array_filter(
-            $this->findFiles('.github/workflows', ['.yml', '.yaml']),
-            static fn (string $f): bool => true,
+            array_unique([...$files, ...$this->workflows()]),
+            static fn (string $file): bool => !self::isUnder($file, ['vendor', 'node_modules'])
+                && preg_match('/\.(md|markdown|rst|txt)$/i', $file) !== 1,
         ));
     }
 

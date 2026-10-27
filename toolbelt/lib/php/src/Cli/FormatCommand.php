@@ -41,7 +41,7 @@ final class FormatCommand implements Command
         if (!$repository->isGitCheckout()) {
             return $this->error('not a git checkout - the file list comes from git ls-files.');
         }
-        $mago = $this->findExecutable('mago');
+        $mago = $this->runner->which('mago');
         if ($mago === null) {
             return $this->error('no mago on PATH - is this a civikitchen image?');
         }
@@ -100,13 +100,6 @@ final class FormatCommand implements Command
             fwrite(STDERR, "ckfmt: unformatted files found - run ckfmt (no flags) and commit the result.\n");
         }
         return $failed ? 1 : 0;
-    }
-
-    private function findExecutable(string $name): ?string
-    {
-        $result = $this->runner->capture(['sh', '-c', 'command -v "$1"', 'sh', $name]);
-        $path = trim($result['output']);
-        return $result['status'] === 0 && $path !== '' ? $path : null;
     }
 
     private function error(string $message): int

@@ -8,6 +8,7 @@ use CiviKitchen\Ckconform\Check;
 use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 use CiviKitchen\Ckconform\Suppressions;
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Yaml\Yaml;
 
@@ -38,8 +39,8 @@ abstract class CheckTestCase extends TestCase
     protected function tearDown(): void
     {
         Suppressions::reset();
-        if ($this->dir !== null && is_dir($this->dir)) {
-            $this->deleteTree($this->dir);
+        if ($this->dir !== null) {
+            Directory::remove($this->dir);
         }
         $this->dir = null;
         parent::tearDown();
@@ -51,8 +52,7 @@ abstract class CheckTestCase extends TestCase
      */
     protected function repo(array $files, bool $git = false): Context
     {
-        $this->dir = sys_get_temp_dir() . '/ckconform-' . bin2hex(random_bytes(6));
-        mkdir($this->dir, 0777, true);
+        $this->dir = Directory::temporary('ckconform');
 
         $files['info.xml'] ??= $this->infoXml();
         foreach ($files as $path => $contents) {
@@ -92,7 +92,7 @@ abstract class CheckTestCase extends TestCase
         string $directory = 'example',
         string $neighbourDirectory = 'base',
     ): Context {
-        $this->dir = sys_get_temp_dir() . '/ckconform-' . bin2hex(random_bytes(6));
+        $this->dir = Directory::temporary('ckconform');
         mkdir($this->dir . '/' . $directory, 0777, true);
         $extensionFiles['info.xml'] ??= $this->infoXml();
         $trees = ['' => $rootFiles, $directory . '/' => $extensionFiles];
@@ -122,7 +122,7 @@ abstract class CheckTestCase extends TestCase
      */
     protected function nestedExtension(array $rootFiles): Context
     {
-        $this->dir = sys_get_temp_dir() . '/ckconform-' . bin2hex(random_bytes(6));
+        $this->dir = Directory::temporary('ckconform');
         mkdir($this->dir . '/extensions/example', 0777, true);
         file_put_contents($this->dir . '/extensions/example/info.xml', $this->infoXml());
         foreach ($rootFiles as $path => $contents) {
@@ -333,17 +333,5 @@ abstract class CheckTestCase extends TestCase
             mkdir(dirname($full), 0777, true);
         }
         file_put_contents($full, $contents);
-    }
-
-    private function deleteTree(string $dir): void
-    {
-        $items = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($items as $item) {
-            $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
-        }
-        rmdir($dir);
     }
 }

@@ -99,7 +99,7 @@ final class RequiredExtensionsCheck implements Check
         foreach ($context->trackedUnder('', ['.php']) as $file) {
             // Static-analysis stubs and tests are never loaded by CiviCRM, so
             // a CiviRules class they extend is no runtime dependency.
-            if (str_starts_with($file, 'phpstan-stubs/') || preg_match('#(^|/)tests/#', $file) === 1) {
+            if (str_starts_with($file, 'phpstan-stubs/') || Context::isUnder($file, ['tests'])) {
                 continue;
             }
             $contents = $context->read($file);

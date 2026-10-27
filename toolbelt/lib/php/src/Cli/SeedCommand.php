@@ -147,7 +147,7 @@ TXT;
             return self::MISS;
         }
         foreach (['zstd', 'mysql'] as $tool) {
-            if (!$this->runner->available($tool)) {
+            if ($this->runner->which($tool) === null) {
                 throw new RuntimeException("{$tool} is not installed; the image needs it to restore {$label}");
             }
         }

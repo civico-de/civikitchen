@@ -55,7 +55,7 @@ TXT;
             return $arguments === [] ? 2 : 0;
         }
         $options = $this->parse($arguments);
-        if (!$this->runner->available('docker')) {
+        if ($this->runner->which('docker') === null) {
             throw new RuntimeException('demo runs on the host and needs docker on PATH');
         }
         $diff = CoreDiff::load($options['source'], $this->runner);

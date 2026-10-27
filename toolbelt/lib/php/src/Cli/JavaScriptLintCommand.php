@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Toolbelt\Cli;
 
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\JavaScript\Api4CatalogExport;
 use CiviKitchen\Toolbelt\Process\Runner;
 use CiviKitchen\Toolbelt\Repository\Files;
@@ -147,7 +148,7 @@ final class JavaScriptLintCommand implements Command
         if ($files === []) {
             return $this->error("no JavaScript found under {$coreDir}");
         }
-        $work = sys_get_temp_dir() . '/ckeslint-core-' . bin2hex(random_bytes(6));
+        $work = Directory::temporary('ckeslint-core');
         $catalogJson = $this->writeCatalog($catalog, []);
         try {
             if (!$this->stage($toolchain, $coreDir, $files, $work)) {
@@ -162,7 +163,7 @@ final class JavaScriptLintCommand implements Command
             );
         } finally {
             @unlink($catalogJson);
-            $this->removeTree($work);
+            Directory::remove($work);
         }
     }
 
@@ -199,7 +200,7 @@ final class JavaScriptLintCommand implements Command
             return 0;
         }
         echo "ckeslint: type check (policy.javascript.type_check) over a copy of the tracked JS/TS beside a CiviKitchen tsconfig.\n";
-        $work = sys_get_temp_dir() . '/ckeslint-typecheck-' . bin2hex(random_bytes(6));
+        $work = Directory::temporary('ckeslint-typecheck');
         try {
             if (!$this->stage($toolchain, '.', $sourceFiles, $work)) {
                 return 2;
@@ -209,7 +210,7 @@ final class JavaScriptLintCommand implements Command
             }
             return $this->runner->passthrough([...$report, '--type-aware', '--type-check', '-A', 'all', ...$checked], $environment, $work);
         } finally {
-            $this->removeTree($work);
+            Directory::remove($work);
         }
     }
 
@@ -222,10 +223,6 @@ final class JavaScriptLintCommand implements Command
                 $this->error("could not copy {$file} to {$work}");
                 return false;
             }
-        }
-        if (!is_dir($work) && !mkdir($work, 0700, true)) {
-            $this->error("could not create {$work}");
-            return false;
         }
         foreach (['tsconfig.json', 'civicrm-globals.d.ts'] as $name) {
             if (!copy($toolchain . '/typecheck/' . $name, $work . '/' . $name)) {
@@ -287,22 +284,6 @@ final class JavaScriptLintCommand implements Command
             }
         }
         return $environment;
-    }
-
-    private function removeTree(string $directory): void
-    {
-        if (!is_dir($directory)) {
-            return;
-        }
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST,
-        );
-        // A linked node_modules is unlinked, never descended into.
-        foreach ($iterator as $entry) {
-            $entry->isDir() && !$entry->isLink() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
-        }
-        rmdir($directory);
     }
 
     /** @param list<string> $files */

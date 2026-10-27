@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use CiviKitchen\Toolbelt\Cli\Application;
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
-use CiviKitchen\Toolbelt\Runtime\ExtensionArchiveInstaller;
 use CiviKitchen\Toolbelt\Runtime\ExtensionProvisioner;
 use CiviKitchen\Toolbelt\Runtime\ProfileProvisioner;
 use PHPUnit\Framework\TestCase;
@@ -32,10 +32,10 @@ final class ProfileProvisionerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->temporary = sys_get_temp_dir() . '/civikitchen-profile-' . bin2hex(random_bytes(6));
+        $this->temporary = Directory::temporary('civikitchen-profile');
         $this->ext = $this->temporary . '/ext';
         $this->state = "{$this->ext}/.ck-profile-example.replaced";
-        self::assertTrue(mkdir($this->ext, 0700, true));
+        self::assertTrue(mkdir($this->ext, 0700));
         $this->site = new ProvisionSite($this->ext);
         $stderr = fopen('php://memory', 'w+');
         self::assertIsResource($stderr);
@@ -46,7 +46,7 @@ final class ProfileProvisionerTest extends TestCase
 
     protected function tearDown(): void
     {
-        ExtensionArchiveInstaller::removeTree($this->temporary);
+        Directory::remove($this->temporary);
         fclose($this->stderr);
         putenv($this->composerHome === false ? 'COMPOSER_HOME' : "COMPOSER_HOME={$this->composerHome}");
     }

@@ -11,30 +11,35 @@ class Runner
      * Checked before proc_open, whose own failure is a raw PHP warning that
      * reads like a memory or seccomp problem; a login shell resetting PATH is
      * the usual cause. No fallback path: a guessed tool is worse than an error.
-     * Searched on this process's PATH: proc_open (posix_spawnp/execvpe) ignores
-     * the PATH of the environment passed to the child.
      *
      * @param non-empty-list<string> $command
      */
     private function unresolved(array $command): ?string
     {
         $program = $command[0];
-        if (str_contains($program, '/')) {
-            return is_file($program) && is_executable($program)
-                ? null : "ck: {$program} is not an executable file\n";
+        if ($this->which($program) !== null) {
+            return null;
         }
-        $path = (string) getenv('PATH');
-        foreach (explode(PATH_SEPARATOR, $path) as $directory) {
-            if ($directory !== '' && is_file($directory . '/' . $program) && is_executable($directory . '/' . $program)) {
-                return null;
-            }
-        }
-        return "ck: {$program} was not found on PATH ({$path})\n";
+        return str_contains($program, '/')
+            ? "ck: {$program} is not an executable file\n"
+            : 'ck: ' . $program . ' was not found on PATH (' . getenv('PATH') . ")\n";
     }
 
-    public function available(string $program): bool
+    /**
+     * The file proc_open would spawn for $program, or null. Searched on this
+     * process's PATH: proc_open (posix_spawnp/execvpe) ignores the child's.
+     */
+    public function which(string $program): ?string
     {
-        return $program !== '' && $this->unresolved([$program]) === null;
+        if (str_contains($program, '/')) {
+            return is_file($program) && is_executable($program) ? $program : null;
+        }
+        foreach (explode(PATH_SEPARATOR, (string) getenv('PATH')) as $directory) {
+            if ($program !== '' && $directory !== '' && is_file("{$directory}/{$program}") && is_executable("{$directory}/{$program}")) {
+                return "{$directory}/{$program}";
+            }
+        }
+        return null;
     }
 
     /** @param non-empty-list<string> $command */

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Toolbelt\Cli;
 
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
 use SimpleXMLElement;
 
@@ -51,16 +52,8 @@ final class LifecycleCommand implements Command
         }
 
         $extensionDirectory = (string) getcwd();
-        $work = sys_get_temp_dir() . '/cklifecycle-' . bin2hex(random_bytes(6));
-        if (!mkdir($work, 0700)) {
-            return $this->error('could not create temporary directory.', 2);
-        }
-        register_shutdown_function(static function () use ($work): void {
-            foreach (glob($work . '/*') ?: [] as $file) {
-                @unlink($file);
-            }
-            @rmdir($work);
-        });
+        $work = Directory::temporary('cklifecycle');
+        register_shutdown_function(Directory::remove(...), $work);
         $transcript = '';
         $logDirectory = trim(str_replace("\r", '', $this->runner->capture([
             'cv', 'ev', 'echo CRM_Core_Config::singleton()->configAndLogDir;',

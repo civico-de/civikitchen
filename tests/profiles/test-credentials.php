@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/docker/profiles/credentials.php';
+require dirname(__DIR__, 2) . '/toolbelt/lib/php/bootstrap.php';
+
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 
 function expect(bool $condition, string $message): void {
   if (!$condition) {
@@ -26,8 +29,8 @@ catch (RuntimeException $e) {
   expect(str_contains($e->getMessage(), 'must be file, log, both, or none'), 'unknown mode explains the contract');
 }
 
-$dir = sys_get_temp_dir() . '/ck-credentials-' . bin2hex(random_bytes(6));
-mkdir($dir, 0700);
+$dir = Directory::temporary('ck-credentials');
+register_shutdown_function(Directory::remove(...), $dir);
 $path = $dir . '/api-credentials.txt';
 $password = ck_credentials_password();
 expect(strlen($password) === 48 && ctype_xdigit($password), 'generated password is a 192-bit hex secret');
@@ -43,7 +46,6 @@ expect(ck_credentials_read_file($path)['readonly'] === "readonly:{$password}:def
 ck_credentials_remove_file($path);
 expect(!file_exists($path), 'non-file output modes remove stale credentials');
 ck_credentials_remove_file($path);
-rmdir($dir);
 
 ob_start();
 ck_credentials_log([['readonly', $password, '0123456789abcdef']]);

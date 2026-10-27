@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Toolbelt\Runtime;
 
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
 use CiviKitchen\Toolbelt\Repository\Files;
 use RuntimeException;
@@ -128,7 +129,7 @@ final class ProfileProvisioner
             echo "  cloning {$key} @ {$version}\n";
             $temporary = $this->clone($repo, $key, $version);
             if (!$this->move($temporary, $target)) {
-                ExtensionArchiveInstaller::removeTree($temporary);
+                Directory::remove($temporary);
                 throw new RuntimeException("could not install pinned {$key}");
             }
             return [$target, true];
@@ -165,22 +166,22 @@ final class ProfileProvisioner
         $temporary = $this->clone($repo, $key, $version);
         $backup = dirname($target) . '/.' . basename($target) . '.packaged.' . getmypid();
         if (file_exists($backup) || is_link($backup)) {
-            ExtensionArchiveInstaller::removeTree($temporary);
+            Directory::remove($temporary);
             throw new RuntimeException("{$backup} already exists");
         }
         // Recorded before the first move, so a crash between the moves stays restorable; a crash while
         // mv copies across overlay layers leaves a partial backup that the restore would put back.
         if (@file_put_contents($this->replacedState, "{$target}\t{$backup}\n", FILE_APPEND) === false) {
-            ExtensionArchiveInstaller::removeTree($temporary);
+            Directory::remove($temporary);
             throw new RuntimeException("could not record the replacement of {$key} in {$this->replacedState}");
         }
         if (!$this->move($target, $backup)) {
-            ExtensionArchiveInstaller::removeTree($temporary);
+            Directory::remove($temporary);
             throw new RuntimeException("could not install pinned {$key}");
         }
         if (!$this->move($temporary, $target)) {
             $this->move($backup, $target);
-            ExtensionArchiveInstaller::removeTree($temporary);
+            Directory::remove($temporary);
             throw new RuntimeException("could not install pinned {$key}");
         }
     }
@@ -203,11 +204,11 @@ final class ProfileProvisioner
         }
         if ($this->runner->passthrough($this->git->gitCommand(['clone', '--quiet', $repo, $temporary])) !== 0
             || $this->runner->passthrough($this->git->gitCommand(['-C', $temporary, 'checkout', '--quiet', $version])) !== 0) {
-            ExtensionArchiveInstaller::removeTree($temporary);
+            Directory::remove($temporary);
             throw new RuntimeException("could not clone {$key} at requested ref {$version}");
         }
         if ($this->inspector->key("{$temporary}/info.xml") !== $key) {
-            ExtensionArchiveInstaller::removeTree($temporary);
+            Directory::remove($temporary);
             throw new RuntimeException("cloned repository does not declare extension key {$key}");
         }
         return $temporary;
@@ -243,7 +244,7 @@ final class ProfileProvisioner
         }
         // Without a lock file `install` has nothing to install.
         $mode = is_file("{$extension}/composer.lock") ? 'install' : 'update';
-        if (!$this->runner->available('composer')) {
+        if ($this->runner->which('composer') === null) {
             throw new RuntimeException("composer is required to resolve {$name} but is not on PATH");
         }
         echo "  composer {$mode} for {$name}\n";

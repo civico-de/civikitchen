@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use CiviKitchen\Toolbelt\Cli\Application;
 use CiviKitchen\Toolbelt\Cli\SeedCommand;
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
 use CiviKitchen\Toolbelt\Runtime\ProfileData;
 use CiviKitchen\Toolbelt\Seed\Calendar;
@@ -23,8 +24,7 @@ final class SeedTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->temporary = sys_get_temp_dir() . '/civikitchen-seed-' . bin2hex(random_bytes(6));
-        self::assertTrue(mkdir($this->temporary, 0700));
+        $this->temporary = Directory::temporary('civikitchen-seed');
     }
 
     protected function tearDown(): void
@@ -32,14 +32,7 @@ final class SeedTest extends TestCase
         foreach ($this->environment as $name => $value) {
             putenv($value === false ? $name : "{$name}={$value}");
         }
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($this->temporary, FilesystemIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CHILD_FIRST,
-        );
-        foreach ($iterator as $entry) {
-            $entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
-        }
-        rmdir($this->temporary);
+        Directory::remove($this->temporary);
     }
 
     public function testTodayIsTheOverrideOrTheContainerDate(): void
@@ -257,9 +250,10 @@ final class SeedTest extends TestCase
         self::assertSame(3, $runner->pipe(['sh', '-c', 'printf x; exit 3'], ['cat'], null, $output));
         self::assertSame(4, $runner->pipe(['printf', 'x'], ['sh', '-c', 'cat >/dev/null; exit 4'], null, $output));
         self::assertSame(2, $runner->pipe(['ck-no-such-tool'], ['cat'], null, $output));
-        self::assertTrue($runner->available('sh'));
-        self::assertFalse($runner->available('ck-no-such-tool'));
-        self::assertFalse($runner->available(''));
+        self::assertSame('/bin/sh', (new Runner())->which('/bin/sh'));
+        self::assertStringEndsWith('/sh', (string) $runner->which('sh'));
+        self::assertNull($runner->which('ck-no-such-tool'));
+        self::assertNull($runner->which(''));
     }
 
     public function testProfileSnapshotDefaultsAndScripts(): void

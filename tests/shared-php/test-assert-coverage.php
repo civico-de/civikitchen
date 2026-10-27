@@ -2,22 +2,16 @@
 
 declare(strict_types=1);
 
+use CiviKitchen\Toolbelt\Filesystem\Directory;
+
 $root = dirname(__DIR__, 2);
-$work = sys_get_temp_dir() . '/civikitchen-coverage-gate-' . bin2hex(random_bytes(6));
-mkdir($work . '/src', 0700, true);
+require $root . '/toolbelt/lib/php/bootstrap.php';
+$work = Directory::temporary('civikitchen-coverage-gate');
+mkdir($work . '/src', 0700);
 file_put_contents($work . '/src/One.php', '<?php echo 1;');
 file_put_contents($work . '/src/Two.php', '<?php echo 2;');
 
-$cleanup = static function () use ($work): void {
-    foreach (glob($work . '/src/*') ?: [] as $file) {
-        unlink($file);
-    }
-    foreach (glob($work . '/*') ?: [] as $file) {
-        is_dir($file) ? rmdir($file) : unlink($file);
-    }
-    rmdir($work);
-};
-register_shutdown_function($cleanup);
+register_shutdown_function(Directory::remove(...), $work);
 
 /** @param list<array{name:string,total:int,covered:int}> $files */
 $clover = static function (array $files, int $total, int $covered) use ($work): string {

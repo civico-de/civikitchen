@@ -60,7 +60,7 @@ final class LintCommand implements Command
         }
         $failed = false;
 
-        $mago = $this->findExecutable('mago');
+        $mago = $this->runner->which('mago');
         if ($mago === null) {
             return $this->error('no mago on PATH - is this a civikitchen image?');
         }
@@ -114,13 +114,6 @@ final class LintCommand implements Command
         $enabled = is_array($config) ? ($config['rules'][$rule]['enabled'] ?? null) : null;
 
         return $result['status'] === 0 && is_bool($enabled) ? $enabled : null;
-    }
-
-    private function findExecutable(string $name): ?string
-    {
-        $result = $this->runner->capture(['sh', '-c', 'command -v "$1"', 'sh', $name]);
-        $path = trim($result['output']);
-        return $result['status'] === 0 && $path !== '' ? $path : null;
     }
 
     private function error(string $message): int

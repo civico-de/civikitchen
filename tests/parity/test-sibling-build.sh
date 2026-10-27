@@ -105,7 +105,6 @@ grep -q 'sibling .civikitchen-siblings/plain: its civikitchen.yaml could not be 
   || fail "unreadable civikitchen.yaml not named; got: $(cat "$work/out")"
 
 # The build runs dependency code, so it comes before any step that writes the token.
-# shellcheck disable=SC2016  # the $vars belong to PHP, not the shell.
 php -r '
   require $argv[1] . "/packages/civikitchen-scenario-schema/vendor/autoload.php";
   $build = $token = null;

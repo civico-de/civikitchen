@@ -22,8 +22,6 @@ final class MovedRepositoryCheck implements Check
         '@jfilter/civicrm-profile-schema' => '@civico-de/civicrm-profile-schema',
     ];
 
-    private const PROSE = ['.md', '.markdown', '.rst', '.txt'];
-
     public function name(): string
     {
         return 'moved-repository';
@@ -33,11 +31,7 @@ final class MovedRepositoryCheck implements Check
     {
         $alternatives = implode('|', array_map(static fn (string $old): string => preg_quote($old, '/'), array_keys(self::MOVED)));
         $pattern = '/(?<![\w-])(' . $alternatives . ')(?![\w-])/i';
-        $files = $context->isGitRepo() ? $context->trackedFiles() : $context->findFiles('');
-        foreach (array_unique([...$files, ...$context->workflows()]) as $file) {
-            if ($this->skipped($file)) {
-                continue;
-            }
+        foreach ($context->nonProseFiles() as $file) {
             $contents = $context->read($file);
             if ($contents === null || str_contains($contents, "\0") || preg_match($pattern, $contents) !== 1) {
                 continue;
@@ -56,21 +50,5 @@ final class MovedRepositoryCheck implements Check
                 ));
             }
         }
-    }
-
-    private function skipped(string $file): bool
-    {
-        foreach (['vendor/', 'node_modules/'] as $directory) {
-            if (str_starts_with($file, $directory) || str_contains($file, '/' . $directory)) {
-                return true;
-            }
-        }
-        foreach (self::PROSE as $extension) {
-            if (str_ends_with(strtolower($file), $extension)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

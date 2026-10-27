@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Toolbelt\Runtime;
 
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
 use Closure;
 use FilesystemIterator;
@@ -378,7 +379,7 @@ final class ExtensionProvisioner
             // A prior Extension.get cached the directory map before this key existed.
             $this->refresh();
         } catch (RuntimeException $e) {
-            ExtensionArchiveInstaller::removeTree($target);
+            Directory::remove($target);
             throw $e;
         }
     }

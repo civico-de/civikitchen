@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Toolbelt\Cli;
 
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
 use CiviKitchen\Toolbelt\Repository\Files;
 
@@ -30,7 +31,7 @@ final class MutationCommand implements Command
             echo "ckmutate: to adopt this, set policy.mutation.minimum_msi to the measured score and ratchet it.\n";
             return 0;
         }
-        $infection = $this->findExecutable('infection');
+        $infection = $this->runner->which('infection');
         if ($infection === null) {
             return $this->error('infection is not installed in this image - a scheduled job on an older image tag should pin a newer one.');
         }
@@ -63,15 +64,12 @@ final class MutationCommand implements Command
         if (file_exists($config)) {
             return $this->error("{$config} already exists - refusing to overwrite it.");
         }
-        $temporary = sys_get_temp_dir() . '/ckmutate-run-' . bin2hex(random_bytes(6));
-        if (!mkdir($temporary, 0700)) {
-            return $this->error('could not create temporary directory.');
-        }
+        $temporary = Directory::temporary('ckmutate-run');
         register_shutdown_function(static function () use ($config, $temporary): void {
             @unlink($config);
-            @rmdir($temporary);
+            Directory::remove($temporary);
         });
-        $phpunit = $this->findExecutable('phpunit') ?? 'phpunit';
+        $phpunit = $this->runner->which('phpunit') ?? 'phpunit';
         $configuration = [
             '$schema' => 'vendor/infection/infection/resources/schema.json',
             'source' => ['directories' => $directories],
@@ -119,13 +117,6 @@ final class MutationCommand implements Command
         }
         $first = strtok($result['output'], "\n");
         return $first === false ? '' : trim($first);
-    }
-
-    private function findExecutable(string $name): ?string
-    {
-        $result = $this->runner->capture(['sh', '-c', 'command -v "$1"', 'sh', $name]);
-        $path = trim($result['output']);
-        return $result['status'] === 0 && $path !== '' ? $path : null;
     }
 
     private function error(string $message): int

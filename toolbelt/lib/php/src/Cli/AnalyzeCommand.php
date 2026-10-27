@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Toolbelt\Cli;
 
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
 use CiviKitchen\Toolbelt\Repository\CiviCore;
 use CiviKitchen\Toolbelt\Repository\Files;
@@ -77,10 +78,7 @@ final class AnalyzeCommand implements Command
         }
         $base = $own ? (string) realpath('mago.toml') : $this->checkoutRoot . '/toolbelt/mago/mago.toml';
         // mago picks the config format by extension, so the file needs its .toml.
-        $directory = sys_get_temp_dir() . '/ckanalyze-' . bin2hex(random_bytes(6));
-        if (!mkdir($directory, 0700)) {
-            return $this->error("cannot create {$directory}");
-        }
+        $directory = Directory::temporary('ckanalyze');
         $config = $directory . '/mago.toml';
         $list = static fn(array $items): string => '[' . implode(', ', array_map(static fn(string $item): string => (string) json_encode($item, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), $items)) . ']';
         // mago's analyzer fails on errors only; a shadow run has to count every finding.
@@ -95,8 +93,7 @@ final class AnalyzeCommand implements Command
         try {
             return $this->runner->passthrough([...$command, 'analyze'], $environment);
         } finally {
-            @unlink($config);
-            @rmdir($directory);
+            Directory::remove($directory);
         }
     }
 

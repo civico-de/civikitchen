@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Toolbelt\Runtime;
 
-use FilesystemIterator;
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use RuntimeException;
 use ZipArchive;
 
@@ -48,7 +46,7 @@ final class ExtensionArchiveInstaller
                     throw new RuntimeException('could not install extension ZIP');
                 }
             } finally {
-                self::removeTree($temporary);
+                Directory::remove($temporary);
             }
         } finally {
             $zip->close();
@@ -173,22 +171,4 @@ final class ExtensionArchiveInstaller
         return implode('/', $parts);
     }
 
-    public static function removeTree(string $directory): void
-    {
-        if (!is_dir($directory)) {
-            return;
-        }
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CHILD_FIRST,
-        );
-        foreach ($iterator as $entry) {
-            if ($entry->isDir() && !$entry->isLink()) {
-                rmdir($entry->getPathname());
-            } else {
-                unlink($entry->getPathname());
-            }
-        }
-        rmdir($directory);
-    }
 }

@@ -7,6 +7,7 @@ namespace CiviKitchen\Ckconform\Tests\Check;
 use CiviKitchen\Ckconform\Check\HookDispatchNameCheck;
 use CiviKitchen\Ckconform\HookSurface;
 use CiviKitchen\Ckconform\Tests\CheckTestCase;
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 
 final class HookDispatchNameCheckTest extends CheckTestCase
 {
@@ -505,7 +506,7 @@ final class HookDispatchNameCheckTest extends CheckTestCase
      */
     public function testARequiredExtensionPublishesTheHooksItDispatches(): void
     {
-        $extDir = sys_get_temp_dir() . '/ckconform-ext-' . bin2hex(random_bytes(6));
+        $extDir = Directory::temporary('ckconform-ext');
         mkdir($extDir . '/org.example.acme/Civi/Acme', 0777, true);
         mkdir($extDir . '/org.example.acme/tests', 0777, true);
         file_put_contents($extDir . '/org.example.acme/info.xml', $this->infoXml(key: 'org.example.acme'));
@@ -543,13 +544,7 @@ final class HookDispatchNameCheckTest extends CheckTestCase
             $this->assertWarns($this->run_(new HookDispatchNameCheck(), $context), "unknown hook suffix 'acmeTestOnly'");
         } finally {
             putenv('CK_EXT_DIR');
-            foreach (['Civi/Acme/Registry.php', 'tests/T.php', 'info.xml'] as $file) {
-                unlink($extDir . '/org.example.acme/' . $file);
-            }
-            foreach (['Civi/Acme', 'Civi', 'tests', ''] as $dir) {
-                rmdir(rtrim($extDir . '/org.example.acme/' . $dir, '/'));
-            }
-            rmdir($extDir);
+            Directory::remove($extDir);
         }
     }
 
@@ -608,7 +603,7 @@ final class HookDispatchNameCheckTest extends CheckTestCase
 
     public function testADispatchSiteWithACommentOrAnotherCasePublishesItsHook(): void
     {
-        $dependency = sys_get_temp_dir() . '/ckconform-dep-' . bin2hex(random_bytes(6));
+        $dependency = Directory::temporary('ckconform-dep');
         mkdir($dependency . '/acme', 0777, true);
         try {
             file_put_contents($dependency . '/acme/info.xml', '<?xml version="1.0"?><extension key="acme" type="module"><file>acme</file></extension>');
@@ -619,7 +614,7 @@ final class HookDispatchNameCheckTest extends CheckTestCase
                 PHP);
             self::assertSame(['acmeConnectors', 'acmeWidgets'], HookSurface::dispatchedSuffixes($dependency . '/acme'));
         } finally {
-            exec('rm -rf ' . escapeshellarg($dependency));
+            Directory::remove($dependency);
         }
     }
 

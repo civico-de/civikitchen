@@ -31,7 +31,7 @@ use CiviKitchen\Ckconform\Reporter;
 final class Api4LiteralEntityCheck implements Check
 {
     /** Built artefacts restate the source; sourceFiles() already drops tests/vendor. */
-    private const SKIP = ['dist/', 'build/'];
+    private const SKIP = ['dist', 'build'];
 
     public function name(): string
     {
@@ -65,7 +65,7 @@ final class Api4LiteralEntityCheck implements Check
         $external = CoreApi4::declaredExternal($context);
         $dangling = [];
         foreach ($context->sourceFiles('', ['.php']) as $file) {
-            if ($this->skipped($file)) {
+            if (Context::isUnder($file, self::SKIP)) {
                 continue;
             }
             $source = $context->read($file);
@@ -166,16 +166,5 @@ final class Api4LiteralEntityCheck implements Check
     private function leadingWord(string $name): string
     {
         return preg_match('/^[A-Z][a-z0-9]*/', $name, $match) === 1 ? $match[0] : $name;
-    }
-
-    private function skipped(string $file): bool
-    {
-        foreach (self::SKIP as $directory) {
-            if (str_starts_with($file, $directory) || str_contains($file, '/' . $directory)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

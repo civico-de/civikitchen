@@ -36,6 +36,7 @@
 # CK_PROVISION_OVERRIDE mounts a checkout's provision.sh over the image's, with this checkout's PHP
 # library and profile driver it calls — for running the test against a published image before it is rebuilt.
 set -euo pipefail
+. "$(dirname "$0")/lib.sh"
 
 IMAGE="${1:?usage: boot-test-standalone.sh <image>}"
 DATABASE_IMAGE="${CK_DATABASE_IMAGE:-mariadb:11.4}"
@@ -104,26 +105,8 @@ docker run -d --name "${APP}" --network "${NET}" \
     "${IMAGE}" >/dev/null
 
 echo "==> waiting for healthy (install + provisioning)..."
-elapsed=0
-while :; do
-    health=$(docker inspect -f '{{.State.Health.Status}}' "${APP}" 2>/dev/null || echo gone)
-    state=$(docker inspect -f '{{.State.Status}}' "${APP}" 2>/dev/null || echo gone)
-    [ "${health}" = "healthy" ] && { echo "    healthy after ~${elapsed}s"; break; }
-    if [ "${state}" = "exited" ] || [ "${state}" = "gone" ]; then
-        echo "!! container ${state} before becoming healthy — last logs:"
-        docker logs --tail 40 "${APP}" 2>&1 || true
-        exit 1
-    fi
-    if [ "${elapsed}" -ge "${HEALTH_TIMEOUT}" ]; then
-        echo "!! not healthy within ${HEALTH_TIMEOUT}s — last logs:"
-        docker logs --tail 40 "${APP}" 2>&1 || true
-        exit 1
-    fi
-    sleep 5; elapsed=$((elapsed + 5))
-done
+wait_healthy "${APP}" "${HEALTH_TIMEOUT}" || exit 1
 
-fail=0
-check() { if eval "$2"; then echo "  ✓ $1"; else echo "  ✗ $1"; fail=1; fi; }
 cv() { docker exec -u www-data "${APP}" cv "$@" 2>/dev/null; }
 
 # 1) Site up.
@@ -285,4 +268,4 @@ authx_after=$(cv ev "${authx_get}" || true)
 check "a profile without API users keeps authx_header_cred (${authx_before:-?} -> ${authx_after:-?})" \
     "[ -n '${authx_before}' ] && [ '${authx_before}' != '[]' ] && [ '${authx_before}' = '${authx_after}' ]"
 
-if [ "${fail}" = 0 ]; then echo "==> PASS: ${IMAGE} on ${DATABASE_IMAGE}"; else echo "==> FAIL: ${IMAGE} on ${DATABASE_IMAGE}"; exit 1; fi
+verdict "${IMAGE} on ${DATABASE_IMAGE}"

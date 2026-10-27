@@ -4,16 +4,11 @@ declare(strict_types=1);
 
 require dirname(__DIR__, 2) . '/toolbelt/lib/php/bootstrap.php';
 
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Runtime\ProfileData;
 
-$work = sys_get_temp_dir() . '/ck-profile-data-' . bin2hex(random_bytes(5));
-mkdir($work, 0700);
-register_shutdown_function(static function () use ($work): void {
-    foreach (glob($work . '/*') ?: [] as $file) {
-        @unlink($file);
-    }
-    @rmdir($work);
-});
+$work = Directory::temporary('ck-profile-data');
+register_shutdown_function(Directory::remove(...), $work);
 
 $first = $work . '/first.json';
 $second = $work . '/second.json';

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use CiviKitchen\Toolbelt\Cli\Application;
-use CiviKitchen\Toolbelt\Runtime\ExtensionArchiveInstaller;
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Runtime\ExtensionProvisioner;
 use PHPUnit\Framework\TestCase;
 
@@ -31,9 +31,9 @@ final class ExtensionProvisionerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->temporary = sys_get_temp_dir() . '/civikitchen-provision-' . bin2hex(random_bytes(6));
+        $this->temporary = Directory::temporary('civikitchen-provision');
         $this->ext = $this->temporary . '/ext';
-        self::assertTrue(mkdir($this->ext, 0700, true));
+        self::assertTrue(mkdir($this->ext, 0700));
         $this->site = new ProvisionSite($this->ext);
         $stderr = fopen('php://memory', 'w+');
         self::assertIsResource($stderr);
@@ -42,7 +42,7 @@ final class ExtensionProvisionerTest extends TestCase
 
     protected function tearDown(): void
     {
-        ExtensionArchiveInstaller::removeTree($this->temporary);
+        Directory::remove($this->temporary);
         fclose($this->stderr);
     }
 
@@ -412,7 +412,7 @@ final class ExtensionProvisionerTest extends TestCase
         self::assertSame([5], $this->pauses);
         self::assertFileExists("{$this->ext}/org.example.dep/info.xml");
 
-        ExtensionArchiveInstaller::removeTree("{$this->ext}/org.example.dep");
+        Directory::remove("{$this->ext}/org.example.dep");
         $this->site->failures['refresh'] = 99;
         self::assertSame('digest-pinned download of org.example.dep failed', $this->attempt(fn () => $this->provisioner()->extras($spec)));
         self::assertDirectoryDoesNotExist("{$this->ext}/org.example.dep");
@@ -426,7 +426,7 @@ final class ExtensionProvisionerTest extends TestCase
         self::assertSame([5, 5], $this->pauses);
         self::assertCount(3, $this->site->curls);
 
-        ExtensionArchiveInstaller::removeTree("{$this->ext}/org.example.dep");
+        Directory::remove("{$this->ext}/org.example.dep");
         $this->site->failures['curl'] = 3;
         self::assertSame('digest-pinned download of org.example.dep failed', $this->attempt(fn () => $this->provisioner()->extras($spec)));
         self::assertCount(6, $this->site->curls);
@@ -554,7 +554,7 @@ final class ExtensionProvisionerTest extends TestCase
         self::assertCount(1, $this->site->curls);
         self::assertStringContainsString('  - org.example.dep (digest-pinned)', $this->stdout);
 
-        ExtensionArchiveInstaller::removeTree("{$this->ext}/org.example.dep");
+        Directory::remove("{$this->ext}/org.example.dep");
         $error = $this->attempt(fn () => $this->provisioner([$release, $source])->extras('org.example.dep'));
         self::assertStringStartsWith('org.example.dep is pinned to release v1.2.3, which has to be staged', (string) $error);
     }

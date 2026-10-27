@@ -117,6 +117,16 @@ final class Api4LiteralEntityCheckTest extends CheckTestCase
         $this->assertPasses($this->run_(new Api4LiteralEntityCheck(), $context));
     }
 
+    /** Built output restates the source; its findings belong to the source file. */
+    public function testBuiltArtefactsAreNotScanned(): void
+    {
+        $context = $this->widget([
+            'dist/Runner.php' => "<?php\ncivicrm_api4('WidgetStatee', 'get', []);\n",
+            'ang/widget/build/Runner.php' => "<?php\ncivicrm_api4('WidgetStatee', 'get', []);\n",
+        ]);
+        $this->assertPasses($this->run_(new Api4LiteralEntityCheck(), $context));
+    }
+
     /**
      * A local CiviRulesRule-style entity puts 'Civi' in the family — which
      * would flag every core CiviCase/CiviMail call. That family is skipped.

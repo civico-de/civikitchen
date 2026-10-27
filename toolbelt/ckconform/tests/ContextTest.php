@@ -49,6 +49,15 @@ final class ContextTest extends CheckTestCase
         self::assertSame([], $this->repo(['info.xml' => 'not xml'])->requiredExtensions());
     }
 
+    public function testIsUnderMatchesWholeDirectoryNamesOnly(): void
+    {
+        self::assertTrue(Context::isUnder('dist/app.js', ['dist']));
+        self::assertTrue(Context::isUnder('ang/widget/dist/app.js', ['build', 'dist']));
+        self::assertFalse(Context::isUnder('distribution/app.js', ['dist']));
+        self::assertFalse(Context::isUnder('ang/rebuild/app.js', ['build']));
+        self::assertFalse(Context::isUnder('ang/dist', ['dist']));
+    }
+
     public function testCompatibilityFloorIsTheLowestNumericVer(): void
     {
         $context = $this->repo([

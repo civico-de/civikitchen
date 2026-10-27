@@ -8,6 +8,7 @@ use CiviKitchen\Ckconform\Check\Api4SelfEntityCheck;
 use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Tests\CheckTestCase;
 use CiviKitchen\Ckconform\Tests\FakeCoreTrait;
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 
 final class Api4SelfEntityCheckTest extends CheckTestCase
 {
@@ -316,7 +317,7 @@ final class Api4SelfEntityCheckTest extends CheckTestCase
             file_put_contents($sibling . '/Civi/Api4/OtherextRecord.php', "<?php\n");
             $this->assertPasses($this->run_(new Api4SelfEntityCheck(), $context));
         } finally {
-            exec('rm -rf ' . escapeshellarg($sibling));
+            Directory::remove($sibling);
         }
     }
 

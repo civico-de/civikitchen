@@ -21,7 +21,6 @@ printf '<?php\n' > .docker/upstream/proxy/proxy.php
 git add -A
 git commit -qm fixture
 
-# shellcheck disable=SC2016 # PHP source, expanded by PHP
 list() {
   php -r 'require $argv[1] . "/toolbelt/lib/php/bootstrap.php";
     $files = (new CiviKitchen\Toolbelt\Repository\Files($argv[1]))->source(["php"], [], true, true);

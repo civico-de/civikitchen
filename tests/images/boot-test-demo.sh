@@ -15,6 +15,7 @@
 #   bash tests/images/boot-test-demo.sh civikitchen:drupal10-demo verein
 #   bash tests/images/boot-test-demo.sh civikitchen:drupal10-demo verein,mailing
 set -euo pipefail
+. "$(dirname "$0")/lib.sh"
 
 IMAGE="${1:?usage: boot-test-demo.sh <image> [profile]}"
 PROFILE="${2:-}"
@@ -40,24 +41,8 @@ docker run -d --name "${APP}" \
     "${IMAGE}" >/dev/null
 
 echo "==> waiting for healthy (embedded MariaDB + provisioning)..."
-elapsed=0
-while :; do
-    health=$(docker inspect -f '{{.State.Health.Status}}' "${APP}" 2>/dev/null || echo gone)
-    state=$(docker inspect -f '{{.State.Status}}' "${APP}" 2>/dev/null || echo gone)
-    [ "${health}" = "healthy" ] && { echo "    healthy after ~${elapsed}s"; break; }
-    if [ "${state}" = "exited" ] || [ "${state}" = "gone" ]; then
-        echo "!! container ${state} before healthy — last logs:"; docker logs --tail 40 "${APP}" 2>&1 || true
-        exit 1
-    fi
-    if [ "${elapsed}" -ge "${HEALTH_TIMEOUT}" ]; then
-        echo "!! not healthy within ${HEALTH_TIMEOUT}s — last logs:"; docker logs --tail 40 "${APP}" 2>&1 || true
-        exit 1
-    fi
-    sleep 5; elapsed=$((elapsed + 5))
-done
+wait_healthy "${APP}" "${HEALTH_TIMEOUT}" || exit 1
 
-fail=0
-check() { if eval "$2"; then echo "  ✓ $1"; else echo "  ✗ $1"; fail=1; fi; }
 
 # CiviCRM's HTTP API entry differs per CMS: Standalone/Drupal/WP expose the
 # clean /civicrm route, but on Joomla CiviCRM has no clean URL — requests go
@@ -242,19 +227,10 @@ if [ -z "${PROFILE}" ] && [ "${CK_SKIP_SITE_URL_TEST:-0}" != "1" ]; then
         docker run -d --name "${APP}-url" -p "${URLPORT}:80" \
             -e "CIVIKITCHEN_SITE_URL=http://127.0.0.1:${URLPORT}" \
             "${IMAGE}" >/dev/null
-        elapsed=0
-        while :; do
-            health=$(docker inspect -f '{{.State.Health.Status}}' "${APP}-url" 2>/dev/null || echo gone)
-            state=$(docker inspect -f '{{.State.Status}}' "${APP}-url" 2>/dev/null || echo gone)
-            [ "${health}" = "healthy" ] && break
-            if [ "${state}" = "exited" ] || [ "${state}" = "gone" ] || [ "${elapsed}" -ge 300 ]; then
-                echo "  ✗ site-url container not healthy (state=${state}) — last logs:"
-                docker logs --tail 20 "${APP}-url" 2>&1 || true
-                fail=1; break
-            fi
-            sleep 5; elapsed=$((elapsed + 5))
-        done
-        if [ "${health:-}" = "healthy" ]; then
+        if ! wait_healthy "${APP}-url" 300; then
+            echo "  ✗ site-url container not healthy"
+            fail=1
+        else
             # Retry: healthy can precede the log flush by a moment on fast runners.
             rewrote=1
             for _ in 1 2 3 4 5 6; do
@@ -291,4 +267,4 @@ if [ -z "${PROFILE}" ] && [ "${CK_SKIP_SITE_URL_TEST:-0}" != "1" ]; then
     fi
 fi
 
-if [ "${fail}" = 0 ]; then echo "==> PASS: ${IMAGE}"; else echo "==> FAIL: ${IMAGE}"; exit 1; fi
+verdict "${IMAGE}"

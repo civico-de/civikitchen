@@ -11,6 +11,7 @@ use CiviKitchen\Toolbelt\Cli\InternalRuntimeCommand;
 use CiviKitchen\Toolbelt\Cli\LintCommand;
 use CiviKitchen\Toolbelt\Cli\MigrateCommand;
 use CiviKitchen\Toolbelt\Cli\ReleaseCommand;
+use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\JavaScript\Api4CatalogExport;
 use CiviKitchen\Toolbelt\Process\Runner;
 use CiviKitchen\Toolbelt\Repository\CiviCore;
@@ -29,23 +30,12 @@ final class SharedPhpTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->temporary = sys_get_temp_dir() . '/civikitchen-shared-php-' . bin2hex(random_bytes(6));
-        self::assertTrue(mkdir($this->temporary, 0700));
+        $this->temporary = Directory::temporary('civikitchen-shared-php');
     }
 
     protected function tearDown(): void
     {
-        if (!is_dir($this->temporary)) {
-            return;
-        }
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($this->temporary, FilesystemIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CHILD_FIRST,
-        );
-        foreach ($iterator as $entry) {
-            $entry->isDir() && !$entry->isLink() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
-        }
-        rmdir($this->temporary);
+        Directory::remove($this->temporary);
     }
 
     public function testApplicationRoutesHelpForEveryCommandThatOffersIt(): void
@@ -1199,6 +1189,25 @@ final class SharedPhpTest extends TestCase
         self::assertSame([], $offenders);
     }
 
+    public function testDirectoryRemovesATreeButOnlyUnlinksALinkInsideIt(): void
+    {
+        $first = Directory::temporary('ck-directory');
+        $second = Directory::temporary('ck-directory');
+        self::assertNotSame($first, $second);
+        self::assertSame(0700, fileperms($first) & 0777);
+        mkdir($this->temporary . '/outside');
+        touch($this->temporary . '/outside/kept');
+        mkdir($first . '/a/b', 0700, true);
+        touch($first . '/a/b/file');
+        symlink($this->temporary . '/outside', $first . '/a/link');
+        Directory::remove($first);
+        Directory::remove($second);
+        Directory::remove($first);
+        self::assertDirectoryDoesNotExist($first);
+        self::assertDirectoryDoesNotExist($second);
+        self::assertFileExists($this->temporary . '/outside/kept');
+    }
+
     public function testRunnerNamesAProgramThatIsNotOnPathInsteadOfSpawningIt(): void
     {
         $runner = new Runner();
@@ -1337,7 +1346,12 @@ final class SharedPhpTest extends TestCase
                 if ($command[0] === 'git') {
                     return parent::capture($command, $environment, $workingDirectory);
                 }
-                return ['status' => 0, 'output' => $command[0] === 'sh' ? '/fake/mago' : ''];
+                return ['status' => 0, 'output' => ''];
+            }
+
+            public function which(string $program): ?string
+            {
+                return $program === 'mago' ? '/fake/mago' : parent::which($program);
             }
 
             public function passthrough(array $command, ?array $environment = null, ?string $workingDirectory = null): int
@@ -1379,7 +1393,12 @@ final class SharedPhpTest extends TestCase
                 if ($command[0] === 'git') {
                     return parent::capture($command, $environment, $workingDirectory);
                 }
-                return ['status' => 0, 'output' => $command[0] === 'sh' ? '/fake/mago' : ''];
+                return ['status' => 0, 'output' => ''];
+            }
+
+            public function which(string $program): ?string
+            {
+                return $program === 'mago' ? '/fake/mago' : parent::which($program);
             }
 
             public function passthrough(array $command, ?array $environment = null, ?string $workingDirectory = null): int
@@ -1568,12 +1587,14 @@ final class RecordingRunner extends Runner
     /** @var list<list<string>> */
     public array $commands = [];
 
+    public function which(string $program): ?string
+    {
+        return $program === 'mago' ? '/fake/mago' : parent::which($program);
+    }
+
     public function capture(array $command, ?array $environment = null, ?string $workingDirectory = null): array
     {
         $this->commands[] = $command;
-        if ($command[0] === 'sh') {
-            return ['status' => 0, 'output' => '/fake/mago'];
-        }
         if ($command[0] === 'git') {
             $joined = implode(' ', $command);
             if (str_contains($joined, 'rev-parse')) {

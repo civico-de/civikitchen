@@ -33,7 +33,7 @@ final class CivixCommand implements Command
         if (!is_file('info.xml')) {
             return $this->error('no info.xml here - run from the extension root.');
         }
-        $civix = $this->findExecutable('civix');
+        $civix = $this->runner->which('civix');
         if ($civix === null) {
             return $this->error('civix not found - this needs the civikitchen image.');
         }
@@ -93,13 +93,6 @@ final class CivixCommand implements Command
         $versions = array_values(array_unique($matches[1]));
         usort($versions, 'version_compare');
         return (string) end($versions);
-    }
-
-    private function findExecutable(string $name): ?string
-    {
-        $result = $this->runner->capture(['sh', '-c', 'command -v "$1"', 'sh', $name]);
-        $path = trim($result['output']);
-        return $result['status'] === 0 && $path !== '' ? $path : null;
     }
 
     private function error(string $message): int

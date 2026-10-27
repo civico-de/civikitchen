@@ -25,7 +25,7 @@ use CiviKitchen\Ckconform\Reporter;
 final class RiverleaCustomPropertyCheck implements Check
 {
     /** Built artefacts restate the source; a finding there is the same one twice. */
-    private const SKIP = ['dist/', 'node_modules/', 'vendor/', 'packages/', 'build/'];
+    private const SKIP = ['dist', 'node_modules', 'vendor', 'packages', 'build'];
 
     private const EXTENSIONS = ['css', 'scss', 'less', 'tpl', 'html', 'js', 'jsx', 'ts', 'tsx', 'mjs'];
 
@@ -198,12 +198,6 @@ final class RiverleaCustomPropertyCheck implements Check
 
     private function scannable(string $file): bool
     {
-        foreach (self::SKIP as $directory) {
-            if (str_starts_with($file, $directory) || str_contains($file, '/' . $directory)) {
-                return false;
-            }
-        }
-
-        return in_array(pathinfo($file, PATHINFO_EXTENSION), self::EXTENSIONS, true);
+        return !Context::isUnder($file, self::SKIP) && in_array(pathinfo($file, PATHINFO_EXTENSION), self::EXTENSIONS, true);
     }
 }

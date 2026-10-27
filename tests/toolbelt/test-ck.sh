@@ -159,8 +159,8 @@ run_ci ck ci --only=ckeslint,cklint > /dev/null
 [ "$(cut -d'|' -f1 "${ci}/log" | paste -sd' ' -)" = 'cklint ckeslint' ] || fail "--only ran the wrong gates"
 for args in '--only nosuch' '--skip cklint,nosuch' '--only ,cklint' '--only' '--only cklint --skip cklint' '--frobnicate'; do
   rc=0
-  # shellcheck disable=SC2086  # the word-split argument list is the point.
-  err=$(run_ci ck ci $args 2>&1 >/dev/null) || rc=$?
+  read -ra argv <<<"$args"
+  err=$(run_ci ck ci "${argv[@]}" 2>&1 >/dev/null) || rc=$?
   [ "$rc" = 2 ] || fail "'ck ci $args' exited $rc, expected a usage error"
   [ -n "$err" ] || fail "'ck ci $args' gave no message"
 done

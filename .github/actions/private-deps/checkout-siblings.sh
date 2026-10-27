@@ -85,7 +85,6 @@ for entry in ${CK_SIBLING_REPO//,/ }; do
   # key. Same reader as the toolbelt's ck_xml_field — inline, because this
   # runs on the bare runner where the toolbelt is not on PATH. php is
   # preinstalled on the GitHub-hosted images.
-  # shellcheck disable=SC2016  # the $vars belong to PHP, not the shell.
   key=$(php -r '
     libxml_use_internal_errors(TRUE);
     $xml = simplexml_load_file($argv[1]);

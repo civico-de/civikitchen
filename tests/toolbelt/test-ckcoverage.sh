@@ -7,13 +7,10 @@ test "$(readlink "$root/toolbelt/bin/ckcoverage")" = ck
 php -l "$root/toolbelt/lib/php/src/Cli/CoverageCommand.php" >/dev/null
 "$root/toolbelt/bin/ckcoverage" --help >/dev/null 2>&1 || true
 
-grep -q "tempnam(sys_get_temp_dir(), 'ckcoverage-run-')" \
-  "$root/toolbelt/lib/php/src/Cli/CoverageCommand.php"
-
 work=$(mktemp -d)
 trap '/bin/rm -rf "$work"' EXIT
 unset PHP_INI_SCAN_DIR
-mkdir -p "$work/bin" "$work/ext"
+mkdir -p "$work/bin" "$work/ext" "$work/tmp"
 cat > "$work/ext/info.xml" <<'EOF'
 <extension key="fixture" type="module"><file>fixture</file></extension>
 EOF
@@ -83,15 +80,16 @@ fi
 exit 0
 EOF
 chmod +x "$work/bin/ckphpunit"
-out=$(cd "$work/ext" && PATH="$work/bin:$PATH" "$root/toolbelt/bin/ckcoverage")
+out=$(cd "$work/ext" && PATH="$work/bin:$PATH" TMPDIR="$work/tmp" "$root/toolbelt/bin/ckcoverage")
 grep -q '75.00% line coverage (6/8 statements)' <<<"$out"
 grep -q 'reporting only' <<<"$out"
+test -z "$(ls -A "$work/tmp")"
 
-echo 'ok   ckcoverage uses the shared PHP CLI and a unique temporary run log'
+echo 'ok   ckcoverage uses the shared PHP CLI and leaves nothing in TMPDIR'
 
 # pcov guesses its directory as ./src when one exists, which in an extension
 # with a JavaScript src/ is no PHP at all: ckcoverage points it at the root.
-mkdir -p "$work/ext/src" "$work/tmp"
+mkdir "$work/ext/src"
 out=$(cd "$work/ext" && PATH="$work/bin:$PATH" TMPDIR="$work/tmp" "$root/toolbelt/bin/ckcoverage")
 grep -q '75.00% line coverage (6/8 statements)' <<<"$out"
 # The caller's scan directories stay in front; an empty variable scans nothing.
