@@ -1,0 +1,24 @@
+# Fixture for the compose-project teardown gate: `leak` boots a stack under its
+# own project on a configurable runner and never removes it; `smoke` removes it
+# behind an always() condition and must pass.
+name: fixture
+
+on: workflow_dispatch
+
+jobs:
+  leak:
+    runs-on: ${{ inputs.runs_on || 'ubuntu-latest' }}
+    steps:
+      - run: echo "COMPOSE_PROJECT_NAME=ck-$GITHUB_RUN_ID-leak" >> "$GITHUB_ENV"
+      - run: docker compose -f .docker/docker-compose.ci.yml up -d --wait
+      - name: Tear down on success only
+        run: docker network ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker network rm
+
+  smoke:
+    runs-on: ${{ inputs.runs_on || 'ubuntu-latest' }}
+    steps:
+      - run: echo "COMPOSE_PROJECT_NAME=ck-$GITHUB_RUN_ID-smoke" >> "$GITHUB_ENV"
+      - run: docker compose -f .docker/docker-compose.ci.yml up -d --wait
+      - name: Tear down the stack
+        if: ${{ always() && inputs.smoke_test }}
+        run: docker compose -f .docker/docker-compose.ci.yml down -v --remove-orphans

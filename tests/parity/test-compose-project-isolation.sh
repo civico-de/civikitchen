@@ -35,4 +35,11 @@ for job in bait hosted-in-a-comment; do
     || fail "checker failed but did not name job '$job' (got: $out)"
 done
 
+# A job-scoped project nobody removes: the checker names the job without an
+# always() teardown and passes the one that has it behind a condition.
+out=$(php "$CHECK" tests/parity/fixtures/workflow.compose-project-leak.yml 2>&1) \
+  && fail "checker passed a job that never removes its compose project"
+grep -q "'leak'" <<<"$out" || fail "checker failed but did not name job 'leak' (got: $out)"
+grep -q "'smoke'" <<<"$out" && fail "checker flagged a job whose teardown runs under always() && …"
+
 echo "compose project isolation suite OK"

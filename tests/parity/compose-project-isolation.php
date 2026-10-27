@@ -13,6 +13,9 @@ declare(strict_types=1);
  * it is not flagged; the trigger is `runs-on` carrying an expression, which is
  * how a job reaches the self-hosted host with its several job slots.
  *
+ * Such a project is never reused, so no later run's `down -v` removes it: the
+ * job itself needs an `always()` step that does, or its networks pile up.
+ *
  * Usage: php compose-project-isolation.php <workflow.yml> [<workflow.yml> ...]
  */
 
@@ -41,11 +44,26 @@ foreach ($files as $file) {
         if ($runsOn !== '' && !str_contains($runsOn, '${{')) {
             continue;
         }
-        if (str_contains($text, 'COMPOSE_PROJECT_NAME')) {
-            continue;
+        if (!str_contains($text, 'COMPOSE_PROJECT_NAME')) {
+            $problems[] = "$file: job '$job' boots a compose stack without COMPOSE_PROJECT_NAME";
+        } elseif (!ck_tears_down($definition)) {
+            $problems[] = "$file: job '$job' leaves its compose project behind (no always() step removes its networks)";
         }
-        $problems[] = "$file: job '$job' boots a compose stack without COMPOSE_PROJECT_NAME";
     }
+}
+
+/** @param array<mixed> $job */
+function ck_tears_down(array $job): bool
+{
+    foreach (is_array($job['steps'] ?? null) ? $job['steps'] : [] as $step) {
+        $run = is_array($step) ? ck_scalar_text($step['run'] ?? null) : '';
+        if (is_array($step) && str_contains(ck_scalar_text($step['if'] ?? null), 'always()')
+            && preg_match('/docker network rm|docker compose\\b[^\\n]*\\bdown\\b/', $run) === 1) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 if ($problems !== []) {
