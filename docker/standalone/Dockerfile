@@ -161,7 +161,8 @@ ENV CIVICRM_UF=Standalone
 # a binary release or a git ref, and those stay overridable per --build-arg.
 ENV PATH="/opt/composer/vendor/bin:${PATH}"
 # Overriding a phar *_VERSION requires overriding its *_SHA256 too — the
-# install script fails a mismatch on purpose.
+# install script fails a mismatch on purpose. Each ARG reaches the script as an
+# environment variable; one left unset keeps the script's default.
 ARG CIVIX_VERSION
 ARG CIVIX_SHA256
 ARG PHPUNIT_VERSION
@@ -178,12 +179,7 @@ COPY toolbelt/ckdeps-root /opt/composer
 # configs and toolchains relative to its own real path, so nothing branches on
 # "image or checkout". install-dev-tools.sh links the tools into PATH.
 COPY toolbelt /opt/civikitchen/toolbelt
-RUN --mount=type=secret,id=composer_auth,env=COMPOSER_AUTH CIVIX_VERSION="${CIVIX_VERSION}" CIVIX_SHA256="${CIVIX_SHA256}" \
-        PHPUNIT_VERSION="${PHPUNIT_VERSION}" PHPUNIT_SHA256="${PHPUNIT_SHA256}" \
-        INFECTION_VERSION="${INFECTION_VERSION}" \
-        MAGO_VERSION="${MAGO_VERSION}" MAGO_SHA256_X86_64="${MAGO_SHA256_X86_64}" \
-        MAGO_SHA256_AARCH64="${MAGO_SHA256_AARCH64}" \
-        bash /opt/civikitchen/toolbelt/install-dev-tools.sh
+RUN --mount=type=secret,id=composer_auth,env=COMPOSER_AUTH bash /opt/civikitchen/toolbelt/install-dev-tools.sh
 
 # CiviCRM itself, AFTER the dev tools: this is the layer a version bump
 # invalidates, and everything above it is version-independent. The tarball's

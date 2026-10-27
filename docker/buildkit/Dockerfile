@@ -80,7 +80,8 @@ RUN pecl install pcov xdebug \
 # a binary release or a git ref, and those stay overridable per --build-arg.
 ENV PATH="/opt/composer/vendor/bin:${PATH}"
 # Overriding a phar *_VERSION requires overriding its *_SHA256 too — the
-# install script fails a mismatch on purpose.
+# install script fails a mismatch on purpose. Each ARG reaches the script as an
+# environment variable; one left unset keeps the script's default.
 ARG CIVIX_VERSION
 ARG CIVIX_SHA256
 ARG PHPUNIT_VERSION
@@ -102,12 +103,7 @@ COPY toolbelt /opt/civikitchen/toolbelt
 # its job token so GitHub dist downloads are not rate-limited; local builds run without.
 RUN --mount=type=secret,id=composer_auth,env=COMPOSER_AUTH rm /opt/civikitchen/toolbelt/bin/cktestreset /opt/civikitchen/toolbelt/bin/ckcoretest \
         /opt/civikitchen/toolbelt/bin/ckboot \
-    && CIVIX_VERSION="${CIVIX_VERSION}" CIVIX_SHA256="${CIVIX_SHA256}" \
-        PHPUNIT_VERSION="${PHPUNIT_VERSION}" PHPUNIT_SHA256="${PHPUNIT_SHA256}" \
-        INFECTION_VERSION="${INFECTION_VERSION}" \
-        MAGO_VERSION="${MAGO_VERSION}" MAGO_SHA256_X86_64="${MAGO_SHA256_X86_64}" \
-        MAGO_SHA256_AARCH64="${MAGO_SHA256_AARCH64}" \
-        bash /opt/civikitchen/toolbelt/install-dev-tools.sh
+    && bash /opt/civikitchen/toolbelt/install-dev-tools.sh
 
 # PHP runtime tuning — matches what civibuild expects for site builds.
 RUN { \
