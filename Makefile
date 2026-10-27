@@ -380,7 +380,7 @@ test-release-steps: $(SCENARIO_YAML_STAMP) ## Extension releases: working_direct
 test-ci-gates-step: $(SCENARIO_YAML_STAMP) ## Extension CI: the ck ci step as written, over a fake docker
 	bash tests/parity/test-ci-gates-step.sh
 
-test-release-script: ## Release pre-flight: argument, branch, sync, tag, image gate, dry run vs --apply
+test-release-script: $(SCENARIO_YAML_STAMP) ## Release pre-flight: argument, branch, sync, tag, image gate, dry run vs --apply
 	bash tests/parity/test-release-script.sh
 
 test-release-verify-images: ## Release image check: standalone mandatory, CMS drift warns and waits, catch-up re-run
@@ -511,6 +511,9 @@ $(OXLINT_STAMP): toolbelt/oxlint/package.json toolbelt/oxlint/package-lock.json 
 $(SCENARIO_YAML_STAMP): packages/civikitchen-scenario-schema/composer.json packages/civikitchen-scenario-schema/composer.lock | $(COMPOSER)
 	composer install --no-interaction --no-progress --working-dir=packages/civikitchen-scenario-schema
 	@touch $(SCENARIO_YAML_STAMP)
+
+release-image-paths: $(SCENARIO_YAML_STAMP) ## Print build-dev-images.yml's push trigger paths (read by scripts/release.sh)
+	@php scripts/image-trigger-paths.php
 
 tools: $(PHPUNIT) $(MAGO) $(CACHE)/actionlint $(SHELLCHECK) $(COMPOSER) $(UVX) $(NODE) $(SCENARIO_YAML_STAMP) $(OXLINT_STAMP) ## Pre-fetch the pinned tools and YAML parser
 

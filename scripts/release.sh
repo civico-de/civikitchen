@@ -38,9 +38,7 @@ ok "ckinit suite passed"
 # The image gate: the trigger paths are read out of the workflow itself, so the
 # two cannot drift apart.
 paths=()
-while IFS= read -r p; do paths+=("$p"); done < <(
-  sed -n '/^  push:/,/^  schedule:/p' .github/workflows/build-dev-images.yml |
-    sed -n "s/^      - '\(.*\)'\$/\1/p")
+while IFS= read -r p; do paths+=("$p"); done < <(scaffold/ck make -s release-image-paths)
 [ "${#paths[@]}" -gt 0 ] || die "no trigger paths found in build-dev-images.yml"
 image_sha=$(git log -1 --format=%H HEAD -- "${paths[@]}")
 [ -n "$image_sha" ] || die "no commit touching the image trigger paths"

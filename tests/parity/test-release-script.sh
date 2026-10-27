@@ -33,7 +33,12 @@ git remote add origin https://github.com/owner/repo
 mkdir -p scripts scaffold .github/scripts .github/workflows docker
 cp "${root}/scripts/release.sh" scripts/release.sh
 printf '#!/bin/bash\nexit 0\n' > .github/scripts/changelog-check.sh
-printf '#!/bin/bash\nexit 0\n' > scaffold/ck
+# The real trigger-path reader against this fixture; every other ck call passes.
+cat > scaffold/ck <<CK
+#!/bin/bash
+[ "\$*" = "make -s release-image-paths" ] || exit 0
+exec php "${root}/scripts/image-trigger-paths.php" .github/workflows/build-dev-images.yml
+CK
 chmod +x scaffold/ck
 cat > .github/workflows/build-dev-images.yml <<'YAML'
 name: Build Dev Images
@@ -42,7 +47,8 @@ on:
     branches: [main]
     paths:
       - 'docker/**'
-      - 'toolbelt/**'
+      # An unquoted entry still gates the release.
+      - toolbelt/**
   schedule:
     - cron: '0 4 * * *'
 YAML
@@ -130,7 +136,14 @@ runs "${red}" "2024-01-03T10:00:00Z 444 workflow_dispatch completed success ${im
 release 1.2.3 || { cat "${work}/out" >&2; fail "newest green run after a red one" ; }
 grep -q 'run 444 (workflow_dispatch) is green' "${work}/out" || fail "wrong run selected"
 
+# A change under the unquoted trigger path moves the image commit past the green run.
+mkdir -p toolbelt && echo tool > toolbelt/tool
+git add toolbelt/tool && git commit -q -m tool && git push -q origin main
 runs "${green}"
+expect_fail 1 "no Build Dev Images run for image commit $(git rev-parse HEAD)" 1.2.3
+runs "2024-01-04T10:00:00Z 888 push completed success $(git rev-parse HEAD)"
+release 1.2.3 || { cat "${work}/out" >&2; fail "green run on the toolbelt commit"; }
+
 release 1.2.3 --apply || { cat "${work}/out" >&2; fail "--apply"; }
 [ -n "$(git tag -l v1.2.3)" ] || fail "--apply created no tag"
 [ "$(git --git-dir="${work}/remote.git" rev-parse refs/tags/v1.2.3^{})" = "$(git rev-parse HEAD)" ] \
