@@ -560,7 +560,9 @@ $(NODE):
 	rm -rf $(NODE_DIR).tmp && mkdir -p $(NODE_DIR).tmp
 	curl -fsSLo $(NODE_DIR).tar.xz "https://nodejs.org/dist/v$(CK_NODE_VERSION)/node-v$(CK_NODE_VERSION)-$(NODE_PLATFORM).tar.xz"
 	echo "$(NODE_SHA256)  $(NODE_DIR).tar.xz" | sha256sum -c --strict -
-	tar -xJf $(NODE_DIR).tar.xz -C $(NODE_DIR).tmp --strip-components=1
+	# -P: without it GNU tar stages bin/npm (-> ../lib/…) as a mode-0 file, which
+	# colima's virtiofs refuses to open (EACCES). The archive is checksum-pinned.
+	tar -xPJf $(NODE_DIR).tar.xz -C $(NODE_DIR).tmp --strip-components=1
 	rm $(NODE_DIR).tar.xz
 	mv $(NODE_DIR).tmp $(NODE_DIR)
 
