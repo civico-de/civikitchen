@@ -5,9 +5,6 @@ node_modules/
 
 # PHP tooling caches
 .phpunit.result.cache
-# ckphpunit's generated config (repo config + transaction canary); removed on
-# exit, so only a killed run leaves one behind.
-.ckphpunit-canary.xml
 .phpunit.cache/
 .phpstan-cache/
 
