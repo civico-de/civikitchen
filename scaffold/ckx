@@ -24,6 +24,7 @@ while [[ ! -f "$dir/.docker/docker-compose.yml" ]]; do
 done
 
 [[ -f "$dir/info.xml" ]] || die "no info.xml next to $dir/.docker"
+# The host has no PHP for ck internal xml-field; civix writes <file> on one line.
 file="$(sed -n 's:.*<file>\([^<]*\)</file>.*:\1:p' "$dir/info.xml" | head -1)"
 [[ -n "$file" ]] || die "no <file> in $dir/info.xml"
 
