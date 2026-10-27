@@ -1,9 +1,7 @@
 # zizmor (docs.zizmor.sh) audits the workflows for supply-chain footguns:
 # unpinned actions, expression injection, over-broad tokens, checkouts that
-# leave a usable token in .git/config. Run by the Lint workflow; locally:
-#
-#   pipx run zizmor==1.29.0 --no-online-audits --config zizmor.yml \
-#     .github/workflows .github/actions scaffold/template/extension/.github/workflows
+# leave a usable token in .git/config. Run by the Lint workflow and, locally,
+# by `scaffold/ck make lint-actions`, which pins the version.
 #
 # --no-online-audits keeps the run hermetic and deterministic: the online
 # audits (known-vulnerable-actions, stale-action-refs) would turn an upstream

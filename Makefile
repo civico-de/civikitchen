@@ -48,12 +48,11 @@ CK_ACTIONLINT_VERSION := 1.7.12
 CK_ACTIONLINT_INSTALLER_SHA256 := 72fa3e45ac20f3c3a512d6747b4fcf719e21f890e8c43e78d48a41fdfb900c4e
 CK_ZIZMOR_VERSION := 1.29.0
 CK_JSCPD_VERSION := 5.0.14
-CK_ZENSICAL_VERSION := 0.0.70
+CK_CHECK_JSONSCHEMA_VERSION := 0.39.0
 
-# zizmor, check-jsonschema and zensical are Python CLIs that the pinned uvx
-# fetches on demand.
-pyrun_pinned = $(UVX) $(1)@$(2)
-pyrun = $(UVX) $(1)
+# zizmor, check-jsonschema and zensical (versions.env) are Python CLIs that the
+# pinned uvx fetches on demand.
+pyrun = $(UVX) $(1)@$(2)
 
 # The toolchain container's architecture: x86_64 in CI, aarch64 on Apple Silicon.
 # Every fetched binary carries one content hash per architecture.
@@ -428,7 +427,7 @@ lint-shell-portability: ## Reject host-incompatible BSD sed in-place syntax
 # the job needs. Exemptions and their reasons live in zizmor.yml.
 lint-actions: $(CACHE)/actionlint $(UVX) ## actionlint + zizmor over the workflows
 	$(CACHE)/actionlint -color
-	$(call pyrun_pinned,zizmor,$(CK_ZIZMOR_VERSION)) --no-online-audits --config zizmor.yml \
+	$(call pyrun,zizmor,$(CK_ZIZMOR_VERSION)) --no-online-audits --config zizmor.yml \
 	  .github/workflows .github/actions scaffold/template/extension/.github/workflows
 
 # The release job runs the same script with --release, so a tag whose version
@@ -440,10 +439,10 @@ lint-changelog: ## CHANGELOG.md follows the Keep a Changelog grammar
 # The site is built from docs/ by zensical.toml; --strict fails on a link to a
 # missing page or anchor. No --clean: it empties .cache/, this Makefile's tool cache.
 docs: $(UVX) ## Build the documentation site into site/, failing on broken links
-	$(call pyrun_pinned,zensical,$(CK_ZENSICAL_VERSION)) build --strict
+	$(call pyrun,zensical,$(CK_ZENSICAL_VERSION)) build --strict
 
 docs-serve: $(UVX) ## Serve the documentation site locally with live reload
-	$(call pyrun_pinned,zensical,$(CK_ZENSICAL_VERSION)) serve
+	$(call pyrun,zensical,$(CK_ZENSICAL_VERSION)) serve
 
 docs-a11y: docs ## WCAG 2.1 AA checks of the site in light and dark mode (in Docker)
 	php toolbelt/bin/ck playwright playwright test -c playwright.docs.config.ts
@@ -474,14 +473,14 @@ lint-phpstan: $(PHPUNIT) $(CORE) $(COMPOSER) $(SCENARIO_YAML_STAMP) ## phpstan o
 # important: runtime tests must not be the first place an external profile or
 # scenario discovers that it drifted from its canonical format.
 lint-schema: $(UVX) ## Validate the profile/scenario schemas and every repository-owned instance
-	$(call pyrun,check-jsonschema) --check-metaschema \
+	$(call pyrun,check-jsonschema,$(CK_CHECK_JSONSCHEMA_VERSION)) --check-metaschema \
 	  packages/civicrm-profile-schema/profile.schema.json \
 	  packages/civikitchen-scenario-schema/scenario.schema.json
-	$(call pyrun,check-jsonschema) \
+	$(call pyrun,check-jsonschema,$(CK_CHECK_JSONSCHEMA_VERSION)) \
 	  --schemafile packages/civicrm-profile-schema/profile.schema.json \
 	  docker/profiles/*/profile.json \
 	  tests/images/fixtures/external-profile/*/profile.json
-	$(call pyrun,check-jsonschema) \
+	$(call pyrun,check-jsonschema,$(CK_CHECK_JSONSCHEMA_VERSION)) \
 	  --schemafile packages/civikitchen-scenario-schema/scenario.schema.json \
 	  examples/scenario/civikitchen.yaml \
 	  tests/scenario/civikitchen.yaml

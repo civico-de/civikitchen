@@ -20,9 +20,6 @@ on:
 permissions:
   contents: read
 
-env:
-  ZENSICAL_VERSION: 0.0.70
-
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -51,14 +48,16 @@ jobs:
             toolbelt/bin/ck
             toolbelt/lib/php
             toolbelt/playwright
+            toolbelt/versions.env
           sparse-checkout-cone-mode: false
 
       - name: Build the site
         env:
           CK_LANGUAGES: ${{ inputs.languages }}
         run: |
+          . .civikitchen-docs/toolbelt/versions.env
           python3 -m venv "$RUNNER_TEMP/zensical"
-          "$RUNNER_TEMP/zensical/bin/pip" install --quiet "zensical==${ZENSICAL_VERSION}"
+          "$RUNNER_TEMP/zensical/bin/pip" install --quiet "zensical==${CK_ZENSICAL_VERSION}"
           read -ra languages <<< "$CK_LANGUAGES"
           # Inside the civikitchen checkout, the work tree ck playwright mounts.
           "$RUNNER_TEMP/zensical/bin/python" .civikitchen-docs/.github/extension-docs/build.py \
