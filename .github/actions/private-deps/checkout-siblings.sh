@@ -20,6 +20,9 @@ set -euo pipefail
 # pattern, and an unquoted expansion is what splits the list.
 set -f
 
+# The toolbelt is checked out beside .github/actions, as build-siblings.sh needs it too.
+ck="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/toolbelt/bin/ck"
+
 # Every path below is workspace-relative, and the calling job may run its own
 # steps from somewhere else entirely.
 cd "${GITHUB_WORKSPACE:-.}"
@@ -81,16 +84,8 @@ for entry in ${CK_SIBLING_REPO//,/ }; do
     exit 1
   fi
   # Parsed as XML, not with a tag-shaped regex: an attribute order or a root
-  # element split over two lines is legal and would silently yield an empty
-  # key. Same reader as the toolbelt's ck_xml_field — inline, because this
-  # runs on the bare runner where the toolbelt is not on PATH. php is
-  # preinstalled on the GitHub-hosted images.
-  key=$(php -r '
-    libxml_use_internal_errors(TRUE);
-    $xml = simplexml_load_file($argv[1]);
-    if ($xml === FALSE) { fwrite(STDERR, "cannot parse {$argv[1]}\n"); exit(2); }
-    echo trim((string) $xml["key"]);
-  ' "$info")
+  # element split over two lines is legal and would silently yield an empty key.
+  key=$(php "$ck" internal xml-field "$info" key)
   if ! [[ "$key" =~ ^[A-Za-z][A-Za-z0-9._-]*$ ]]; then
     echo "sibling_repo: could not read a usable extension key from $repo's info.xml (got: '$key')" >&2
     exit 1

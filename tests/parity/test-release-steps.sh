@@ -69,7 +69,9 @@ for input in base ./base/ base/; do
   [ "$rc" -eq 0 ] || fail "working_directory '$input' was refused: $out"
   [ "$(output wd)" = base ] || fail "working_directory '$input' normalized to '$(output wd)', expected 'base'"
 done
-for input in '' /base ../base base/../base base//x; do
+# A directory with whitespace holds an extension, yet it is no usable compose path.
+extension 'base dir' org.example.spaced
+for input in '' /base ../base base/../base base//x 'base dir' missing; do
   CK_STAGE=build CK_DRY_RUN=true CK_WORKING_DIRECTORY=$input run_step
   [ "$rc" -ne 0 ] || fail "working_directory '$input' was accepted"
 done
@@ -81,6 +83,10 @@ extension . org.example.single
 CK_EXT_KEY_INPUT='' CK_WORKING_DIRECTORY=./ run_step
 [ "$rc" -eq 0 ] || fail "extension-ci refused working_directory './': $out"
 [ "$(output key)" = single ] || fail "extension-ci read key '$(output key)' for './'"
+mkdir "$ws/broken" && printf '<extension key=' > "$ws/broken/info.xml"
+CK_EXT_KEY_INPUT='' CK_WORKING_DIRECTORY=broken run_step
+[ "$rc" -ne 0 ] || fail "extension-ci accepted an info.xml it cannot parse"
+case "$out" in *'cannot parse'*) ;; *) fail "extension-ci on an unparsable info.xml: $out" ;; esac
 
 # --- the same-repository closure ------------------------------------------
 step "$workflow" dist 'Find the same-repository extensions this one requires'

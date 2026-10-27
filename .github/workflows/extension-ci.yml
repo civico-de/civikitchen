@@ -242,8 +242,8 @@ jobs:
   # The extension's directory name — info.xml <file>, the same value ckinit
   # stamps into the compose mount and CIVIKITCHEN_ENABLE_EXTENSIONS. Read once
   # here so the caller has nothing to restate; every stack job consumes the
-  # output. Parsed as XML, not with a tag-shaped regex — the same reader the
-  # sibling step uses, inline because this runs on the bare runner.
+  # output. Parsed as XML by the toolbelt's ck_xml_field reader, not with a
+  # tag-shaped regex.
   key:
     # Cancelled only by this job in a newer run of the same caller workflow,
     # ref, directory and image. Literal name: github.job is the caller's job id.
@@ -269,36 +269,26 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # The toolbelt reads info.xml and civikitchen.yaml for the steps below.
+      - name: Check out civikitchen for the info.xml and policy readers
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          repository: civico-de/civikitchen
+          ref: ${{ job.workflow_sha }}
+          sparse-checkout: |
+            toolbelt
+            packages
+            .github/scripts
+          path: .civikitchen-ci
+
       - name: Validate working_directory and read the extension key from info.xml
         id: key
         run: |
           set -euo pipefail
-          case "$CK_WORKING_DIRECTORY" in
-            '') echo "working_directory is empty — '.' is the repository root" >&2; exit 1 ;;
-            /*) echo "working_directory must be relative to the repository root (got: '$CK_WORKING_DIRECTORY')" >&2; exit 1 ;;
-          esac
-          wd=${CK_WORKING_DIRECTORY#./}
-          wd=${wd%/}
-          wd=${wd:-.}
-          case "$wd" in
-            ..|../*|*/..|*/../*) echo "working_directory must stay inside the repository (got: '$CK_WORKING_DIRECTORY')" >&2; exit 1 ;;
-            *//*|*/./*) echo "working_directory must be a plain relative path (got: '$CK_WORKING_DIRECTORY')" >&2; exit 1 ;;
-          esac
-          # The value becomes a container path in `cd`, a compose path and a
-          # $GITHUB_OUTPUT line; ckinit refuses whitespace in a directory name too.
-          [ "$wd" = . ] || [[ "$wd" =~ ^[A-Za-z0-9._][A-Za-z0-9._/-]*$ ]] \
-            || { echo "working_directory may hold only letters, digits, '.', '_', '-' and '/' (got: '$CK_WORKING_DIRECTORY')" >&2; exit 1; }
-          [ -d "$wd" ] \
-            || { echo "working_directory '$CK_WORKING_DIRECTORY' is not a directory in this repository" >&2; exit 1; }
-          [ -f "$wd/info.xml" ] \
-            || { echo "no info.xml in '$CK_WORKING_DIRECTORY' — this is not a CiviCRM extension" >&2; exit 1; }
-          # shellcheck disable=SC2016  # the $vars belong to PHP, not the shell.
-          key=$(php -r '
-            libxml_use_internal_errors(TRUE);
-            $xml = simplexml_load_file($argv[1]);
-            if ($xml === FALSE) { fwrite(STDERR, "cannot parse {$argv[1]}\n"); exit(2); }
-            echo trim((string) $xml->file);
-          ' "$wd/info.xml")
+          wd=$(.civikitchen-ci/.github/scripts/extension-dir.sh "$CK_WORKING_DIRECTORY")
+          key=$(php .civikitchen-ci/toolbelt/bin/ck internal xml-field "$wd/info.xml" file)
           [[ "$key" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]] \
             || { echo "info.xml <file> is not a usable extension directory name (got: '$key')" >&2; exit 1; }
           if [ -n "$CK_EXT_KEY_INPUT" ] && [ "$CK_EXT_KEY_INPUT" != "$key" ]; then
@@ -333,18 +323,6 @@ jobs:
 
       # policy.dist.build: output the repo builds instead of committing. Every job
       # that runs the extension's tests or pages builds it the way the release does.
-      - name: Check out civikitchen for the policy parser
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          repository: civico-de/civikitchen
-          ref: ${{ job.workflow_sha }}
-          sparse-checkout: |
-            toolbelt
-            packages
-            .github/scripts
-          path: .civikitchen-ci
-
       - name: Read the declared release build
         id: dist-build
         env:
@@ -947,13 +925,11 @@ jobs:
           fi
           echo "::notice::docker compose -f .docker/docker-compose.yml exec -u www-data -w $CK_EXT_PATH$tool app ck ci runs these same gates in the dev stack; cklint --fix and ckfmt auto-fix most lint and formatting findings; ckcivix --update brings the civix scaffold forward."
 
-      # Same lifecycle block as the compat job below — deliberately duplicated
-      # rather than factored out: a reusable workflow cannot share steps
-      # between its own jobs. The substance lives in `cklifecycle` in the
-      # image, which is also why this is two lines instead of twenty: the
-      # sequence is only the setup, and the checks it exists for (post-uninstall
-      # DB invariants, and a log scan so a swallowed SQL error cannot stay
-      # green) need a booted site anyway.
+      # Same lifecycle block as the compat job below. The substance lives in
+      # `cklifecycle` in the image, which is why this is two lines instead of
+      # twenty: the sequence is only the setup, and the checks it exists for
+      # (post-uninstall DB invariants, and a log scan so a swallowed SQL error
+      # cannot stay green) need a booted site anyway.
       - name: Lifecycle smoke + gate (cklifecycle)
         id: lifecycle
         if: ${{ inputs.lifecycle }}
