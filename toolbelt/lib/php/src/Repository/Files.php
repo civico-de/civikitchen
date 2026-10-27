@@ -70,12 +70,8 @@ final class Files
     /** @return list<string> */
     public function vendoredPrefixes(): array
     {
-        $result = $this->runner->capture([$this->checkoutRoot . '/toolbelt/bin/ckconform', '--policy', 'vendored_paths']);
-        if ($result['status'] !== 0) {
-            throw new RuntimeException("cannot read policy.vendored_paths from civikitchen.yaml:\n" . trim($result['output']));
-        }
         $prefixes = [];
-        foreach (preg_split('/\R/', trim($result['output'])) ?: [] as $line) {
+        foreach ((new Policy($this->checkoutRoot, $this->runner))->values('vendored_paths') as $line) {
             $path = rtrim(explode(' -- ', $line, 2)[0], '/');
             if ($path !== '') {
                 $prefixes[] = $path;

@@ -6,6 +6,7 @@ namespace CiviKitchen\Toolbelt\Cli;
 
 use CiviKitchen\Toolbelt\Process\Runner;
 use CiviKitchen\Toolbelt\Repository\Files;
+use CiviKitchen\Toolbelt\Repository\Policy;
 
 final class MigrateCommand implements Command
 {
@@ -50,6 +51,8 @@ final class MigrateCommand implements Command
             fwrite(STDERR, "ckmigrate: not a git checkout - run it where git diff can show what changed.\n");
             return 2;
         }
+        $templateCustom = (new Policy($this->checkoutRoot, $this->runner))->value('template_custom');
+        $custom = array_map('trim', explode(',', explode(' -- ', $templateCustom, 2)[0]));
 
         $manual = [];
         $rewritten = 0;
@@ -83,8 +86,7 @@ final class MigrateCommand implements Command
                 $manual[] = "{$config} (deleted) {$setting}";
             }
         }
-        $custom = $this->runner->capture([$this->checkoutRoot . '/toolbelt/bin/ckconform', '--policy', 'template_custom']);
-        if (preg_match('/^phpcs\.xml(\.dist)?\b/m', $custom['output']) === 1) {
+        if (array_intersect(['phpcs.xml', 'phpcs.xml.dist'], $custom) !== []) {
             $manual[] = 'civikitchen.yaml: drop the phpcs.xml.dist entry from policy.template_custom';
         }
 

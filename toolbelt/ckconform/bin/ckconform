@@ -96,6 +96,10 @@ switch ($argv[1] ?? '') {
             fwrite(STDERR, "ckconform: --policy needs a key, e.g. --policy min_coverage\n");
             exit(2);
         }
+        if (!isset(Policy::KEYS[$key])) {
+            fwrite(STDERR, "ckconform: --policy {$key}: not a policy key\n");
+            exit(2);
+        }
         foreach (Policy::effective($policyRaw())[$key] ?? [] as $value) {
             echo $value, "\n";
         }

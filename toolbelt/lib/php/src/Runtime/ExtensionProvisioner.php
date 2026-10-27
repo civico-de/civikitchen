@@ -6,6 +6,7 @@ namespace CiviKitchen\Toolbelt\Runtime;
 
 use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
+use CiviKitchen\Toolbelt\Repository\Policy;
 use Closure;
 use FilesystemIterator;
 use JsonException;
@@ -28,7 +29,7 @@ final class ExtensionProvisioner
 
     private readonly ExtensionInspector $inspector;
     private readonly ExtensionArchiveInstaller $installer;
-    private readonly string $ckconform;
+    private readonly Policy $civikitchenYaml;
     private readonly Closure $pause;
 
     /** @var resource */
@@ -53,7 +54,7 @@ final class ExtensionProvisioner
     ) {
         $this->inspector = new ExtensionInspector($checkoutRoot . '/packages/civikitchen-scenario-schema/vendor/autoload.php');
         $this->installer = new ExtensionArchiveInstaller($this->inspector);
-        $this->ckconform = $checkoutRoot . '/toolbelt/bin/ckconform';
+        $this->civikitchenYaml = new Policy($checkoutRoot, $runner);
         $this->pause = $pause ?? static function (int $seconds): void {
             sleep($seconds);
         };
@@ -446,11 +447,7 @@ final class ExtensionProvisioner
             return '';
         }
         if (!isset($this->policies[$directory][$policy])) {
-            $result = $this->runner->captureStdout([$this->ckconform, '--policy', $policy], null, $directory);
-            if ($result['status'] !== 0) {
-                throw new RuntimeException("could not read {$directory}/civikitchen.yaml");
-            }
-            $this->policies[$directory][$policy] = self::lines($result['output']);
+            $this->policies[$directory][$policy] = $this->civikitchenYaml->values($policy, $directory);
         }
         foreach ($this->policies[$directory][$policy] as $line) {
             [$name, $value] = array_pad(explode($separator, explode(' -- ', $line, 2)[0], 2), 2, '');

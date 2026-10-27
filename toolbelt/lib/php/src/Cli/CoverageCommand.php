@@ -6,14 +6,18 @@ namespace CiviKitchen\Toolbelt\Cli;
 
 use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
+use CiviKitchen\Toolbelt\Repository\Policy;
 use SimpleXMLElement;
 
 final class CoverageCommand implements Command
 {
+    private readonly Policy $policy;
+
     public function __construct(
         private readonly string $checkoutRoot,
         private readonly Runner $runner = new Runner(),
     ) {
+        $this->policy = new Policy($checkoutRoot, $runner);
     }
 
     public function run(array $arguments): int
@@ -28,7 +32,7 @@ final class CoverageCommand implements Command
         // policy.tests always carries a reason, so the value is
         // 'optional -- <reason>', never the bare word (TestSuiteRequiredCheck
         // reads the same key the same way).
-        $testsOptional = preg_match('/^optional\s+--\s+\S/', $this->policyValue('tests')) === 1;
+        $testsOptional = preg_match('/^optional\s+--\s+\S/', $this->policy->value('tests')) === 1;
         $config = is_file('phpunit.xml') ? 'phpunit.xml' : (is_file('phpunit.xml.dist') ? 'phpunit.xml.dist' : null);
         if ($config === null) {
             if ($testsOptional) {
@@ -139,7 +143,7 @@ final class CoverageCommand implements Command
         $formatted = number_format($percentage, 2, '.', '');
         echo "ckcoverage: {$formatted}% line coverage ({$covered}/{$total} statements)\n";
 
-        $floor = $this->policyValue('min_coverage');
+        $floor = $this->policy->value('min_coverage');
         if ($floor === '') {
             echo "ckcoverage: no policy.coverage.minimum in civikitchen.yaml - reporting only.\n";
             return 0;
@@ -193,16 +197,6 @@ final class CoverageCommand implements Command
             }
         }
         return null;
-    }
-
-    private function policyValue(string $key): string
-    {
-        $result = $this->runner->capture([$this->checkoutRoot . '/toolbelt/bin/ckconform', '--policy', $key]);
-        if ($result['status'] !== 0) {
-            return '';
-        }
-        $first = strtok($result['output'], "\n");
-        return $first === false ? '' : trim($first);
     }
 
     private function error(string $message): int

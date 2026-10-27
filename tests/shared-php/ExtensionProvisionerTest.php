@@ -92,14 +92,14 @@ final class ExtensionProvisionerTest extends TestCase
         $this->feed('org.example.dep');
         $fixture = $this->fixtureRequiringDep("version: 1\npolicy: [\n");
 
-        $error = "could not read {$fixture}/civikitchen.yaml";
-        self::assertSame($error, $this->attempt(fn () => $this->provisioner()->enable('fixture')));
+        $error = "cannot read policy.extension_source from {$fixture}/civikitchen.yaml:\nckconform: invalid civikitchen.yaml";
+        self::assertStringStartsWith($error, (string) $this->attempt(fn () => $this->provisioner()->enable('fixture')));
         self::assertSame([], $this->site->log);
         self::assertSame([], $this->site->curls);
 
         // Read before presence is asked: a present requirement does not hide it.
         $this->site->site = ['org.example.dep' => 'installed'];
-        self::assertSame($error, $this->attempt(fn () => $this->provisioner()->enable('fixture')));
+        self::assertStringStartsWith($error, (string) $this->attempt(fn () => $this->provisioner()->enable('fixture')));
     }
 
     public function testPresentRequirementIsOnlyCheckedAgainstItsConstraint(): void

@@ -7,6 +7,7 @@ namespace CiviKitchen\Toolbelt\Cli;
 use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
 use CiviKitchen\Toolbelt\Repository\Files;
+use CiviKitchen\Toolbelt\Repository\Policy;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -249,7 +250,7 @@ final class ReleaseCommand implements Command
     {
         $missing = array_values(array_filter($this->stagedPaths, static fn(string $path): bool => !self::built($path)));
         if ($missing !== []) {
-            $tool = trim($this->runner->capture([$this->ckconform(), '--policy', 'dist_build_tool'])['output']);
+            $tool = (new Policy($this->checkoutRoot, $this->runner))->value('dist_build_tool');
             $build = self::BUILD_COMMANDS[$tool] ?? 'the build civikitchen.yaml declares';
             fwrite(STDERR, "ckrelease: FAIL - policy.dist.build output missing:\n  " . implode("\n  ", $missing)
                 . "\n  Run {$build} first: the archive stages the build output the working tree holds.\n");

@@ -10,6 +10,13 @@ grep -q 'ck conform' <<<"${help}"
 printf '%s\n' 'version: 1' 'policy:' '  coverage:' '    minimum: 73' > "${work}/civikitchen.yaml"
 value=$(cd "${work}" && "${root}/toolbelt/bin/ck" conform --policy min_coverage)
 [ "${value}" = 73 ] || { echo "ck conform did not dispatch (got: ${value})" >&2; exit 1; }
+# A misspelt key is an error, not an unset value a coverage floor would skip.
+status=0
+out=$(cd "${work}" && "${root}/toolbelt/bin/ck" conform --policy min_covrage 2>&1) || status=$?
+if [ "${status}" -ne 2 ] || ! grep -q 'min_covrage: not a policy key' <<<"${out}"; then
+  echo "ckconform --policy accepted an unknown key (exit ${status}): ${out}" >&2
+  exit 1
+fi
 cat > "${work}/info.xml" <<'XML'
 <?xml version="1.0"?>
 <extension key="demo" type="module">

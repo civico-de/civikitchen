@@ -8,6 +8,7 @@ use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\JavaScript\Api4CatalogExport;
 use CiviKitchen\Toolbelt\Process\Runner;
 use CiviKitchen\Toolbelt\Repository\Files;
+use CiviKitchen\Toolbelt\Repository\Policy;
 
 final class JavaScriptLintCommand implements Command
 {
@@ -79,10 +80,7 @@ final class JavaScriptLintCommand implements Command
             echo 'ckeslint: ', count($sourceFiles), " JS/TS file(s) to lint.\n";
             $paths[] = '.';
         }
-        $typeCheck = $this->policyFlag('javascript_type_check');
-        if ($typeCheck === null) {
-            return 2;
-        }
+        $typeCheck = (new Policy($this->checkoutRoot, $this->runner))->value('javascript_type_check') === 'true';
         $copy = false;
         if (is_file('.oxlintrc.json')) {
             if ($typeCheck) {
@@ -231,17 +229,6 @@ final class JavaScriptLintCommand implements Command
             }
         }
         return true;
-    }
-
-    /** A boolean policy key; null after reporting an unreadable civikitchen.yaml. */
-    private function policyFlag(string $key): ?bool
-    {
-        $result = $this->runner->capture([$this->checkoutRoot . '/toolbelt/bin/ckconform', '--policy', $key]);
-        if ($result['status'] !== 0) {
-            $this->error('cannot read civikitchen.yaml: ' . trim($result['output']));
-            return null;
-        }
-        return trim($result['output']) === 'true';
     }
 
     /** @return list<string> core-relative paths of core's first-party .js */

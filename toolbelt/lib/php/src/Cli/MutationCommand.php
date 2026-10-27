@@ -7,13 +7,17 @@ namespace CiviKitchen\Toolbelt\Cli;
 use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
 use CiviKitchen\Toolbelt\Repository\Files;
+use CiviKitchen\Toolbelt\Repository\Policy;
 
 final class MutationCommand implements Command
 {
+    private readonly Policy $policy;
+
     public function __construct(
         private readonly string $checkoutRoot,
         private readonly Runner $runner = new Runner(),
     ) {
+        $this->policy = new Policy($checkoutRoot, $runner);
     }
 
     public function run(array $arguments): int
@@ -25,7 +29,7 @@ final class MutationCommand implements Command
         if (!is_file('info.xml')) {
             return $this->error('no info.xml here - run from the extension root.');
         }
-        $floor = $this->policyValue('mutation_min_msi');
+        $floor = $this->policy->value('mutation_min_msi');
         if ($floor === '') {
             echo "ckmutate: no policy.mutation.minimum_msi in civikitchen.yaml - nothing to enforce, skipping.\n";
             echo "ckmutate: to adopt this, set policy.mutation.minimum_msi to the measured score and ratchet it.\n";
@@ -38,12 +42,8 @@ final class MutationCommand implements Command
         if (!is_file('phpunit.xml') && !is_file('phpunit.xml.dist')) {
             return $this->error('no phpunit config - mutation testing needs a suite to run against.');
         }
-        $extensions = array_map('strtolower', get_loaded_extensions());
-        if (!in_array('pcov', $extensions, true) && !in_array('xdebug', $extensions, true)) {
-            return $this->error('no pcov/xdebug loaded - infection cannot collect coverage.');
-        }
-        $coveredFloor = $this->policyValue('mutation_min_covered_msi');
-        $pathValue = $this->policyValue('mutation_paths');
+        $coveredFloor = $this->policy->value('mutation_min_covered_msi');
+        $pathValue = $this->policy->value('mutation_paths');
         $directories = $pathValue !== '' ? array_values(array_filter(explode(',', $pathValue), 'strlen')) : [];
         if ($directories === []) {
             foreach (['Civi', 'CRM', 'src'] as $directory) {
@@ -109,16 +109,6 @@ final class MutationCommand implements Command
         return $status;
     }
 
-    private function policyValue(string $key): string
-    {
-        $result = $this->runner->capture([$this->checkoutRoot . '/toolbelt/bin/ckconform', '--policy', $key]);
-        if ($result['status'] !== 0) {
-            return '';
-        }
-        $first = strtok($result['output'], "\n");
-        return $first === false ? '' : trim($first);
-    }
-
     private function error(string $message): int
     {
         fwrite(STDERR, "ckmutate: {$message}\n");
@@ -134,7 +124,8 @@ ckmutate - mutation testing with infection against the floor in civikitchen.yaml
 
 The floors are policy.mutation.minimum_msi and minimum_covered_msi. It mutates
 policy.mutation.paths, or else the lines of Civi/, CRM/ and src/ changed against
-CK_MUTATE_BASE (default origin/main). Needs pcov or xdebug.
+CK_MUTATE_BASE (default origin/main). Infection needs pcov, xdebug or phpdbg,
+or an existing report via --coverage.
 
 TXT;
     }

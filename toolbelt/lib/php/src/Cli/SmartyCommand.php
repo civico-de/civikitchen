@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CiviKitchen\Toolbelt\Cli;
 
 use CiviKitchen\Toolbelt\Process\Runner;
+use CiviKitchen\Toolbelt\Repository\Policy;
 use SimpleXMLElement;
 
 final class SmartyCommand implements Command
@@ -46,7 +47,7 @@ final class SmartyCommand implements Command
         }
 
         $payload = $this->checkoutRoot . '/toolbelt/lib/smarty-compile.php';
-        $skip = $this->policyValues('smarty_skip_templates');
+        $skip = (new Policy($this->checkoutRoot, $this->runner))->values('smarty_skip_templates');
         $environment = getenv();
         $environment = is_array($environment) ? $environment : [];
         $environment['CK_SMARTY_ROOT'] = (string) getcwd();
@@ -66,16 +67,6 @@ final class SmartyCommand implements Command
             return 2;
         }
         return $status;
-    }
-
-    /** @return list<string> */
-    private function policyValues(string $key): array
-    {
-        $result = $this->runner->capture([$this->checkoutRoot . '/toolbelt/bin/ckconform', '--policy', $key]);
-        if ($result['status'] !== 0) {
-            return [];
-        }
-        return array_values(array_filter(array_map('trim', explode("\n", $result['output'])), 'strlen'));
     }
 
     private function usage(): string

@@ -26,6 +26,18 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - `CIVIKITCHEN_LOCALES` no longer hangs on a stalled download of the core
   language archive: a transfer under 10 kB/s for 30 s aborts, and a failed
   download is retried up to three times before provisioning fails.
+- `ckcoverage`, `ckmutate`, `cksmarty` and `ckmigrate` stop with an error
+  when `civikitchen.yaml` cannot be read. A broken file no longer reads as
+  unset, which had turned a coverage or mutation floor into "reporting only".
+  `cklifecycle` and `ckmigrate` read it before they change anything.
+- `ckconform --policy <key>` rejects a key that is not a policy key instead of
+  printing nothing for it.
+- `ckmigrate` names a `phpcs.xml.dist` entry in `policy.template_custom`
+  wherever it stands in the list, and no longer mistakes a path such as
+  `phpcs.xml.dist.bak` for one.
+- `ckmutate` leaves the coverage-driver check to infection, so an existing
+  report passed with `--coverage`, `--initial-tests-php-options` and phpdbg
+  work through it. It had refused any run without pcov or xdebug loaded.
 
 ## [1.53.0] - 2026-10-25
 

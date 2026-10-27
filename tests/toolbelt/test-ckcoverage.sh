@@ -156,6 +156,16 @@ done
 
 echo 'ok   ckcoverage reads the include list where PHPUnit 9 does and names a filter that measures nothing'
 
+# An unreadable civikitchen.yaml stops the run: its floor must not read as unset.
+printf 'version: 1\npolicy:\n  coverage:\n    minimum: 90\n  bad: [unclosed\n' > "$work/ext/civikitchen.yaml"
+status=0
+out=$(cd "$work/ext" && PATH="$work/bin:$PATH" "$root/toolbelt/bin/ckcoverage" 2>&1) || status=$?
+test "$status" -eq 2
+grep -q 'cannot read policy.tests from civikitchen.yaml' <<<"$out"
+if grep -q 'reporting only' <<<"$out"; then exit 1; fi
+
+echo 'ok   ckcoverage stops on an unreadable civikitchen.yaml'
+
 # A configured floor of 0 is a floor, not an unset key: the run must report it
 # as met instead of falling back to "reporting only".
 cat > "$work/ext/civikitchen.yaml" <<'EOF'

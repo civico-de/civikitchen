@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CiviKitchen\Ckconform\Tests\Check;
 
 use CiviKitchen\Ckconform\Check\PolicyKeyCheck;
+use CiviKitchen\Ckconform\PhpSource;
 use CiviKitchen\Ckconform\Policy;
 use CiviKitchen\Ckconform\Tests\CheckTestCase;
 
@@ -158,36 +159,34 @@ final class PolicyKeyCheckTest extends CheckTestCase
     /**
      * The inventory is only useful if it is complete: a key a tool reads but
      * KEYS does not list would be reported as unknown in every repo using it.
-     * This pins the two directions that drift — the checks' own policyValue()
-     * calls, and the keys the ck* tools read through --policy/--policy-env.
+     * Every PHP file of the tool belt, read as tokens so prose never counts:
+     * the checks' policyValue() calls and Repository\Policy's value()/values().
      */
     public function testInventoryCoversEveryKeyTheToolbeltReads(): void
     {
         $root = dirname(__DIR__, 3);
-        $sources = [];
-        foreach ([$root . '/ckconform/src', $root . '/bin', $root . '/../tools'] as $dir) {
-            if (!is_dir($dir)) {
+        $files = new \RecursiveIteratorIterator(new \RecursiveCallbackFilterIterator(
+            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
+            static fn (\SplFileInfo $file): bool => !in_array($file->getFilename(), ['vendor', 'node_modules', 'tests'], true),
+        ));
+        $read = [];
+        foreach ($files as $file) {
+            if (!$file instanceof \SplFileInfo || $file->getExtension() !== 'php') {
                 continue;
             }
-            $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir));
-            foreach ($files as $file) {
-                if ($file->isFile()) {
-                    $sources[] = (string) file_get_contents($file->getPathname());
+            $tokens = PhpSource::codeTokens((string) file_get_contents($file->getPathname()));
+            foreach ($tokens as $i => $token) {
+                if ($token->is([T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR])
+                    && in_array($tokens[$i + 1]->text ?? '', ['policyValue', 'policyValues', 'value', 'values'], true)
+                    && ($tokens[$i + 2] ?? null)?->text === '('
+                    && ($tokens[$i + 3] ?? null)?->is(T_CONSTANT_ENCAPSED_STRING)
+                ) {
+                    $read[] = trim($tokens[$i + 3]->text, '\'"');
                 }
             }
         }
-        $haystack = implode("\n", $sources);
 
-        $read = [];
-        // ckconform's own checks: $context->policyValue('<key>')
-        preg_match_all("/policyValue\('([a-z_]+)'\)/", $haystack, $m);
-        $read = array_merge($read, $m[1]);
-        // the ck* tools: ckconform --policy <key> / $CK_POLICY_<KEY>
-        preg_match_all('/--policy ([a-z_]+)/', $haystack, $m);
-        $read = array_merge($read, $m[1]);
-        preg_match_all('/CK_POLICY_([A-Z_]+)/', $haystack, $m);
-        $read = array_merge($read, array_map('strtolower', $m[1]));
-
+        self::assertContains('mutation_min_msi', $read, 'the scan misses Repository\Policy in the tool belt');
         $missing = array_diff(array_unique($read), array_keys(Policy::KEYS));
         self::assertSame(
             [],

@@ -114,10 +114,6 @@ final class ProvisionSite extends Runner
 
     public function captureStdout(array $command, ?string $input = null, ?string $workingDirectory = null): array
     {
-        if (str_ends_with($command[0], '/ckconform')) {
-            $this->policyReads[] = (string) $workingDirectory;
-            return parent::captureStdout($command, $input, $workingDirectory);
-        }
         $arguments = $this->cv($command);
         $key = substr($arguments[3] ?? '', 4);
         if ($arguments === ['api4', 'Extension.get', '+w', "key={$key}", '+s', 'key,status', '--out=json-strict']) {
@@ -159,7 +155,10 @@ final class ProvisionSite extends Runner
 
     public function captureSeparate(array $command, ?array $environment = null, ?string $workingDirectory = null): array
     {
-        if ($command[0] === 'git') {
+        if (str_ends_with($command[0], '/ckconform')) {
+            $this->policyReads[] = (string) $workingDirectory;
+        }
+        if ($command[0] === 'git' || str_ends_with($command[0], '/ckconform')) {
             return parent::captureSeparate($command, $environment, $workingDirectory);
         }
         $arguments = $this->cv($command);

@@ -6,6 +6,7 @@ namespace CiviKitchen\Toolbelt\Cli;
 
 use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
+use CiviKitchen\Toolbelt\Repository\Policy;
 use SimpleXMLElement;
 
 final class LifecycleCommand implements Command
@@ -51,6 +52,7 @@ final class LifecycleCommand implements Command
             return $this->error('extension key contains unsafe characters.', 2);
         }
 
+        $logIgnore = (new Policy($this->checkoutRoot, $this->runner))->values('lifecycle_log_ignore');
         $extensionDirectory = (string) getcwd();
         $work = Directory::temporary('cklifecycle');
         register_shutdown_function(Directory::remove(...), $work);
@@ -118,7 +120,7 @@ final class LifecycleCommand implements Command
             }
         }
         $ignored = [];
-        foreach ($this->policyRules('lifecycle_log_ignore') as $rule) {
+        foreach ($logIgnore as $rule) {
             if (!str_contains($rule, ' -- ') || trim(explode(' -- ', $rule, 2)[1]) === '') {
                 fwrite(STDERR, "cklifecycle: policy.lifecycle.log_ignore needs a non-empty reason: {$rule}\n");
                 $this->failed = true;
@@ -171,18 +173,6 @@ final class LifecycleCommand implements Command
             fwrite(STDERR, "cklifecycle: step failed: {$label} (exit {$result['status']})\n");
             $this->failed = true;
         }
-    }
-
-    /** @return list<string> */
-    private function policyRules(string $key): array
-    {
-        $result = $this->runner->capture([$this->checkoutRoot . '/toolbelt/bin/ckconform', '--policy', $key]);
-        if ($result['status'] !== 0) {
-            $this->failed = true;
-            fwrite(STDERR, "cklifecycle: could not read policy.lifecycle.log_ignore\n");
-            return [];
-        }
-        return array_values(array_filter(preg_split('/\R/', trim($result['output'])) ?: [], 'strlen'));
     }
 
     private function error(string $message, int $status = 1): int

@@ -677,6 +677,24 @@ final class SharedPhpTest extends TestCase
         }
     }
 
+    public function testMigrateFindsThePhpcsConfigAnywhereInTemplateCustom(): void
+    {
+        $before = getcwd();
+        chdir($this->temporary);
+        try {
+            mkdir('Civi');
+            file_put_contents('Civi/Widget.php', "<?php\n");
+            foreach (['mago.toml,phpcs.xml.dist -- local config' => 1, 'phpcs.xml.dist.bak -- a backup' => 0] as $value => $status) {
+                ob_start();
+                self::assertSame($status, (new MigrateCommand(dirname(__DIR__, 2), new MigrateRunner($value)))->run([]), $value);
+                $output = (string) ob_get_clean();
+                self::assertSame($status === 1, str_contains($output, 'drop the phpcs.xml.dist entry'), $value);
+            }
+        } finally {
+            chdir($before === false ? dirname(__DIR__, 2) : $before);
+        }
+    }
+
     public function testMigrateDeletesThePhpcsConfigAndListsWhatNeedsAPerson(): void
     {
         $before = getcwd();
@@ -1681,10 +1699,13 @@ final class AnalyzeRunner extends Runner
         if (str_contains($joined, 'ls-files')) {
             return ['status' => 0, 'output' => "CRM/Widget/DAO/Thing.php\nCivi/Widget.php\nlib/upstream.php\nphpstanBootstrap.php\ntests/phpunit/WidgetTest.php\nwidget.civix.php\n"];
         }
-        if (str_ends_with($command[0], 'ckconform')) {
-            return ['status' => 0, 'output' => "lib -- unmodified upstream\n"];
-        }
         return ['status' => 0, 'output' => ''];
+    }
+
+    /** policy.vendored_paths */
+    public function captureSeparate(array $command, ?array $environment = null, ?string $workingDirectory = null): array
+    {
+        return ['status' => 0, 'stdout' => str_ends_with($command[0], 'ckconform') ? "lib -- unmodified upstream\n" : '', 'stderr' => ''];
     }
 
     public function passthrough(array $command, ?array $environment = null, ?string $workingDirectory = null): int
@@ -1747,9 +1768,13 @@ final class MigrateRunner extends Runner
         return match (true) {
             str_contains($joined, 'rev-parse') => ['status' => 0, 'output' => "true\n"],
             str_contains($joined, 'ls-files') => ['status' => 0, 'output' => "Civi/Widget.php\n"],
-            str_contains($joined, 'template_custom') => ['status' => 0, 'output' => $this->templateCustom],
             default => ['status' => 0, 'output' => ''],
         };
+    }
+
+    public function captureSeparate(array $command, ?array $environment = null, ?string $workingDirectory = null): array
+    {
+        return ['status' => 0, 'stdout' => in_array('template_custom', $command, true) ? $this->templateCustom : '', 'stderr' => ''];
     }
 }
 
@@ -1760,8 +1785,8 @@ final class PolicyRunner extends Runner
     {
     }
 
-    public function capture(array $command, ?array $environment = null, ?string $workingDirectory = null): array
+    public function captureSeparate(array $command, ?array $environment = null, ?string $workingDirectory = null): array
     {
-        return ['status' => 0, 'output' => $this->value . "\n"];
+        return ['status' => 0, 'stdout' => $this->value . "\n", 'stderr' => ''];
     }
 }
