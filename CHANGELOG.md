@@ -39,6 +39,10 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Changed
 
+- The images ship `oxlint-tsgolint` 7.0.2005, built with Go 1.26.9, which
+  fixes three of the Go stdlib CVEs the image scan excused. The scan's
+  exception for CiviCRM core's PhpSpreadsheet 5.8.1 covers the WordPress,
+  Joomla and Backdrop flavors as well as standalone.
 - **Breaking:** the `playwright` job of `extension-ci.yml` runs the suite and
   the `bun run build` before it through `ck playwright`, inside the app
   container's network namespace. The site is `http://localhost`

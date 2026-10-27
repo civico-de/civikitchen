@@ -12,7 +12,7 @@
 #
 #   - id: CVE-0000-00000
 #     statement: <why this does not apply here>
-#     expired_at: 2026-11-01
+#     expired_at: 2027-01-31
 #
 # expired_at is a MECHANISM, not a convention: trivy prunes an expired entry
 # and the finding comes back, so the gate goes red on that date and the
@@ -45,7 +45,7 @@ vulnerabilities:
   #
   # /usr/lib/node_modules/npm/node_modules. A newer npm moves this tree
   # (NPM_VERSION), but npm 12.2.1, the current npm, still bundles undici
-  # 6.29.0 — read out of its registry tarball on 2026-10-25 — so no release
+  # 6.29.0 — confirmed by the image scan on 2026-10-27 — so no release
   # carries this fix yet.
   # -------------------------------------------------------------------------
   - id: CVE-2026-109869
@@ -58,52 +58,27 @@ vulnerabilities:
       container. On expiry re-read the bundled version
       (node -p 'require("/usr/lib/node_modules/npm/node_modules/undici/package.json").version')
       and delete this entry once an npm release ships >= 6.29.1.
-    expired_at: 2026-11-15
+    expired_at: 2027-01-31
 
   # -------------------------------------------------------------------------
   # Go stdlib inside the oxlint-tsgolint binary
   #
   # opt/civikitchen/toolbelt/oxlint/node_modules/@oxlint-tsgolint/*/tsgolint is a
   # prebuilt Go binary from npm; its stdlib version is whatever oxlint built
-  # with (1.26.8 in 7.0.2003 and in 7.0.2004, the newest on 2026-10-21), and
-  # nothing here can relink it. All four CVEs sit in HTTP, TLS and certificate
-  # handling. tsgolint is the type-aware linter behind ckeslint: it reads
+  # with (1.26.9 in 7.0.2005, the newest on 2026-10-27), and nothing here can
+  # relink it. The CVE sits in certificate handling. tsgolint is the type-aware linter behind ckeslint: it reads
   # TypeScript sources the developer points it at, opens no listener and speaks
-  # no TLS/HTTP, so none of them is reachable. On expiry: `npm view
-  # oxlint-tsgolint version` — bump toolbelt/oxlint/package.json as soon as a
-  # release built with >= 1.26.10 is out and delete all four entries together.
+  # no TLS/HTTP, so it is not reachable. On expiry: `npm view oxlint-tsgolint
+  # version` — bump toolbelt/oxlint/package.json as soon as a release built
+  # with >= 1.26.10 is out and delete this entry.
   # -------------------------------------------------------------------------
-  - id: CVE-2026-78667
-    paths:
-      - "opt/civikitchen/toolbelt/oxlint/node_modules/@oxlint-tsgolint/**"
-    statement: >-
-      Go stdlib net/http denial of service via a crafted HTTP request in the prebuilt tsgolint binary — unreachable
-      from a local linter that serves nothing; see the group note above.
-    expired_at: 2026-11-10
-
-  - id: CVE-2026-78669
-    paths:
-      - "opt/civikitchen/toolbelt/oxlint/node_modules/@oxlint-tsgolint/**"
-    statement: >-
-      Go stdlib net/http internal HTTP/2 denial of service in the prebuilt tsgolint binary — unreachable
-      from a local linter that serves nothing; see the group note above.
-    expired_at: 2026-11-10
-
-  - id: CVE-2026-97031
-    paths:
-      - "opt/civikitchen/toolbelt/oxlint/node_modules/@oxlint-tsgolint/**"
-    statement: >-
-      Go stdlib crypto/tls handshake denial of service in the prebuilt tsgolint binary — unreachable
-      from a local linter that serves nothing; see the group note above.
-    expired_at: 2026-11-10
-
   - id: CVE-2026-111943
     paths:
       - "opt/civikitchen/toolbelt/oxlint/node_modules/@oxlint-tsgolint/**"
     statement: >-
       Go stdlib crypto/x509 certificate handling in the prebuilt tsgolint binary — only reached when
       verifying certificates, which a local linter without TLS never does; see the group note above.
-    expired_at: 2026-11-10
+    expired_at: 2027-01-31
 
   # -------------------------------------------------------------------------
   # CiviCRM core's bundled frontend libraries
@@ -159,7 +134,9 @@ vulnerabilities:
   # -------------------------------------------------------------------------
   # PhpSpreadsheet in CiviCRM core's vendor tree
   #
-  # var/www/html/core/vendor, reported against its composer/installed.json.
+  # Core's vendor tree, reported against its composer/installed.json: in
+  # standalone at var/www/html/core, in the buildkit flavors inside the CMS's
+  # civicrm directory (Drupal's site-level composer already resolves 5.10.0).
   # Same argument as the bundled frontend libraries: core's composer.lock pins
   # phpoffice/phpspreadsheet 5.8.1 on every line these images build. The fixed
   # 5.x releases require PHP 8.2, which core's stable lines do not; master
@@ -169,6 +146,7 @@ vulnerabilities:
   - id: CVE-2026-108357
     paths:
       - "var/www/html/core/vendor/composer/installed.json"
+      - "home/buildkit/buildkit/build/site/**/civicrm/vendor/composer/installed.json"
     statement: >-
       XmlScanner bypass through the unentity() callback, which only the
       SpreadsheetML 2003 reader (Reader/Xml.php) registers. Core reads uploaded
@@ -179,6 +157,7 @@ vulnerabilities:
   - id: CVE-2026-108358
     paths:
       - "var/www/html/core/vendor/composer/installed.json"
+      - "home/buildkit/buildkit/build/site/**/civicrm/vendor/composer/installed.json"
     statement: >-
       XmlScanner bypass via ISO-2022 escape sequences in the Xlsx reader that
       civiimport's Spreadsheet data source uses. Reachable by a user with
@@ -191,6 +170,7 @@ vulnerabilities:
   - id: CVE-2026-108359
     paths:
       - "var/www/html/core/vendor/composer/installed.json"
+      - "home/buildkit/buildkit/build/site/**/civicrm/vendor/composer/installed.json"
     statement: >-
       Unbounded table:number-rows-repeated in the Ods reader, reached through
       the same civiimport upload. Measured: a 3 KB file exhausts a 256 MB
@@ -226,7 +206,7 @@ vulnerabilities:
       running karma wrote. Reached only by hand-run karma, never by the served
       site. On expiry recheck after a buildkit rebuild; upstream bumping karma
       or its lockfile drops this without any change here.
-    expired_at: 2026-11-01
+    expired_at: 2027-01-31
 
   - id: CVE-2024-21538
     statement: >-
@@ -234,27 +214,7 @@ vulnerabilities:
       The ReDoS is in parsing the command string, and the command strings in
       that chain come from buildkit's own scripts, not from request input.
       Recheck after a buildkit rebuild.
-    expired_at: 2026-11-01
-
-  - id: CVE-2025-7783
-    statement: >-
-      form-data 2.3.3 via karma-phantomjs-launcher@1.0.4 ->
-      phantomjs-prebuilt@2.1.16 -> request@2.88.0. phantomjs-prebuilt is an
-      OPTIONAL dependency of an abandoned browser launcher; nothing in these
-      images posts multipart bodies through it. Parameter pollution via the
-      predictable boundary requires an application that sends attacker-chosen
-      field values to a remote endpoint — there is no such caller here. On
-      expiry recheck after a buildkit rebuild; upstream dropping
-      karma-phantomjs-launcher removes the whole chain.
-    expired_at: 2026-11-01
-
-  - id: CVE-2026-12143
-    statement: >-
-      form-data 2.3.3, same abandoned phantomjs chain as above. CRLF injection
-      needs attacker-controlled field names or filenames passed to
-      FormData#append; nothing in the image calls it at all. Recheck after a
-      buildkit rebuild.
-    expired_at: 2026-11-01
+    expired_at: 2027-01-31
 
   - id: CVE-2026-4800
     statement: >-
@@ -263,7 +223,7 @@ vulnerabilities:
       karma do not expose _.template to any input, and neither is on any
       request path in these images. lodash 4.18.0 is released, so this clears
       as soon as upstream's lockfile moves.
-    expired_at: 2026-11-01
+    expired_at: 2027-01-31
 
   - id: CVE-2026-26996
     paths:
@@ -275,7 +235,7 @@ vulnerabilities:
       toolbelt/oxlint resolves minimatch 10.2.6 and npm 12 bundles a fixed
       one, so a regression in either surfaces instead of being hidden.
       Recheck after a buildkit rebuild.
-    expired_at: 2026-11-01
+    expired_at: 2027-01-31
 
   - id: CVE-2026-27903
     paths:
@@ -284,7 +244,7 @@ vulnerabilities:
       minimatch 3.0.8, same two parents. Unbounded recursive backtracking on
       non-adjacent ** segments in a developer-supplied pattern. Same scoping
       as CVE-2026-26996. Recheck after a buildkit rebuild.
-    expired_at: 2026-11-01
+    expired_at: 2027-01-31
 
   - id: CVE-2026-27904
     paths:
@@ -293,7 +253,7 @@ vulnerabilities:
       minimatch 3.0.8, same two parents. Catastrophic backtracking from nested
       *() extglobs in a developer-supplied pattern. Same scoping as
       CVE-2026-26996. Recheck after a buildkit rebuild.
-    expired_at: 2026-11-01
+    expired_at: 2027-01-31
 
   - id: CVE-2026-69246
     statement: >-
@@ -305,30 +265,7 @@ vulnerabilities:
       the node_modules block above. Left image-wide: extension repos lock their
       own guzzle and their osv gate still catches this ID. Recheck after a
       buildkit rebuild; upstream re-locking guzzle >= 7.15.2 drops this.
-    expired_at: 2026-11-01
-
-  - id: CVE-2026-67434
-    paths:
-      - "home/buildkit/buildkit/**"
-    statement: >-
-      php_codesniffer 3.13.5 in civicrm-buildkit's own vendor tree, pinned by
-      upstream's composer.lock. The OS command injection is in phpcs's own
-      argument handling, reached only when a developer runs buildkit's phpcs by
-      hand on a tree they mounted; nothing the images serve loads it. Scoped to
-      buildkit's clone on purpose: the toolbelt ships no phpcs, so the
-      standalone flavors scan clean for this ID and a phpcs that reaches them
-      must NOT be hidden.
-      Recheck after a buildkit rebuild; upstream re-locking >= 3.13.6 drops it.
-    expired_at: 2026-11-01
-
-  - id: CVE-2026-69185
-    statement: >-
-      socket.io-parser 4.2.6 via karma's socket.io stack. Memory exhaustion
-      needs an attacker speaking Socket.IO to a running server — karma's dev
-      server only runs when a developer starts it by hand, bound for a local
-      test browser; the served site never opens a socket. Recheck after a
-      buildkit rebuild.
-    expired_at: 2026-11-01
+    expired_at: 2027-01-31
 
   - id: CVE-2026-111181
     paths:
@@ -339,7 +276,7 @@ vulnerabilities:
       runs only when a developer starts karma by hand; the served site never
       loads it. Scoped to buildkit's clone: the standalone flavors scan clean
       for this ID. Recheck after a buildkit rebuild.
-    expired_at: 2026-11-15
+    expired_at: 2027-01-31
 
   # -------------------------------------------------------------------------
   # Drupal's package_manager test FIXTURE (drupal11 flavors)
@@ -398,7 +335,7 @@ vulnerabilities:
       images bake serves CiviCRM on localhost and does not. Pinned by Joomla's
       own composer.lock. Recheck after the next Joomla release civibuild picks
       up; drop the entry if the tree has moved.
-    expired_at: 2026-11-01
+    expired_at: 2027-01-31
 
   - id: CVE-2026-32935
     statement: >-
@@ -407,14 +344,14 @@ vulnerabilities:
       and time the responses; this is a single-user localhost dev site with no
       such endpoint exposed. Pinned by Joomla's composer.lock. Recheck after
       the next Joomla release.
-    expired_at: 2026-11-01
+    expired_at: 2027-01-31
 
   - id: CVE-2026-44167
     statement: >-
       phpseclib 3.0.37, same tree. Requires loading untrusted ASN.1/X.509
       input; nothing in the baked site parses attacker-supplied certificates.
       Recheck after the next Joomla release.
-    expired_at: 2026-11-01
+    expired_at: 2027-01-31
 
   - id: CVE-2026-45133
     statement: >-
@@ -422,49 +359,17 @@ vulnerabilities:
       attacker-controlled YAML; the YAML Joomla parses is its own configuration
       and language files, which ship with the release. Pinned by Joomla's
       composer.lock. Recheck after the next Joomla release.
-    expired_at: 2026-11-01
+    expired_at: 2027-01-31
 
   - id: CVE-2026-45304
     statement: >-
       symfony/yaml 5.4.23, same tree — alias expansion memory exhaustion, same
       "only parses its own config" argument. Recheck after the next Joomla
       release.
-    expired_at: 2026-11-01
+    expired_at: 2027-01-31
 
   - id: CVE-2026-45305
     statement: >-
       symfony/yaml 5.4.23, same tree — ReDoS in Parser::cleanup(), same "only
       parses its own config" argument. Recheck after the next Joomla release.
-    expired_at: 2026-11-01
-
-  # -------------------------------------------------------------------------
-  # tsgolint's Go stdlib
-  #
-  # opt/civikitchen/toolbelt/oxlint/node_modules/@oxlint-tsgolint/linux-*/tsgolint, the
-  # prebuilt binary oxlint runs for its type-aware rules. Trivy reports these
-  # as `fixed` because Go fixed them — but the fix is a Go toolchain version,
-  # not a tsgolint release: oxlint-tsgolint 7.0.2001 is the newest published
-  # (verified against the npm registry) and it ships a binary built with Go
-  # 1.26.5. There is nothing to install over it, so this is the brace-expansion
-  # case, not an exception for something we could fix. Recheck when
-  # oxlint-tsgolint publishes a rebuild; then this entry goes, not its date.
-  # -------------------------------------------------------------------------
-  - id: CVE-2026-39821
-    paths:
-      - "opt/civikitchen/toolbelt/oxlint/**"
-    statement: >-
-      net/http request smuggling via x/net/idna in the Go stdlib compiled into
-      tsgolint. tsgolint is a local type checker: ckeslint execs it over files
-      already on disk and talks to it on stdio. It opens no listener, makes no
-      outbound request and resolves no name, so nothing supplies it the HTTP
-      traffic the CVE needs. No fixed tsgolint build exists.
-    expired_at: 2026-11-01
-
-  - id: CVE-2026-46600
-    paths:
-      - "opt/civikitchen/toolbelt/oxlint/**"
-    statement: >-
-      Same binary, same absence of a fixed build: a parsing flaw in
-      x/net/dns/dnsmessage, reachable only by feeding the process DNS responses.
-      tsgolint performs no name resolution during a ckeslint run.
-    expired_at: 2026-11-01
+    expired_at: 2027-01-31
