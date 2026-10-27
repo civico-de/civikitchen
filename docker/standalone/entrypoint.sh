@@ -25,23 +25,6 @@ set -e
 # CIVICRM_* is reserved for the upstream image contract (CIVICRM_AUTO_INSTALL,
 # CIVICRM_DB_*), for describing the CiviCRM target (CIVICRM_VERSION,
 # CIVICRM_SITE_TYPE) and for CiviCRM's own variables (CIVICRM_UF, ...).
-# Legacy CIVICRM_-spelled kitchen vars keep working with a deprecation warning.
-_ck_legacy() {
-    local new="$1" legacy="$2"
-    if [[ -z "${!new+x}" && -n "${!legacy+x}" ]]; then
-        echo "[civikitchen] WARN: ${legacy} is deprecated - use ${new}" >&2
-        export "${new}=${!legacy}"
-    fi
-}
-_ck_legacy CIVIKITCHEN_COMPONENTS        CIVICRM_COMPONENTS
-_ck_legacy CIVIKITCHEN_DEMO_USER         CIVICRM_DEMO_USER
-_ck_legacy CIVIKITCHEN_DEMO_PASS         CIVICRM_DEMO_PASS
-_ck_legacy CIVIKITCHEN_DEMO_EMAIL        CIVICRM_DEMO_EMAIL
-_ck_legacy CIVIKITCHEN_SMTP_HOST         CIVICRM_SMTP_HOST
-_ck_legacy CIVIKITCHEN_SMTP_PORT         CIVICRM_SMTP_PORT
-_ck_legacy CIVIKITCHEN_EXTRA_EXTENSIONS  CIVICRM_EXTRA_EXTENSIONS
-_ck_legacy CIVIKITCHEN_ENABLE_EXTENSIONS CIVICRM_ENABLE_EXTENSIONS
-_ck_legacy CIVIKITCHEN_SITE_URL          SITE_URL
 
 # ---------------------------------------------------------------------------
 # Shared provisioning library. ck_as_web runs a command as the web user
@@ -52,6 +35,12 @@ ck_as_web() {
     if [[ "$(id -u)" == 0 ]]; then runuser -u www-data -- "$@"; else "$@"; fi
 }
 . /usr/local/share/civikitchen/provision.sh
+# Legacy CIVICRM_-spelled kitchen vars keep working with a deprecation warning.
+_ck_legacy CIVIKITCHEN_COMPONENTS        CIVICRM_COMPONENTS
+_ck_legacy CIVIKITCHEN_DEMO_USER         CIVICRM_DEMO_USER
+_ck_legacy CIVIKITCHEN_DEMO_PASS         CIVICRM_DEMO_PASS
+_ck_legacy CIVIKITCHEN_DEMO_EMAIL        CIVICRM_DEMO_EMAIL
+_ck_legacy CIVIKITCHEN_SITE_URL          SITE_URL
 
 # ---------------------------------------------------------------------------
 # Extra OS packages (e.g. libreoffice-writer + unoconv for CiviOffice

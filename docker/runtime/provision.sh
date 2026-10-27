@@ -19,6 +19,19 @@
 # The CK_* parameters below default to the standalone image's layout; the
 # buildkit entrypoint overrides them before sourcing.
 
+# Accept legacy CIVICRM_-spelled kitchen vars with a deprecation warning.
+_ck_legacy() {
+    local new="$1" legacy="$2"
+    if [[ -z "${!new+x}" && -n "${!legacy+x}" ]]; then
+        echo "[civikitchen] WARN: ${legacy} is deprecated - use ${new}" >&2
+        export "${new}=${!legacy}"
+    fi
+}
+_ck_legacy CIVIKITCHEN_SMTP_HOST         CIVICRM_SMTP_HOST
+_ck_legacy CIVIKITCHEN_SMTP_PORT         CIVICRM_SMTP_PORT
+_ck_legacy CIVIKITCHEN_EXTRA_EXTENSIONS  CIVICRM_EXTRA_EXTENSIONS
+_ck_legacy CIVIKITCHEN_ENABLE_EXTENSIONS CIVICRM_ENABLE_EXTENSIONS
+
 # --- parameters (defaults = standalone layout) -----------------------------
 : "${CK_WEB_USER:=www-data}"
 : "${CK_WEB_GROUP:=www-data}"

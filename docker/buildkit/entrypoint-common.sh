@@ -16,19 +16,6 @@ if [[ "${CIVICRM_SITE_TYPE:-}" == joomla* ]]; then
     export CIVICRM_SETTINGS="${SITE_WEB}/administrator/components/com_civicrm/civicrm.settings.php"
 fi
 
-# Accept legacy CIVICRM_-spelled kitchen vars (parity with the standalone image).
-_ck_legacy() {
-    local new="$1" legacy="$2"
-    if [[ -z "${!new+x}" && -n "${!legacy+x}" ]]; then
-        echo "[civikitchen] WARN: ${legacy} is deprecated - use ${new}" >&2
-        export "${new}=${!legacy}"
-    fi
-}
-_ck_legacy CIVIKITCHEN_SMTP_HOST         CIVICRM_SMTP_HOST
-_ck_legacy CIVIKITCHEN_SMTP_PORT         CIVICRM_SMTP_PORT
-_ck_legacy CIVIKITCHEN_EXTRA_EXTENSIONS  CIVICRM_EXTRA_EXTENSIONS
-_ck_legacy CIVIKITCHEN_ENABLE_EXTENSIONS CIVICRM_ENABLE_EXTENSIONS
-
 # Run a command as the buildkit user from the site docroot so cv auto-detects
 # the civibuild site. Under root (the demo image), PATH and SITE_WEB are
 # expanded in THIS shell and printf %q carries them and each argument's quoting
