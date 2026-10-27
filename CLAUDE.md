@@ -21,10 +21,10 @@ the rest; `make test-images` is the ~1 h Docker round.
   example. Use neutral names: `org.example.myext`, Acme, Widget, Greeter,
   Ledger. `extensions/` and `sites/` are gitignored local checkouts.
 - **One parser per format.** `civikitchen.yaml` → `ckconform --policy-env` /
-  `--policy <key>`; XML and JSON → `ck_xml_field` / `ck_json_field` in
-  `toolbelt/lib/ckcommon.sh`. Never `sed`/`grep -o` a structured file. A new
-  public YAML key goes into the JSON Schema, and into `Policy::KEYS` if a
-  consumer reads its normalized value.
+  `--policy <key>`; XML and JSON → `ck internal xml-field` / `json-field`
+  (`ck_xml_field` in `toolbelt/lib/ckcommon.sh`). Never `sed`/`grep -o` a
+  structured file. A new public YAML key goes into the JSON Schema, and into
+  `Policy::KEYS` if a consumer reads its normalized value.
 - **Select files by what they are, not where they live.** A directory list
   fails open: the run says "clean" about files it never saw.
 - **A fix ships with the fixture that would have failed.** Most checks here are

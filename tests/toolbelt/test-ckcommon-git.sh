@@ -50,8 +50,8 @@ test "$got" = "safe.directory=$work/linked"
 
 echo 'ok   ck_git finds a linked worktree root through its .git file'
 
-# Nothing above is a checkout: the cwd stands in, so ck_in_git_repo keeps
-# reporting "not a git checkout" instead of failing differently.
+# Nothing above is a checkout: the cwd stands in, so git keeps reporting
+# "not a git checkout" instead of failing differently.
 mkdir -p "$work/loose/sub"
 got=$(probe "$work/loose/sub")
 test "$got" = "safe.directory=$work/loose/sub"

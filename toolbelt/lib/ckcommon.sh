@@ -45,19 +45,12 @@ ck_git_root() {
 
 ck_git() { git -c safe.directory="$(ck_git_root)" "$@"; }
 
-ck_in_git_repo() { ck_git rev-parse --is-inside-work-tree >/dev/null 2>&1; }
-
-# --- info.xml and composer.json ----------------------------------------------
-# XML is parsed as XML and JSON as JSON: a line-oriented `tr | grep -o | sed`
-# reads a <license> spanning two lines as empty and is blind to attributes.
+# --- info.xml -----------------------------------------------------------------
+# XML is parsed as XML: a line-oriented `tr | grep -o | sed` reads a <license>
+# spanning two lines as empty and is blind to attributes.
 
 # $1 = file, $2 = 'key' (the root attribute) or a child element name.
 ck_xml_field() {
     "$ck_root/bin/ck" internal xml-field "$1" "$2"
-}
-
-# $1 = file, $2 = top-level key. A missing file or key prints nothing.
-ck_json_field() {
-    "$ck_root/bin/ck" internal json-field "$1" "$2"
 }
 
