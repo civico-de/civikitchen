@@ -158,7 +158,7 @@ help: ## Show this help
 doctor: ## Report every missing host prerequisite in one pass
 	bash scripts/doctor.sh
 
-test: test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario test-provision test-core-patches test-ckcoretest test-ck-headless test-ck-headless-phpstan test-phpstan-bootstrap test-ckcommon-git test-missing-tool test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-promote-scanned test-promote-digest test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-sibling-vendor test-sibling-build test-database-matrix test-demo-basic-auth test-release-retag test-release-move-major-tag test-release-publish-flags test-release-steps test-ci-gates-step test-release-script test-release-verify-images test-vendored-paths test-ckeslint test-ckcoverage test-doctor test-make-phony test-tool-locks test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-cms-families test-changelog test-extension-docs ## Run every fast test suite (no Docker)
+test: test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario test-provision test-core-patches test-ckcoretest test-ck-headless test-ck-headless-phpstan test-phpstan-bootstrap test-ckcommon-git test-missing-tool test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-promote-scanned test-promote-digest test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-sibling-vendor test-sibling-build test-database-matrix test-demo-basic-auth test-release-retag test-release-move-major-tag test-release-publish-flags test-release-steps test-ci-gates-step test-release-script test-release-verify-images test-vendored-paths test-ckeslint test-ckcoverage test-doctor test-make-phony test-make-downloads test-tool-locks test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-cms-families test-changelog test-extension-docs ## Run every fast test suite (no Docker)
 
 test-shared-php-coverage: $(PHPUNIT) $(SCENARIO_YAML_STAMP) ## Shared PHP unit tests and measured line-coverage floor
 	if command -v phpdbg >/dev/null 2>&1; then \
@@ -308,6 +308,9 @@ test-doctor: ## doctor verdicts against synthesised hosts
 
 test-make-phony: ## A file named like a target cannot satisfy it
 	MAKE='$(MAKE)' bash tests/toolbelt/test-make-phony.sh
+
+test-make-downloads: ## A download that fails its checksum leaves no tool behind
+	MAKE='$(MAKE)' bash tests/toolbelt/test-make-downloads.sh
 
 # A lock that installs is not a lock that runs: resolved against a newer PHP
 # than the images ship, a tool tree can pick a transitive that dies at startup
@@ -550,7 +553,7 @@ $(SHELLCHECK):
 $(MAGO):
 	@mkdir -p $(CACHE)
 	@[ -n "$(MAGO_SHA256)" ] && [ -n "$(TRIPLE)" ] || { \
-	  echo "no mago hash pinned for $(SHELLCHECK_PLATFORM) — add CK_MAGO_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)) to toolbelt/versions.env" >&2; exit 1; }
+	  echo "no mago pin for $(SHELLCHECK_PLATFORM) — it needs CK_MAGO_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)) in toolbelt/versions.env and TRIPLE_$(subst .,_,$(SHELLCHECK_PLATFORM)) in the Makefile" >&2; exit 1; }
 	curl -fsSLo $@.tar.gz \
 	  "https://github.com/carthage-software/mago/releases/download/$(CK_MAGO_VERSION)/mago-$(CK_MAGO_VERSION)-$(TRIPLE).tar.gz"
 	echo "$(MAGO_SHA256)  $@.tar.gz" | sha256sum -c --strict -
@@ -558,15 +561,17 @@ $(MAGO):
 	mv $(CACHE)/mago $@
 	rm $@.tar.gz
 
+# Verified under a temporary name: a target that exists is never fetched again.
 $(COMPOSER):
 	@mkdir -p $(@D)
-	curl -fsSLo $@ "https://getcomposer.org/download/$(CK_COMPOSER_VERSION)/composer.phar"
-	echo "$(CK_COMPOSER_SHA256)  $@" | sha256sum -c --strict -
-	chmod +x $@
+	curl -fsSLo $@.tmp "https://getcomposer.org/download/$(CK_COMPOSER_VERSION)/composer.phar"
+	echo "$(CK_COMPOSER_SHA256)  $@.tmp" | sha256sum -c --strict -
+	chmod +x $@.tmp
+	mv $@.tmp $@
 
 $(UVX):
 	@[ -n "$(UV_SHA256)" ] && [ -n "$(TRIPLE)" ] || { \
-	  echo "no uv hash pinned for $(SHELLCHECK_PLATFORM) — add CK_UV_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)) to the Makefile" >&2; exit 1; }
+	  echo "no uv pin for $(SHELLCHECK_PLATFORM) — it needs CK_UV_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)) and TRIPLE_$(subst .,_,$(SHELLCHECK_PLATFORM)) in the Makefile" >&2; exit 1; }
 	@mkdir -p $(@D)
 	curl -fsSLo $(@D).tar.gz "https://github.com/astral-sh/uv/releases/download/$(CK_UV_VERSION)/uv-$(TRIPLE).tar.gz"
 	echo "$(UV_SHA256)  $(@D).tar.gz" | sha256sum -c --strict -
@@ -575,7 +580,7 @@ $(UVX):
 
 $(NODE):
 	@[ -n "$(NODE_SHA256)" ] && [ -n "$(NODE_PLATFORM)" ] || { \
-	  echo "no Node hash pinned for $(SHELLCHECK_PLATFORM) — add CK_NODE_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)) to the Makefile" >&2; exit 1; }
+	  echo "no Node pin for $(SHELLCHECK_PLATFORM) — it needs CK_NODE_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)) and NODE_PLATFORM_$(subst .,_,$(SHELLCHECK_PLATFORM)) in the Makefile" >&2; exit 1; }
 	rm -rf $(NODE_DIR).tmp && mkdir -p $(NODE_DIR).tmp
 	curl -fsSLo $(NODE_DIR).tar.xz "https://nodejs.org/dist/v$(CK_NODE_VERSION)/node-v$(CK_NODE_VERSION)-$(NODE_PLATFORM).tar.xz"
 	echo "$(NODE_SHA256)  $(NODE_DIR).tar.xz" | sha256sum -c --strict -
@@ -585,8 +590,9 @@ $(NODE):
 
 $(PHPUNIT):
 	@mkdir -p $(CACHE)
-	curl -fsSLo $@ "https://phar.phpunit.de/phpunit-$(CK_PHPUNIT_VERSION).phar"
-	echo "$(CK_PHPUNIT_SHA256)  $@" | sha256sum -c --strict -
+	curl -fsSLo $@.tmp "https://phar.phpunit.de/phpunit-$(CK_PHPUNIT_VERSION).phar"
+	echo "$(CK_PHPUNIT_SHA256)  $@.tmp" | sha256sum -c --strict -
+	mv $@.tmp $@
 
 $(CACHE)/actionlint:
 	@mkdir -p $(CACHE)

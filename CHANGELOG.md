@@ -56,6 +56,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
   download is retried up to three times before provisioning fails.
 - Every `make` target is phony, so a file named like one, such as
   `test-provision`, no longer skips its suite.
+- A composer or phpunit download that fails its checksum no longer stays in
+  `.cache/`, where the next `make` run took it as fetched and used it.
 - `ckcoverage`, `ckmutate`, `cksmarty` and `ckmigrate` stop with an error
   when `civikitchen.yaml` cannot be read. A broken or unreadable file no longer
   reads as unset, which had turned a coverage or mutation floor into "reporting only".
