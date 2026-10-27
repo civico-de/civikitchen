@@ -135,7 +135,9 @@ final class TranslationCatalogCheck implements Check
     private function judgeSourceStrings(Context $context, Reporter $reporter, array $msgids): void
     {
         $literals = [];
-        foreach ($this->sourceFiles($context) as $file) {
+        // Tests are not shipped UI and vendored code has its own catalogs, so
+        // Context's default exclusions fit.
+        foreach ($context->sourceFiles('', ['.php', '.tpl']) as $file) {
             $source = $context->read($file);
             if ($source === null) {
                 continue;
@@ -192,17 +194,6 @@ final class TranslationCatalogCheck implements Check
         sort($files);
 
         return $files;
-    }
-
-    /**
-     * Files that can carry a translatable literal. Tests are not shipped UI and
-     * vendored code has its own catalogs.
-     *
-     * @return list<string>
-     */
-    private function sourceFiles(Context $context): array
-    {
-        return $context->sourceFiles('', ['.php', '.tpl']);
     }
 
     /**
