@@ -84,7 +84,7 @@ final class Sql
      * leading literal part, which is enough to see the statement's verb and
      * its first table.
      */
-    public static function literalString(Node\Expr $expr): ?string
+    public static function literalString(?Node\Expr $expr): ?string
     {
         if ($expr instanceof Node\Scalar\String_) {
             return $expr->value;

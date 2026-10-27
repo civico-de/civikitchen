@@ -37,28 +37,23 @@ final class SqlTableMethodCallRule implements Rule
         $method = $node->name instanceof Node\Identifier ? $node->name->toLowerString() : '';
         // CRM_Core_DAO::query($query, $i18nRewrite = TRUE)
         if (Sql::isDatabaseCall($node)) {
-            $literal = self::literal(CallArgs::value($node, 0, 'query'));
+            $literal = Sql::literalString(CallArgs::value($node, 0, 'query'));
 
             return $literal === null ? [] : $this->schema->checkSql($literal, sprintf('->%s()', $method));
         }
 
         // ->from($from, $options = []); ->join($name, $exprs, $args = NULL)
         if ($method === 'from') {
-            $literal = self::literal(CallArgs::value($node, 0, 'from'));
+            $literal = Sql::literalString(CallArgs::value($node, 0, 'from'));
 
             return $literal === null ? [] : $this->schema->checkTableClause($literal, '->from()');
         }
         if ($method === 'join') {
-            $literal = self::literal(CallArgs::value($node, 1, 'exprs'));
+            $literal = Sql::literalString(CallArgs::value($node, 1, 'exprs'));
 
             return $literal === null ? [] : $this->schema->checkSql($literal, '->join()');
         }
 
         return [];
-    }
-
-    private static function literal(?Node\Expr $expr): ?string
-    {
-        return $expr === null ? null : Sql::literalString($expr);
     }
 }

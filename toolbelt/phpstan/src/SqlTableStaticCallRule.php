@@ -35,23 +35,18 @@ final class SqlTableStaticCallRule implements Rule
         $method = $node->name instanceof Node\Identifier ? $node->name->toString() : '';
         // executeQuery($query, ...), singleValueQuery($query, ...), executeUnbufferedQuery($query, ...)
         if (Sql::isDatabaseCall($node)) {
-            $literal = self::literal(CallArgs::value($node, 0, 'query'));
+            $literal = Sql::literalString(CallArgs::value($node, 0, 'query'));
 
             return $literal === null ? [] : $this->schema->checkSql($literal, sprintf('%s::%s()', $class, $method));
         }
 
         // CRM_Utils_SQL_Select::from($from, $options = [])
         if (strcasecmp($class, 'CRM_Utils_SQL_Select') === 0 && strtolower($method) === 'from') {
-            $literal = self::literal(CallArgs::value($node, 0, 'from'));
+            $literal = Sql::literalString(CallArgs::value($node, 0, 'from'));
 
             return $literal === null ? [] : $this->schema->checkTableClause($literal, 'CRM_Utils_SQL_Select::from()');
         }
 
         return [];
-    }
-
-    private static function literal(?Node\Expr $expr): ?string
-    {
-        return $expr === null ? null : Sql::literalString($expr);
     }
 }

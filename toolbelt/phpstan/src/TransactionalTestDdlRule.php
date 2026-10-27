@@ -261,7 +261,7 @@ final class TransactionalTestDdlRule implements Rule
     private static function checkSqlArguments(array $args, Node $expr): array
     {
         foreach ($args as $arg) {
-            $sql = self::literal($arg->value);
+            $sql = Sql::literalString($arg->value);
             $verb = $sql === null ? null : TransactionalDdl::ddlVerb($sql);
             if ($verb !== null) {
                 return [self::error(
@@ -286,7 +286,7 @@ final class TransactionalTestDdlRule implements Rule
         if (strtolower($action) === 'setvalue') {
             $field = self::item($params, 'field');
 
-            return $field !== null && self::literal($field) === 'is_multiple';
+            return $field !== null && Sql::literalString($field) === 'is_multiple';
         }
 
         return self::item($params, 'is_multiple') !== null;
@@ -298,7 +298,7 @@ final class TransactionalTestDdlRule implements Rule
         if ($method === 'addvalue') {
             $field = CallArgs::value($call, 0, 'fieldName');
 
-            return $field !== null && self::literal($field) === 'is_multiple';
+            return $field !== null && Sql::literalString($field) === 'is_multiple';
         }
 
         return self::item(CallArgs::value($call, 0, 'values'), 'is_multiple') !== null;
@@ -311,7 +311,7 @@ final class TransactionalTestDdlRule implements Rule
             return null;
         }
         foreach ($array->items as $item) {
-            if ($item->key !== null && self::literal($item->key) === $key) {
+            if ($item->key !== null && Sql::literalString($item->key) === $key) {
                 return $item->value;
             }
         }
@@ -329,11 +329,6 @@ final class TransactionalTestDdlRule implements Rule
         }
 
         return false;
-    }
-
-    private static function literal(Node\Expr $expr): ?string
-    {
-        return Sql::literalString($expr);
     }
 
     private static function isExtensionManager(Node\Expr $expr): bool
