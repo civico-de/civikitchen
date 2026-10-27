@@ -982,11 +982,8 @@ jobs:
     env:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
-      # Where CiviCRM has the extension enabled, and where the git-reading
-      # tools see the same directory inside the checkout — derived by `key`.
+      # Where CiviCRM has the extension enabled — derived by `key`.
       CK_EXT_PATH: ${{ needs.key.outputs.ext_path }}
-      CK_TOOL_PATH: ${{ needs.key.outputs.tool_path }}
-      CK_REPO_PATH: ${{ needs.key.outputs.repo_path }}
       CIVIKITCHEN_IMAGE: ${{ needs.key.outputs.image }}
       # One compose project per job — see the note in `ci`.
       COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.key.outputs.key_slug }}-upgrade
@@ -1180,11 +1177,8 @@ jobs:
     env:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
-      # Where CiviCRM has the extension enabled, and where the git-reading
-      # tools see the same directory inside the checkout — derived by `key`.
+      # Where CiviCRM has the extension enabled — derived by `key`.
       CK_EXT_PATH: ${{ needs.key.outputs.ext_path }}
-      CK_TOOL_PATH: ${{ needs.key.outputs.tool_path }}
-      CK_REPO_PATH: ${{ needs.key.outputs.repo_path }}
       CIVIKITCHEN_IMAGE: ${{ needs.key.outputs.image }}
       # One compose project per job — see the note in `ci`.
       COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.key.outputs.key_slug }}-schema-parity
@@ -1435,10 +1429,9 @@ jobs:
     env:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
-      # Where CiviCRM has the extension enabled, and where the git-reading
-      # tools see the same directory inside the checkout — derived by `key`.
+      # Where CiviCRM has the extension enabled, and the checkout's root in the
+      # container that git has to trust — derived by `key`.
       CK_EXT_PATH: ${{ needs.key.outputs.ext_path }}
-      CK_TOOL_PATH: ${{ needs.key.outputs.tool_path }}
       CK_REPO_PATH: ${{ needs.key.outputs.repo_path }}
       CIVIKITCHEN_IMAGE: ${{ needs.key.outputs.image }}
       # One compose project per job — see the note in `ci`.
@@ -1569,11 +1562,8 @@ jobs:
     env:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
-      # Where CiviCRM has the extension enabled, and where the git-reading
-      # tools see the same directory inside the checkout — derived by `key`.
+      # Where CiviCRM has the extension enabled — derived by `key`.
       CK_EXT_PATH: ${{ needs.key.outputs.ext_path }}
-      CK_TOOL_PATH: ${{ needs.key.outputs.tool_path }}
-      CK_REPO_PATH: ${{ needs.key.outputs.repo_path }}
       CK_CORE_FROM: ${{ inputs.core_upgrade_from }}
       # The job-level image is the upgrade TARGET: the run's normal image, or
       # empty for the compose file's own default. Only the first boot overrides
@@ -1926,11 +1916,8 @@ jobs:
     env:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
-      # Where CiviCRM has the extension enabled, and where the git-reading
-      # tools see the same directory inside the checkout — derived by `key`.
+      # Where CiviCRM has the extension enabled — derived by `key`.
       CK_EXT_PATH: ${{ needs.key.outputs.ext_path }}
-      CK_TOOL_PATH: ${{ needs.key.outputs.tool_path }}
-      CK_REPO_PATH: ${{ needs.key.outputs.repo_path }}
       CIVIKITCHEN_IMAGE: ${{ matrix.image }}
       # One compose project per job — see the note in `ci`.
       COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.key.outputs.key_slug }}-compat-${{ strategy.job-index }}
@@ -2073,11 +2060,6 @@ jobs:
     env:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
-      # Where CiviCRM has the extension enabled, and where the git-reading
-      # tools see the same directory inside the checkout — derived by `key`.
-      CK_EXT_PATH: ${{ needs.key.outputs.ext_path }}
-      CK_TOOL_PATH: ${{ needs.key.outputs.tool_path }}
-      CK_REPO_PATH: ${{ needs.key.outputs.repo_path }}
       CIVIKITCHEN_IMAGE: ${{ matrix.image }}
       # One compose project per job — see the note in `ci`.
       COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.key.outputs.key_slug }}-playwright-${{ strategy.job-index }}
