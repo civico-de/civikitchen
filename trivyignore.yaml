@@ -135,8 +135,9 @@ vulnerabilities:
   # PhpSpreadsheet in CiviCRM core's vendor tree
   #
   # Core's vendor tree, reported against its composer/installed.json: in
-  # standalone at var/www/html/core, in the buildkit flavors inside the CMS's
-  # civicrm directory (Drupal's site-level composer already resolves 5.10.0).
+  # standalone at var/www/html/core, in the buildkit flavors (standalone-demo
+  # included) below the civibuild site (Drupal's site-level composer already
+  # resolves 5.10.0).
   # Same argument as the bundled frontend libraries: core's composer.lock pins
   # phpoffice/phpspreadsheet 5.8.1 on every line these images build. The fixed
   # 5.x releases require PHP 8.2, which core's stable lines do not; master
@@ -146,7 +147,7 @@ vulnerabilities:
   - id: CVE-2026-108357
     paths:
       - "var/www/html/core/vendor/composer/installed.json"
-      - "home/buildkit/buildkit/build/site/**/civicrm/vendor/composer/installed.json"
+      - "home/buildkit/buildkit/build/site/**/vendor/composer/installed.json"
     statement: >-
       XmlScanner bypass through the unentity() callback, which only the
       SpreadsheetML 2003 reader (Reader/Xml.php) registers. Core reads uploaded
@@ -157,7 +158,7 @@ vulnerabilities:
   - id: CVE-2026-108358
     paths:
       - "var/www/html/core/vendor/composer/installed.json"
-      - "home/buildkit/buildkit/build/site/**/civicrm/vendor/composer/installed.json"
+      - "home/buildkit/buildkit/build/site/**/vendor/composer/installed.json"
     statement: >-
       XmlScanner bypass via ISO-2022 escape sequences in the Xlsx reader that
       civiimport's Spreadsheet data source uses. Reachable by a user with
@@ -170,7 +171,7 @@ vulnerabilities:
   - id: CVE-2026-108359
     paths:
       - "var/www/html/core/vendor/composer/installed.json"
-      - "home/buildkit/buildkit/build/site/**/civicrm/vendor/composer/installed.json"
+      - "home/buildkit/buildkit/build/site/**/vendor/composer/installed.json"
     statement: >-
       Unbounded table:number-rows-repeated in the Ods reader, reached through
       the same civiimport upload. Measured: a 3 KB file exhausts a 256 MB
