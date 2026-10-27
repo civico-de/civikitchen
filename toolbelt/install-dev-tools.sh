@@ -1,6 +1,7 @@
 #!/bin/bash
 # Install OS-agnostic CiviCRM extension dev tools used by both the standalone
 # and buildkit images:
+#   - composer (the phar the Makefile's suites run on too)
 #   - civix    (CiviCRM extension scaffolding/build tool)
 #   - phpunit  (pinned to 9 for CiviCRM compatibility)
 #   - phpstan  (isolated; static analysis incl. the deprecation rules and
@@ -17,15 +18,15 @@
 #   - oxfmt    (npm toolchain; JS/TS half of `ckfmt`)
 #
 # Prerequisites (handled per image):
-#   - composer, php, curl, git on PATH
+#   - php, curl, git on PATH
 #   - /opt/composer/vendor/bin on PATH (so composer-dependency-analyser is picked up)
 set -euo pipefail
 
 # Pins with more than one consumer come from versions.env, which Make `include`s
-# and bash sources natively — no parser on either side. Of the tool pins, only
-# PHPUNIT_* is shared (the Makefile runs the tool test suites on the same phar
-# this image bakes); everything else below has exactly one consumer and stays
-# here, next to the comment that explains it.
+# and bash sources natively — no parser on either side. Of the tool pins,
+# composer, phpunit and mago are shared (the Makefile runs the tool test suites
+# on the same releases this image bakes); everything else below has exactly one
+# consumer and stays here, next to the comment that explains it.
 #
 # The image carries the toolbelt at /opt/civikitchen/toolbelt, laid out as in
 # the checkout, so versions.env and every tool root sit beside this script.
@@ -72,10 +73,10 @@ MAGO_VERSION="${MAGO_VERSION:-$CK_MAGO_VERSION}"
 NPM_VERSION="${NPM_VERSION:-12.2.1}"
 
 # ---------------------------------------------------------------------------
-# Phars: civix, phpunit. (phpstan is NOT a phar: it is composer-installed
-# below so extensions can register, and its integrity is composer's dist
-# checksum — a phar fetched here would be overwritten by that wrapper and its
-# hash check would guard nothing.)
+# Phars: composer, civix, phpunit. (phpstan is NOT a phar: it is
+# composer-installed below so extensions can register, and its integrity is
+# composer's dist checksum — a phar fetched here would be overwritten by that
+# wrapper and its hash check would guard nothing.)
 #
 # A pinned version only pins what the server chooses to serve — over TLS or
 # not, an unverified phar is arbitrary code entering every image. The hashes
@@ -104,6 +105,11 @@ fetch_phar() {
     fi
     chmod +x "${dest}"
 }
+
+# From versions.env, with no build argument: the standalone image's git source
+# stage and the Makefile's lockfile gate run the same release.
+fetch_phar "https://getcomposer.org/download/${CK_COMPOSER_VERSION}/composer.phar" \
+    /usr/local/bin/composer "${CK_COMPOSER_SHA256}"
 
 fetch_phar "https://download.civicrm.org/civix/civix-${CIVIX_VERSION}.phar" \
     /usr/local/bin/civix "${CIVIX_SHA256}"

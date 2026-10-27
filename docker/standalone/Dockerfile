@@ -55,9 +55,14 @@ RUN curl -fsSL "${CIVICRM_DOWNLOAD_URL}" -o /tmp/civicrm-standalone.tar.gz \
 # PHP extensions are checked in the runtime stage, which installs them.
 FROM php:${PHP_VERSION}-apache-bookworm AS download-git
 ARG CIVICRM_VERSION
-RUN apt-get update && apt-get install -y --no-install-recommends git unzip \
-    && curl -sS https://getcomposer.org/installer \
-       | php -- --install-dir=/usr/local/bin --filename=composer
+# The composer release install-dev-tools.sh bakes into the image.
+COPY toolbelt/versions.env /tmp/versions.env
+RUN . /tmp/versions.env \
+    && apt-get update && apt-get install -y --no-install-recommends git unzip \
+    && curl -fsSL --retry 3 --retry-all-errors -o /usr/local/bin/composer \
+       "https://getcomposer.org/download/${CK_COMPOSER_VERSION}/composer.phar" \
+    && echo "${CK_COMPOSER_SHA256}  /usr/local/bin/composer" | sha256sum -c --strict - \
+    && chmod +x /usr/local/bin/composer
 ADD --keep-git-dir=true "https://github.com/civicrm/civicrm-core.git#${CIVICRM_VERSION}" /tmp/civicrm/civicrm-standalone/core
 ADD --keep-git-dir=true "https://github.com/civicrm/civicrm-packages.git#${CIVICRM_VERSION}" /tmp/civicrm/civicrm-standalone/core/packages
 WORKDIR /tmp/civicrm/civicrm-standalone/core
@@ -148,15 +153,12 @@ RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
 
 ENV CIVICRM_UF=Standalone
 
-# composer: required by most modern extensions to install vendor deps.
-RUN curl -sS https://getcomposer.org/installer \
-    | php -- --install-dir=/usr/local/bin --filename=composer
-
-# Shared dev-tools install (civix, phpunit, phpstan, mago, rector/ckmodernize,
-# the ckdeps analyser).
+# Shared dev-tools install (composer, civix, phpunit, phpstan, mago,
+# rector/ckmodernize, the ckdeps analyser).
 # Lives in toolbelt/ so the buildkit image uses the same script.
-# Every tool version is pinned in the script; pass --build-arg to override
-# (e.g. to test a newer phpstan before bumping the default).
+# Composer-installable tools are pinned in committed lockfiles (toolbelt/*-root,
+# toolbelt/rector, toolbelt/psalm); what is left below is what needs a phar,
+# a binary release or a git ref, and those stay overridable per --build-arg.
 ENV PATH="/opt/composer/vendor/bin:${PATH}"
 # Overriding a phar *_VERSION requires overriding its *_SHA256 too — the
 # install script fails a mismatch on purpose.

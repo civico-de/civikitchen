@@ -51,6 +51,9 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - `mail_count` and `newest_mail_text` in the managed `tests/e2e/lib.sh` filter
   maildev's list with the app container's jq, so the bash suites need no
   python3 on the host. `ckinit --update` brings the file forward.
+- The images install composer from the pin in `toolbelt/versions.env` and
+  check its checksum; `make test` runs the same release. They had installed
+  whichever version getcomposer.org's installer served at build time.
 
 ### Removed
 

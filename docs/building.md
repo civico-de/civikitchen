@@ -140,16 +140,16 @@ the tool locks to a vulnerable version. It is removed once the tool's own pin
 moves past the fix.
 
 Tools that neither composer nor npm installs stay in
-`toolbelt/install-dev-tools.sh`, and each can be overridden with a build
-argument. These are the civix and phpunit phars, the mago binary, and npm.
-Each of the first three has a checksum, so overriding a `*_VERSION` means
-overriding its `*_SHA256` too. The phpunit pin itself sits in
+`toolbelt/install-dev-tools.sh`: composer itself, the civix and phpunit phars,
+the mago binary, and npm. All but composer can be overridden with a build
+argument. The phars and mago have a checksum, so overriding a `*_VERSION`
+means overriding its `*_SHA256` too. The composer, phpunit and mago pins sit in
 `toolbelt/versions.env`, because the Makefile runs the tool test suites on the
-same phar.
+same releases.
 
-infection is the one composer tool still pinned in `versions.env`, because the
-pin works as a ceiling. Images for older CiviCRM lines run on PHP 8.1 or 8.2,
-and composer picks the newest release that PHP accepts.
+infection is the one composer tool pinned in `install-dev-tools.sh` instead of
+a lockfile, because the pin works as a ceiling. Images for older CiviCRM lines
+run on PHP 8.1 or 8.2, and composer picks the newest release that PHP accepts.
 
 ## Keeping the CiviCRM git history (`KEEP_GIT=1`)
 

@@ -64,8 +64,6 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends \
     && docker-php-ext-install -j"$(nproc)" \
         pdo_mysql mysqli gd intl zip bcmath soap opcache \
     && a2enmod rewrite ssl headers \
-    && curl -sS https://getcomposer.org/installer \
-        | php -- --install-dir=/usr/local/bin --filename=composer \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -74,8 +72,8 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends \
 RUN pecl install pcov xdebug \
     && docker-php-ext-enable pcov
 
-# Shared dev-tools install (civix, phpunit, phpstan, mago, rector/ckmodernize,
-# the ckdeps analyser).
+# Shared dev-tools install (composer, civix, phpunit, phpstan, mago,
+# rector/ckmodernize, the ckdeps analyser).
 # Lives in toolbelt/ so the standalone image uses the same script.
 # Composer-installable tools are pinned in committed lockfiles (toolbelt/*-root,
 # toolbelt/rector, toolbelt/psalm); what is left below is what needs a phar,

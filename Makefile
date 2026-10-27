@@ -83,9 +83,8 @@ MAGO_SHA256 := $(CK_MAGO_SHA256_$(subst .,_,$(SHELLCHECK_PLATFORM)))
 MAGO := $(CACHE)/mago-$(CK_MAGO_VERSION)
 
 # Composer, uv and Node are fetched pinned too, so the host needs no package
-# manager of its own. Their directories lead every recipe's PATH.
-CK_COMPOSER_VERSION := 2.10.3
-CK_COMPOSER_SHA256 := 7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6
+# manager of its own; composer is the images' release (versions.env). Their
+# directories lead every recipe's PATH.
 CK_UV_VERSION := 0.13.6
 CK_UV_SHA256_linux_x86_64 := f29c3e94ffabd7e6f3ba521dba169a9b7ec12100bf3257087f0f24f6123f3645
 CK_UV_SHA256_darwin_aarch64 := 60fbd5c8a1ed681845eea28d9d622fcde03c51e91a43465b64a1e17db1ed3472

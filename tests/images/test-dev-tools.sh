@@ -11,7 +11,7 @@
 # Or via the workflow's smoke-test job (see .github/workflows/build-dev-images.yml).
 #
 # What it checks:
-#   1. Every binary responds to --version
+#   1. Every binary responds to --version; the dev tools' composer is the pin
 #   2. the toolbelt ships no phpcs; mago does its jobs
 #   3. ck scenario parses a canonical civikitchen.yaml
 #   3b. cklint's mago stage runs the CiviKitchen extension rules and its tests
@@ -62,6 +62,16 @@ for bin in composer composer-dependency-analyser node npm civix phpunit phpstan 
         fail "${bin} --version"
     fi
 done
+# install-dev-tools.sh's composer is the versions.env pin. On buildkit images
+# civibuild's own composer comes first on PATH, hence the absolute path.
+# shellcheck source=../../toolbelt/versions.env
+. /opt/civikitchen/toolbelt/versions.env
+COMPOSER_LINE="$(/usr/local/bin/composer --version 2>/dev/null)" || true
+if [[ "${COMPOSER_LINE}" == "Composer version ${CK_COMPOSER_VERSION} "* ]]; then
+    ok "/usr/local/bin/composer is the pinned ${CK_COMPOSER_VERSION}"
+else
+    fail "/usr/local/bin/composer is not the pinned ${CK_COMPOSER_VERSION}: ${COMPOSER_LINE%%$'\n'*}"
+fi
 
 # Every toolbelt tool is on PATH as a link into /opt/civikitchen/toolbelt, the
 # standalone-only helpers only there, and the deprecated v1 paths resolve.
