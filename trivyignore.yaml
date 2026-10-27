@@ -157,6 +157,48 @@ vulnerabilities:
     expired_at: 2027-02-01
 
   # -------------------------------------------------------------------------
+  # PhpSpreadsheet in CiviCRM core's vendor tree
+  #
+  # var/www/html/core/vendor, reported against its composer/installed.json.
+  # Same argument as the bundled frontend libraries: core's composer.lock pins
+  # phpoffice/phpspreadsheet 5.8.1 on every line these images build. The fixed
+  # 5.x releases require PHP 8.2, which core's stable lines do not; master
+  # takes 5.10.0 with civicrm-core#37744. On expiry recheck core's
+  # composer.lock for each built line and delete what no longer reports.
+  # -------------------------------------------------------------------------
+  - id: CVE-2026-108357
+    paths:
+      - "var/www/html/core/vendor/composer/installed.json"
+    statement: >-
+      XmlScanner bypass through the unentity() callback, which only the
+      SpreadsheetML 2003 reader (Reader/Xml.php) registers. Core reads uploaded
+      spreadsheets only in civiimport's Spreadsheet data source, with the Xlsx
+      and Ods readers; nothing in core loads Reader/Xml.
+    expired_at: 2027-01-31
+
+  - id: CVE-2026-108358
+    paths:
+      - "var/www/html/core/vendor/composer/installed.json"
+    statement: >-
+      XmlScanner bypass via ISO-2022 escape sequences in the Xlsx reader that
+      civiimport's Spreadsheet data source uses. Reachable by a user with
+      import permission uploading a file. The readers pass neither
+      LIBXML_NOENT nor LIBXML_DTDLOAD, so libxml 2.9.14 in the images loads no
+      external entities; what is left is a denial of service of the uploading
+      request in a dev container.
+    expired_at: 2027-01-31
+
+  - id: CVE-2026-108359
+    paths:
+      - "var/www/html/core/vendor/composer/installed.json"
+    statement: >-
+      Unbounded table:number-rows-repeated in the Ods reader, reached through
+      the same civiimport upload. Measured: a 3 KB file exhausts a 256 MB
+      memory_limit in that one request. 5.10.0 still accepts repeats up to the
+      sheet's row limit, so the upgrade bounds this rather than removing it.
+    expired_at: 2027-01-31
+
+  # -------------------------------------------------------------------------
   # civicrm-buildkit's own node_modules (buildkit-based flavors only)
   #
   # /home/buildkit/buildkit/node_modules is created by upstream's
