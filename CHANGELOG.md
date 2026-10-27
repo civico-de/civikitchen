@@ -76,6 +76,9 @@ except that a break the consumers are adjusted for ships as a minor, marked
   `-` and `/` is refused before the build.
 - `extension-docs.yml` uploads the WCAG check's HTML report with a trace of
   each failing page (`docs-wcag-report`) when the check fails.
+- The login setup of `examples/extension-with-playwright` waits for CiviCRM's
+  menubar. It had waited for the username on the page after login, which the
+  standalone image does not show, so the starter suite failed in its setup.
 - `ckmigrate` names a `phpcs.xml.dist` entry in `policy.template_custom`
   wherever it stands in the list, and no longer mistakes a path such as
   `phpcs.xml.dist.bak` for one.

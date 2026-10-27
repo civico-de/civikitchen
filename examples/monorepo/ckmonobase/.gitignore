@@ -24,3 +24,8 @@ Thumbs.db
 # TypeScript's incremental build cache (named after the tsconfig it belongs
 # to, so a bare '.tsbuildinfo' pattern misses it)
 *.tsbuildinfo
+
+# Playwright's session file, report and traces (playwright.config.ts)
+.auth/
+/playwright-report/
+/test-results/

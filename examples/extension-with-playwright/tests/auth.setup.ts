@@ -21,7 +21,8 @@ setup('authenticate as admin', async ({ page }) => {
   await page.getByRole('button', { name: /log in/i }).click();
 
   await expect(page).not.toHaveURL(/\/civicrm\/login/, { timeout: 15_000 });
-  await expect(page.locator('body')).toContainText(DEMO_USER, { timeout: 15_000 });
+  // CiviCRM's menubar renders only for a logged-in user.
+  await expect(page.getByRole('navigation').getByRole('link', { name: 'Home' })).toBeVisible({ timeout: 15_000 });
 
   await page.context().storageState({ path: authFile });
 });

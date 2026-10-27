@@ -39,6 +39,8 @@ jobs:
     with:
       working_directory: examples/monorepo/ckmonobase
       image: ghcr.io/civico-de/civikitchen:standalone
+      # The browser job against the starter suite of examples/extension-with-playwright.
+      playwright: true
 
   addon:
     if: ${{ github.repository == 'civico-de/civikitchen' }}
