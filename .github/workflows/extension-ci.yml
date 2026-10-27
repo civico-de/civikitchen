@@ -166,8 +166,8 @@ on:
           Runner label for all jobs. Resolution: this input, else the caller's
           CK_RUNS_ON repo/org variable, else 'ubuntu-latest' — one variable
           flips a whole fleet. NEVER attach self-hosted runners to a public
-          repo (fork PRs run arbitrary code). Host needs Docker + php-cli with
-          SimpleXML and posix.
+          repo (fork PRs run arbitrary code). The host tools a self-hosted
+          runner needs are listed in docs/reusable-workflows.md.
         type: string
         default: ''
       node_version:

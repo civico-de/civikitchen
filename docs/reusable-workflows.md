@@ -61,6 +61,19 @@ All jobs except those of `extension-docs.yml` pick their runner in this order:
 2. the caller repository's `CK_RUNS_ON` variable,
 3. `ubuntu-latest`.
 
+GitHub-hosted runners bring every tool the workflows call. A self-hosted
+runner needs these on the host; Node and Bun come from their setup actions:
+
+| Workflow | Host tools |
+|---|---|
+| `extension-ci.yml` | Docker with the compose plugin, git, php-cli with the xml and posix extensions, composer, curl, jq |
+| `extension-release.yml` | Docker with the compose plugin, git, php-cli with the xml, posix and zip extensions, composer, gh, unzip |
+| `playwright-e2e.yml` | Docker, git, php-cli with the xml and posix extensions; composer when `sibling_repo` is set |
+| `frontend-ci.yml`, `command-check.yml` | whatever the caller's commands run |
+
+Never attach a self-hosted runner to a public repository: a pull request from
+a fork runs its own code on it.
+
 ## Frontend CI
 
 `frontend-ci.yml` installs an npm project. It then runs the typecheck, lint,
