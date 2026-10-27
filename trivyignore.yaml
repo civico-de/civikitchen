@@ -217,6 +217,26 @@ vulnerabilities:
       Recheck after a buildkit rebuild.
     expired_at: 2027-01-31
 
+  - id: CVE-2025-7783
+    statement: >-
+      form-data 2.3.3 via karma-phantomjs-launcher@1.0.4 ->
+      phantomjs-prebuilt@2.1.16 -> request@2.88.0. phantomjs-prebuilt is an
+      OPTIONAL dependency of an abandoned browser launcher; nothing in these
+      images posts multipart bodies through it. Parameter pollution via the
+      predictable boundary requires an application that sends attacker-chosen
+      field values to a remote endpoint — there is no such caller here. On
+      expiry recheck after a buildkit rebuild; upstream dropping
+      karma-phantomjs-launcher removes the whole chain.
+    expired_at: 2027-01-31
+
+  - id: CVE-2026-12143
+    statement: >-
+      form-data 2.3.3, same abandoned phantomjs chain as above. CRLF injection
+      needs attacker-controlled field names or filenames passed to
+      FormData#append; nothing in the image calls it at all. Recheck after a
+      buildkit rebuild; it shows only in the amd64 images.
+    expired_at: 2027-01-31
+
   - id: CVE-2026-4800
     statement: >-
       lodash 4.17.23 via jshint@2.13.4 and karma@6.4.4. The RCE is in
