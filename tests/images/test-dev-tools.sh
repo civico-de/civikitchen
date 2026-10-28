@@ -423,6 +423,7 @@ fi
 # The extension's own cases (exact findings per fixture) run against the
 # image's mago, from a copy since /opt is not the test's to write to.
 cp -r /opt/civikitchen/toolbelt "${WORKDIR}/toolbelt"
+ln -s /opt/civikitchen/vendor "${WORKDIR}/vendor"
 if EXT_TESTS_OUT="$(php "${WORKDIR}/toolbelt/mago-ext/tests/run.php" --mago="$(command -v mago)" 2>&1)"; then
     ok "CiviKitchen mago extension cases"
 else
