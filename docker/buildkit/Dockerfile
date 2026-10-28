@@ -75,10 +75,9 @@ RUN pecl install pcov xdebug \
 # Shared dev-tools install (composer, civix, phpunit, phpstan, mago,
 # rector/ckmodernize, the ckdeps analyser).
 # Lives in toolbelt/ so the standalone image uses the same script.
-# Composer-installable tools are pinned in committed lockfiles (toolbelt/*-root,
-# toolbelt/rector, toolbelt/psalm); what is left below is what needs a phar,
-# a binary release or a git ref, and those stay overridable per --build-arg.
-ENV PATH="/opt/composer/vendor/bin:${PATH}"
+# Composer-installable tools are pinned in the committed root composer.lock;
+# what is left below is what needs a phar, a binary release or a git ref, and
+# those stay overridable per --build-arg.
 # Overriding a phar *_VERSION requires overriding its *_SHA256 too — the
 # install script fails a mismatch on purpose. Each ARG reaches the script as an
 # environment variable; one left unset keeps the script's default.
@@ -91,9 +90,8 @@ ARG MAGO_SHA256_X86_64
 ARG MAGO_SHA256_AARCH64
 ARG NPM_VERSION
 ARG INFECTION_VERSION
-# The ckdeps installation root IS composer's home dir — `composer global
-# install` in install-dev-tools.sh reads exactly these two files.
-COPY toolbelt/ckdeps-root /opt/composer
+# The one composer root of the toolbelt; install-dev-tools.sh installs from it.
+COPY composer.json composer.lock /opt/civikitchen/
 # The toolbelt, laid out as in a checkout, as in the standalone image — minus
 # the standalone-only helpers: cktestreset reseeds the standalone scratch DB,
 # ckcoretest runs core suites against its dist core, ckboot provisions the
@@ -138,13 +136,8 @@ COPY docker/buildkit/ext/ckjoomlaidentity /usr/local/share/civikitchen/ext/ckjoo
 # any runtime `civibuild` invocation see the same definition.
 COPY docker/buildkit/site-types /usr/local/share/civikitchen/site-types
 
-# The scenario CLI parses the canonical civikitchen.yaml with Symfony's
-# maintained YAML component. Install it once in the shared base so both final
-# and demo targets inherit the exact locked parser without runtime downloads.
+# The scenario CLI's schema and loader; its YAML parser is in the root vendor/.
 COPY packages/civikitchen-scenario-schema /opt/civikitchen/packages/civikitchen-scenario-schema
-RUN --mount=type=secret,id=composer_auth,env=COMPOSER_AUTH composer install --no-dev --no-interaction --no-progress --classmap-authoritative \
-    --working-dir=/opt/civikitchen/packages/civikitchen-scenario-schema \
-    && composer clear-cache
 
 # buildkit user owns the site tree so civibuild can write to it. Apache is
 # reconfigured to run as buildkit so the served files match the writer's uid
@@ -255,7 +248,7 @@ ARG DEFAULT_SITE_TYPE
 ARG CIVICRM_VERSION
 # Which CiviCRM the image bakes, readable via `docker inspect` without booting.
 LABEL org.opencontainers.image.version="${CIVICRM_VERSION}"
-ENV PATH="/opt/composer/vendor/bin:/home/buildkit/buildkit/bin:${PATH}" \
+ENV PATH="/home/buildkit/buildkit/bin:${PATH}" \
     CIVIBUILD_ADMIN_PASS="admin" \
     CIVICRM_SITE_TYPE_DEFAULT="${DEFAULT_SITE_TYPE}"
 
@@ -310,13 +303,11 @@ ENTRYPOINT ["/home/buildkit/entrypoint.sh"]
 # underneath that COPY, inflating the image for nothing.
 FROM base AS final
 
-# /opt/composer/vendor/bin is prepended ahead of /home/buildkit/buildkit/bin
-# so the toolbelt's pinned tools win over buildkit's own copies.
 ARG DEFAULT_SITE_TYPE
 ARG CIVICRM_VERSION
 # Which CiviCRM the image bakes, readable via `docker inspect` without booting.
 LABEL org.opencontainers.image.version="${CIVICRM_VERSION}"
-ENV PATH="/opt/composer/vendor/bin:/home/buildkit/buildkit/bin:${PATH}" \
+ENV PATH="/home/buildkit/buildkit/bin:${PATH}" \
     CIVIBUILD_ADMIN_PASS="admin" \
     CIVICRM_SITE_TYPE_DEFAULT="${DEFAULT_SITE_TYPE}"
 

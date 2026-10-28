@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 $templateDir = __DIR__ . '/template/extension';
-$yamlAutoload = dirname(__DIR__) . '/packages/civikitchen-scenario-schema/vendor/autoload.php';
+$yamlAutoload = dirname(__DIR__) . '/vendor/autoload.php';
 if (!is_file($yamlAutoload)) {
-  fwrite(STDERR, "ckinit: YAML parser dependency is missing; run composer install --working-dir=packages/civikitchen-scenario-schema\n");
+  fwrite(STDERR, "ckinit: YAML parser dependency is missing; run composer install --no-dev\n");
   exit(2);
 }
 

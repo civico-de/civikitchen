@@ -158,7 +158,7 @@ jobs:
         working-directory: .
         run: |
           composer install --no-dev --no-interaction --no-progress --classmap-authoritative \
-            --working-dir=.civikitchen-ci/packages/civikitchen-scenario-schema
+            --working-dir=.civikitchen-ci
 
       # From the checkout root, so a working_directory that does not exist gets
       # this message rather than a runner error. A tag that is no release

@@ -20,6 +20,9 @@ use PHPStan\Testing\RuleTestCase;
  */
 final class Api4ActionPropertyRuleTest extends RuleTestCase
 {
+
+    use ScansFixtures;
+
     public function testParametersThatFailAsPhpErrorsInsteadOfApiErrors(): void
     {
         $this->analyse(

@@ -19,11 +19,12 @@ use CiviKitchen\Ckconform\Reporter;
  */
 final class DeprecatedImagePathCheck implements Check
 {
-    /** v1 path => where it lives now. */
+    /** Old path => where it lives now. */
     private const MOVED = [
         '/opt/civikitchen-phpstan-config' => '/opt/civikitchen/toolbelt/phpstan-config',
         '/opt/civikitchen-phpstan-ext' => '/opt/civikitchen/toolbelt/phpstan',
-        '/opt/civikitchen-phpstan' => '/opt/civikitchen/toolbelt/phpstan-root',
+        '/opt/civikitchen-phpstan' => '/opt/civikitchen',
+        '/opt/civikitchen/toolbelt/phpstan-root' => '/opt/civikitchen',
         '/opt/civikitchen-psalm' => '/opt/civikitchen/toolbelt/psalm',
         '/opt/civikitchen-rector' => '/opt/civikitchen/toolbelt/rector',
         '/opt/civikitchen-ckconform' => '/opt/civikitchen/toolbelt/ckconform',

@@ -30,7 +30,7 @@ CACHE := .cache
 PHPUNIT := $(CACHE)/phpunit-$(CK_PHPUNIT_VERSION).phar
 SHARED_PHP_COVERAGE := $(CACHE)/shared-php-coverage.xml
 SHARED_PHP_COVERAGE_MIN := 74
-SCENARIO_YAML_STAMP := packages/civikitchen-scenario-schema/vendor/.civikitchen-installed
+VENDOR_STAMP := vendor/.civikitchen-installed
 OXLINT_STAMP := toolbelt/oxlint/node_modules/.civikitchen-installed
 
 # The pinned release IN the path: a catalog bump must invalidate the cached
@@ -145,7 +145,7 @@ help: ## Show this help
 
 test: test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario test-provision test-core-patches test-ckcoretest test-ck-headless test-ck-headless-phpstan test-phpstan-bootstrap test-ckcommon-git test-missing-tool test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-promote-scanned test-promote-digest test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-sibling-vendor test-sibling-build test-database-matrix test-demo-basic-auth test-release-retag test-release-move-major-tag test-release-publish-flags test-release-steps test-ci-gates-step test-release-script test-release-verify-images test-vendored-paths test-ckeslint test-ckcoverage test-make-phony test-make-downloads test-tool-locks test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-cms-families test-changelog test-extension-docs test-compose-config test-playwright-network ## Run every fast test suite (no Docker daemon)
 
-test-shared-php-coverage: $(PHPUNIT) $(SCENARIO_YAML_STAMP) ## Shared PHP unit tests and measured line-coverage floor
+test-shared-php-coverage: $(PHPUNIT) $(VENDOR_STAMP) ## Shared PHP unit tests and measured line-coverage floor
 	if command -v phpdbg >/dev/null 2>&1; then \
 	  phpdbg -qrr $(PHPUNIT) -c tests/shared-php/phpunit.xml.dist --coverage-clover $(SHARED_PHP_COVERAGE); \
 	elif grep -qiE '^(pcov|xdebug)$$' <<<"$$(php -m)"; then \
@@ -160,14 +160,13 @@ test-shared-php-coverage: $(PHPUNIT) $(SCENARIO_YAML_STAMP) ## Shared PHP unit t
 # adds hooks and namespaces every release, and a stale catalog reports them as
 # typos. The drift tests regenerate and diff — but they SKIP without a core
 # checkout, so without $(CORE) the suite goes green while the gate never runs.
-test-ckconform: $(PHPUNIT) $(CORE) $(SCENARIO_YAML_STAMP) ## ckconform's check fixtures + catalog drift gates
+test-ckconform: $(PHPUNIT) $(CORE) $(VENDOR_STAMP) ## ckconform's check fixtures + catalog drift gates
 	CIVICRM_CORE_DIR=$(abspath $(CORE)) \
 	  php $(PHPUNIT) -c toolbelt/ckconform/phpunit.xml.dist
 
 # The rule fixtures run through phpstan's own test harness, so this package
 # needs its vendor tree; the drift gates alone would not.
-test-phpstan: $(PHPUNIT) $(CORE) $(COMPOSER) ## The phpstan extension's rule tests + catalog drift gates
-	composer install --no-interaction --no-progress --working-dir=toolbelt/phpstan
+test-phpstan: $(PHPUNIT) $(CORE) $(VENDOR_STAMP) ## The phpstan extension's rule tests + catalog drift gates
 	CIVICRM_CORE_DIR=$(abspath $(CORE)) \
 	  php $(PHPUNIT) -c toolbelt/phpstan/phpunit.xml.dist
 	# Without fiber scopes a rule sees body variables as mixed; both paths must agree.
@@ -176,8 +175,7 @@ test-phpstan: $(PHPUNIT) $(CORE) $(COMPOSER) ## The phpstan extension's rule tes
 
 # Every mago extension rule against its fixtures, through the pinned mago
 # binary; the runner refuses a binary whose version differs from the SDK's.
-test-mago-ext: $(MAGO) $(COMPOSER) ## The mago extension's rule and plugin fixtures
-	composer install --no-interaction --no-progress --working-dir=toolbelt/mago-ext
+test-mago-ext: $(MAGO) $(VENDOR_STAMP) ## The mago extension's rule and plugin fixtures
 	php toolbelt/mago-ext/tests/run.php --mago=$(abspath $(MAGO))
 
 # A stub replaces core's declaration for mago, so a member core adds or changes
@@ -187,24 +185,23 @@ test-mago-stubs: $(CORE) ## The mago stubs declare every member of the pinned co
 
 # ckmodernize writes these rewrites into extension code, so each rule's
 # fixtures pin both the rewrite and the calls it must leave alone.
-test-rector: $(PHPUNIT) $(COMPOSER) ## The rector rules' fixture tests
-	composer install --no-interaction --no-progress --working-dir=toolbelt/rector
+test-rector: $(PHPUNIT) $(VENDOR_STAMP) ## The rector rules' fixture tests
 	php $(PHPUNIT) -c toolbelt/rector/phpunit.xml.dist
 
 # ckinit stamps the template into every extension repo and its --check mode
 # gates those repos' CI, so a silent regression here either rewrites files it
 # must not touch or waves drift through.
-test-ckinit: $(SCENARIO_YAML_STAMP) ## ckinit seed/update/check integration checks, ckup port picking, the ckx and ck wrappers
+test-ckinit: $(VENDOR_STAMP) ## ckinit seed/update/check integration checks, ckup port picking, the ckx and ck wrappers
 	bash tests/ckinit/test-ckinit.sh
 	bash tests/ckinit/test-ckinit-wrapper.sh
 	bash tests/ckinit/test-ckup.sh
 	bash tests/ckinit/test-ckx.sh
 	bash tests/ckinit/test-ck.sh
 
-test-example-template: $(SCENARIO_YAML_STAMP) ## The monorepo examples carry the current template files and pass ckconform
+test-example-template: $(VENDOR_STAMP) ## The monorepo examples carry the current template files and pass ckconform
 	set -e; for info in examples/monorepo/*/info.xml; do php scaffold/ckinit.php --check "$$(dirname "$$info")"; (cd "$$(dirname "$$info")" && ../../../toolbelt/bin/ckconform >/dev/null) || { echo "ckconform fails in $$(dirname "$$info")" >&2; exit 1; }; done
 
-test-ckcreate: $(SCENARIO_YAML_STAMP) ## ckcreate orchestration and atomic-output checks (fake Docker)
+test-ckcreate: $(VENDOR_STAMP) ## ckcreate orchestration and atomic-output checks (fake Docker)
 	bash tests/ckcreate/test-ckcreate.sh
 
 test-ckcivix: ## ckcivix current/behind/missing/update checks (fake civix)
@@ -225,12 +222,11 @@ test-ckcommon-git: ## ck_git trusts the worktree root, not the cwd
 test-missing-tool: ## A tool missing from PATH is named, not a proc_open warning
 	bash tests/toolbelt/test-missing-tool.sh
 
-test-composer-deps: $(COMPOSER) ## ckdeps config: core-provided classes only, sibling checkouts not scanned
+test-composer-deps: $(VENDOR_STAMP) ## ckdeps config: core-provided classes only, sibling checkouts not scanned
 	php tests/toolbelt/test-composer-deps.php
-	composer install --no-interaction --no-progress --working-dir=toolbelt/ckdeps-root
 	bash tests/toolbelt/test-composer-deps-paths.sh
 
-test-profiles: $(SCENARIO_YAML_STAMP) ## Profile schema, external resolution, credentials modes, file permissions and seed helpers
+test-profiles: $(VENDOR_STAMP) ## Profile schema, external resolution, credentials modes, file permissions and seed helpers
 	php tests/profiles/test-credentials.php
 	php tests/profiles/test-validator.php
 	php -d zend.assertions=1 -d assert.exception=1 tests/profiles/test-profile-data.php
@@ -239,7 +235,7 @@ test-profiles: $(SCENARIO_YAML_STAMP) ## Profile schema, external resolution, cr
 	bash tests/profiles/test-profile-clone.sh
 	bash tests/profiles/test-profile-composer.sh
 
-test-scenario: $(SCENARIO_YAML_STAMP) ## Declarative scenario schema, plan, Compose render and fixed checks
+test-scenario: $(VENDOR_STAMP) ## Declarative scenario schema, plan, Compose render and fixed checks
 	bash tests/scenario/test-scenario.sh
 
 # The <requires> resolution itself is ExtensionProvisionerTest in test-shared-php-coverage;
@@ -265,8 +261,7 @@ test-core-patches: ## Standalone core patches: applied once, contained ones skip
 test-ck-headless: ## ck_headless() installs the <requires> closure and rebuilds on install-file changes (stubbed Civi)
 	bash tests/toolbelt/test-ck-headless.sh
 
-test-ck-headless-phpstan: $(CORE) $(COMPOSER) ## The managed ckHeadless.php passes phpstan level 10 against the pinned core
-	composer install --no-interaction --no-progress --working-dir=toolbelt/phpstan
+test-ck-headless-phpstan: $(CORE) $(VENDOR_STAMP) ## The managed ckHeadless.php passes phpstan level 10 against the pinned core
 	CIVICRM_CORE_DIR=$(abspath $(CORE)) bash tests/toolbelt/test-ck-headless-phpstan.sh
 
 test-phpstan-bootstrap: ## phpstanBootstrap.php autoloads mounted <requires> extensions (stubbed core)
@@ -280,10 +275,10 @@ test-vendored-paths: ## civikitchen.yaml vendored_paths file-list exclusion
 
 # The APIv4 contract rule reaches oxlint through its alpha jsPlugins bridge;
 # only a run through the pinned toolchain proves the rule still fires.
-test-ckeslint: $(OXLINT_STAMP) $(SCENARIO_YAML_STAMP) ## ckeslint: APIv4 contract rule and --core over fixtures
+test-ckeslint: $(OXLINT_STAMP) $(VENDOR_STAMP) ## ckeslint: APIv4 contract rule and --core over fixtures
 	bash tests/toolbelt/test-ckeslint.sh
 
-test-ckcoverage: $(SCENARIO_YAML_STAMP) ## ckcoverage temporary logs, coverage floor, tests opt-out
+test-ckcoverage: $(VENDOR_STAMP) ## ckcoverage temporary logs, coverage floor, tests opt-out
 	bash tests/toolbelt/test-ckcoverage.sh
 
 test-make-phony: ## A file named like a target cannot satisfy it
@@ -301,37 +296,37 @@ test-tool-locks: $(COMPOSER) ## Tool lockfiles: in sync, and resolved against th
 # Two jobs of one run sharing a compose project means the second one's
 # `down -v` kills the first one's containers. Only reproducible where jobs
 # share a Docker daemon, i.e. never on the runner this suite runs on.
-test-compose-isolation: $(SCENARIO_YAML_STAMP) ## Per-job compose project names in the workflows
+test-compose-isolation: $(VENDOR_STAMP) ## Per-job compose project names in the workflows
 	bash tests/parity/test-compose-project-isolation.sh
 
 # A group missing the caller workflow, the image or the leg cancels jobs that
 # are not its own copy in a newer run, which Actions only shows as cancelled.
-test-concurrency-groups: $(SCENARIO_YAML_STAMP) ## Extension CI concurrency groups name the caller workflow, image and leg
+test-concurrency-groups: $(VENDOR_STAMP) ## Extension CI concurrency groups name the caller workflow, image and leg
 	bash tests/parity/test-concurrency-groups.sh
 
-test-matrix-legs: $(SCENARIO_YAML_STAMP) ## Extension CI matrix legs: own project and artifact, compat and browser legs as written
+test-matrix-legs: $(VENDOR_STAMP) ## Extension CI matrix legs: own project and artifact, compat and browser legs as written
 	bash tests/parity/test-matrix-legs.sh
 
 # Without the sibling override a stack-booting job cannot install an extension
 # whose <requires> names a sibling the registry does not know.
-test-sibling-wiring: $(SCENARIO_YAML_STAMP) ## Stack-booting jobs reach the private-dependency steps
+test-sibling-wiring: $(VENDOR_STAMP) ## Stack-booting jobs reach the private-dependency steps
 	bash tests/parity/test-sibling-wiring.sh
 
-test-dist-build-wiring: $(SCENARIO_YAML_STAMP) ## Jobs that run the suite build the policy.dist.build output first
+test-dist-build-wiring: $(VENDOR_STAMP) ## Jobs that run the suite build the policy.dist.build output first
 	bash tests/parity/test-dist-build-wiring.sh
 
 # The runner creates only the workspace root; a step in a subdirectory before
 # the checkout fails on every fresh runner and passes on one with a stale tree.
-test-pre-checkout-workdir: $(SCENARIO_YAML_STAMP) ## No workflow step runs in a workspace subdirectory before the checkout
+test-pre-checkout-workdir: $(VENDOR_STAMP) ## No workflow step runs in a workspace subdirectory before the checkout
 	bash tests/parity/test-pre-checkout-workdir.sh
 
 test-composer-auth: ## Only the images' own composer gets the composer_auth build secret
 	bash tests/parity/test-composer-auth.sh
 
-test-image-wiring: $(SCENARIO_YAML_STAMP) ## Stack images reach compose only through the policy.civicrm resolver
+test-image-wiring: $(VENDOR_STAMP) ## Stack images reach compose only through the policy.civicrm resolver
 	bash tests/parity/test-image-wiring.sh
 
-test-promote-scanned: $(SCENARIO_YAML_STAMP) ## Every image promote job waits for the scan of its own candidates
+test-promote-scanned: $(VENDOR_STAMP) ## Every image promote job waits for the scan of its own candidates
 	bash tests/parity/test-promote-scanned.sh
 
 test-promote-digest: ## Scan resolves each candidate digest once; promote publishes exactly that digest
@@ -340,7 +335,7 @@ test-promote-digest: ## Scan resolves each candidate digest once; promote publis
 test-stack-image: ## stack-image.sh: policy.civicrm or the image input, never both
 	bash tests/parity/test-stack-image.sh
 
-test-gitlab-mr-jobs: $(SCENARIO_YAML_STAMP) ## Every shared GitLab job runs in merge request pipelines
+test-gitlab-mr-jobs: $(VENDOR_STAMP) ## Every shared GitLab job runs in merge request pipelines
 	bash tests/parity/test-gitlab-mr-jobs.sh
 
 test-sibling-checkout: ## Sibling clones land in one directory per extension key
@@ -349,17 +344,17 @@ test-sibling-checkout: ## Sibling clones land in one directory per extension key
 test-sibling-vendor: ## Siblings with runtime packages get vendor/ built before the mount
 	bash tests/parity/test-sibling-vendor.sh
 
-test-sibling-build: $(SCENARIO_YAML_STAMP) ## Siblings declaring policy.dist.build get built before the mount
+test-sibling-build: $(VENDOR_STAMP) ## Siblings declaring policy.dist.build get built before the mount
 	bash tests/parity/test-sibling-build.sh
 
-test-database-matrix: $(SCENARIO_YAML_STAMP) ## Supported database images gate standalone promotion and bound policy.database
+test-database-matrix: $(VENDOR_STAMP) ## Supported database images gate standalone promotion and bound policy.database
 	bash tests/parity/test-database-matrix.sh
 
 test-compose-config: ## Every shipped compose file passes `docker compose config`
 	bash tests/parity/test-compose-config.sh
 
 # Browser jobs on one self-hosted host share its ports and its netns.
-test-playwright-network: $(SCENARIO_YAML_STAMP) ## The browser job publishes no port and runs its suite in the app's netns
+test-playwright-network: $(VENDOR_STAMP) ## The browser job publishes no port and runs its suite in the app's netns
 	bash tests/parity/test-playwright-network.sh
 
 test-demo-basic-auth: ## Demo smoke test delegates long Basic Auth credentials to curl
@@ -374,13 +369,13 @@ test-release-move-major-tag: ## Major tag push: App token required, never on dis
 test-release-publish-flags: ## Extension releases: pre-release flag, Latest only for the highest plain version
 	bash tests/parity/test-release-publish-flags.sh
 
-test-release-steps: $(SCENARIO_YAML_STAMP) ## Extension releases: working_directory, same-repository closure, pins and staging steps as written
+test-release-steps: $(VENDOR_STAMP) ## Extension releases: working_directory, same-repository closure, pins and staging steps as written
 	bash tests/parity/test-release-steps.sh
 
-test-ci-gates-step: $(SCENARIO_YAML_STAMP) ## Extension CI: the ck ci step as written, over a fake docker
+test-ci-gates-step: $(VENDOR_STAMP) ## Extension CI: the ck ci step as written, over a fake docker
 	bash tests/parity/test-ci-gates-step.sh
 
-test-release-script: $(SCENARIO_YAML_STAMP) ## Release pre-flight: argument, branch, sync, tag, image gate, dry run vs --apply
+test-release-script: $(VENDOR_STAMP) ## Release pre-flight: argument, branch, sync, tag, image gate, dry run vs --apply
 	bash tests/parity/test-release-script.sh
 
 test-release-verify-images: ## Release image check: standalone mandatory, CMS drift warns and waits, catch-up re-run
@@ -395,7 +390,7 @@ test-install-trivy: ## Trivy installer architecture selection and release checks
 test-resolve-civicrm-stable: ## The image matrix always builds the phpstan catalog's CiviCRM minor
 	bash tests/parity/test-resolve-civicrm-stable.sh
 
-test-cms-families: $(SCENARIO_YAML_STAMP) ## Build CMS Images skips exactly the families its skip input names
+test-cms-families: $(VENDOR_STAMP) ## Build CMS Images skips exactly the families its skip input names
 	bash tests/parity/test-cms-families.sh
 
 test-resolve-civicrm-git: ## The git-built images track master and the newest release branch
@@ -461,12 +456,9 @@ lint-php: ## php -l over every tracked or untracked, non-ignored PHP file
 	  [ "$$rc" = 0 ] && echo "php syntax clean ($$(printf '%s\n' "$$files" | wc -l) files)"
 
 # phpstan.neon.dist names the trees and the vendor trees they load at run time.
-lint-phpstan: $(PHPUNIT) $(CORE) $(COMPOSER) $(SCENARIO_YAML_STAMP) ## phpstan over the repository's own PHP at the PHP 8.1 floor
-	for package in phpstan mago-ext rector ckdeps-root; do \
-	  composer install --no-interaction --no-progress --quiet --working-dir=toolbelt/$$package || exit 1; \
-	done
+lint-phpstan: $(PHPUNIT) $(CORE) $(VENDOR_STAMP) ## phpstan over the repository's own PHP at the PHP 8.1 floor
 	CIVICRM_CORE_DIR=$(abspath $(CORE)) CK_PHPUNIT_PHAR=$(abspath $(PHPUNIT)) \
-	  toolbelt/phpstan/vendor/bin/phpstan analyse --no-progress --memory-limit=2G
+	  vendor/bin/phpstan analyse --no-progress --memory-limit=2G
 
 # The schemas are published contracts, so validate both the schemas themselves
 # and every repository-owned example/fixture. Keeping fixtures in this gate is
@@ -508,14 +500,14 @@ $(OXLINT_STAMP): toolbelt/oxlint/package.json toolbelt/oxlint/package-lock.json 
 	npm ci --prefix toolbelt/oxlint --no-audit --no-fund --loglevel=error
 	@touch $(OXLINT_STAMP)
 
-$(SCENARIO_YAML_STAMP): packages/civikitchen-scenario-schema/composer.json packages/civikitchen-scenario-schema/composer.lock | $(COMPOSER)
-	composer install --no-interaction --no-progress --working-dir=packages/civikitchen-scenario-schema
-	@touch $(SCENARIO_YAML_STAMP)
+$(VENDOR_STAMP): composer.json composer.lock toolbelt/phpstan/composer.json | $(COMPOSER)
+	composer install --no-interaction --no-progress
+	@touch $(VENDOR_STAMP)
 
-release-image-paths: $(SCENARIO_YAML_STAMP) ## Print build-dev-images.yml's push trigger paths (read by scripts/release.sh)
+release-image-paths: $(VENDOR_STAMP) ## Print build-dev-images.yml's push trigger paths (read by scripts/release.sh)
 	@php scripts/image-trigger-paths.php
 
-tools: $(PHPUNIT) $(MAGO) $(CACHE)/actionlint $(SHELLCHECK) $(COMPOSER) $(UVX) $(NODE) $(SCENARIO_YAML_STAMP) $(OXLINT_STAMP) ## Pre-fetch the pinned tools and YAML parser
+tools: $(PHPUNIT) $(MAGO) $(CACHE)/actionlint $(SHELLCHECK) $(COMPOSER) $(UVX) $(NODE) $(VENDOR_STAMP) $(OXLINT_STAMP) ## Pre-fetch the pinned tools and the composer root
 
 $(SHELLCHECK):
 	@mkdir -p $(CACHE)

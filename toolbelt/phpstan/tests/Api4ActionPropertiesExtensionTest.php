@@ -16,6 +16,9 @@ use PHPStan\Testing\PHPStanTestCase;
  */
 final class Api4ActionPropertiesExtensionTest extends PHPStanTestCase
 {
+
+    use ScansFixtures;
+
     public function testOnlyProtectedActionPropertiesAreApiParameters(): void
     {
         $reflection = self::createReflectionProvider();

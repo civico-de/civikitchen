@@ -291,11 +291,11 @@ final class Policy
         if (class_exists(Yaml::class)) {
             return;
         }
-        $package = dirname(__DIR__, 3) . '/packages/civikitchen-scenario-schema';
-        if (!is_file($package . '/vendor/autoload.php')) {
-            throw new \RuntimeException("CiviKitchen YAML parser dependency is missing - run composer install in {$package}");
+        $root = dirname(__DIR__, 3);
+        if (!is_file($root . '/vendor/autoload.php')) {
+            throw new \RuntimeException("CiviKitchen YAML parser dependency is missing - run composer install --no-dev in {$root}");
         }
-        require_once $package . '/vendor/autoload.php';
+        require_once $root . '/vendor/autoload.php';
     }
 
     /**

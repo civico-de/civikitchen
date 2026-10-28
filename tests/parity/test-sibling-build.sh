@@ -106,7 +106,7 @@ grep -q 'sibling .civikitchen-siblings/plain: its civikitchen.yaml could not be 
 
 # The build runs dependency code, so it comes before any step that writes the token.
 php -r '
-  require $argv[1] . "/packages/civikitchen-scenario-schema/vendor/autoload.php";
+  require $argv[1] . "/vendor/autoload.php";
   $build = $token = null;
   foreach (Symfony\Component\Yaml\Yaml::parseFile($argv[1] . "/.github/actions/private-deps/action.yml")["runs"]["steps"] as $i => $step) {
     $run = (string) ($step["run"] ?? "");

@@ -21,6 +21,9 @@ use PHPStan\Testing\RuleTestCase;
  */
 final class Api4CallRulesTest extends RuleTestCase
 {
+
+    use ScansFixtures;
+
     private ?Rule $rule = null;
 
     public function testFunctionCalls(): void

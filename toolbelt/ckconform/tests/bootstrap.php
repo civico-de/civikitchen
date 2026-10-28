@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-require_once dirname(__DIR__, 3) . '/packages/civikitchen-scenario-schema/vendor/autoload.php';
+require_once dirname(__DIR__, 3) . '/vendor/autoload.php';
 require_once __DIR__ . '/../src/Autoloader.php';
 CiviKitchen\Ckconform\Autoloader::register();
 

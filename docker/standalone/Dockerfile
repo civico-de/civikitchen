@@ -156,10 +156,9 @@ ENV CIVICRM_UF=Standalone
 # Shared dev-tools install (composer, civix, phpunit, phpstan, mago,
 # rector/ckmodernize, the ckdeps analyser).
 # Lives in toolbelt/ so the buildkit image uses the same script.
-# Composer-installable tools are pinned in committed lockfiles (toolbelt/*-root,
-# toolbelt/rector, toolbelt/psalm); what is left below is what needs a phar,
-# a binary release or a git ref, and those stay overridable per --build-arg.
-ENV PATH="/opt/composer/vendor/bin:${PATH}"
+# Composer-installable tools are pinned in the committed root composer.lock;
+# what is left below is what needs a phar, a binary release or a git ref, and
+# those stay overridable per --build-arg.
 # Overriding a phar *_VERSION requires overriding its *_SHA256 too — the
 # install script fails a mismatch on purpose. Each ARG reaches the script as an
 # environment variable; one left unset keeps the script's default.
@@ -172,9 +171,8 @@ ARG MAGO_SHA256_X86_64
 ARG MAGO_SHA256_AARCH64
 ARG NPM_VERSION
 ARG INFECTION_VERSION
-# The ckdeps installation root IS composer's home dir — `composer global
-# install` in install-dev-tools.sh reads exactly these two files.
-COPY toolbelt/ckdeps-root /opt/composer
+# The one composer root of the toolbelt; install-dev-tools.sh installs from it.
+COPY composer.json composer.lock /opt/civikitchen/
 # The toolbelt, laid out as in a checkout: every ck* tool resolves its library,
 # configs and toolchains relative to its own real path, so nothing branches on
 # "image or checkout". install-dev-tools.sh links the tools into PATH.
@@ -222,9 +220,6 @@ COPY docker/runtime/patch-test-db-boot.php /usr/local/share/civikitchen/patch-te
 # docs/images.md).
 COPY docker/profiles /opt/civikitchen/docker/profiles
 COPY packages /opt/civikitchen/packages
-RUN --mount=type=secret,id=composer_auth,env=COMPOSER_AUTH composer install --no-dev --no-interaction --no-progress --classmap-authoritative \
-    --working-dir=/opt/civikitchen/packages/civikitchen-scenario-schema \
-    && composer clear-cache
 
 COPY docker/standalone/entrypoint.sh /usr/local/bin/civikitchen-entrypoint
 RUN chmod +x /usr/local/bin/civikitchen-entrypoint

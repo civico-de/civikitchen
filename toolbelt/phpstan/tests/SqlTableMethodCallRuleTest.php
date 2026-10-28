@@ -15,6 +15,9 @@ use PHPStan\Testing\RuleTestCase;
  */
 final class SqlTableMethodCallRuleTest extends RuleTestCase
 {
+
+    use ScansFixtures;
+
     public function testTablesInTheBuilderAndInDaoQueriesAreChecked(): void
     {
         $version = SchemaCatalog::CORE_VERSION;

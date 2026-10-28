@@ -1,8 +1,5 @@
-# Fixture config for ArchitectureTestTest: the real extension.neon plus phpat,
-# analysed with this directory as the working directory.
-includes:
-	- ../../../../vendor/phpat/phpat/extension.neon
-	- ../../../../extension.neon
+# Fixture config for ArchitectureTestTest, analysed with this directory as the
+# working directory; extension-installer registers phpat and the real extension.neon.
 
 parameters:
 	level: 0

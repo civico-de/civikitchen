@@ -26,6 +26,6 @@ parameters:
 		- $core/CRM/Core/Session.php
 		- $core/CRM/Utils/System.php
 NEON
-"$root/toolbelt/phpstan/vendor/bin/phpstan" analyse -c "$work/phpstan.neon" --no-progress --memory-limit=1G ||
+"$root/vendor/bin/phpstan" analyse -c "$work/phpstan.neon" --no-progress --memory-limit=1G ||
   { echo "FAIL: ckHeadless.php does not pass phpstan level 10" >&2; exit 1; }
 echo "ck_headless phpstan: ok"

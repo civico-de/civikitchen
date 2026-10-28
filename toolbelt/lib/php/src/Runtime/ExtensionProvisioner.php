@@ -52,7 +52,7 @@ final class ExtensionProvisioner
         ?Closure $pause = null,
         $stderr = null,
     ) {
-        $this->inspector = new ExtensionInspector($checkoutRoot . '/packages/civikitchen-scenario-schema/vendor/autoload.php');
+        $this->inspector = new ExtensionInspector($checkoutRoot . '/vendor/autoload.php');
         $this->installer = new ExtensionArchiveInstaller($this->inspector);
         $this->civikitchenYaml = new Policy($checkoutRoot, $runner);
         $this->pause = $pause ?? static function (int $seconds): void {

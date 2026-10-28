@@ -14,7 +14,7 @@ declare(strict_types=1);
 // of a run that must fail without a report). {toolbelt} in env, help, includes
 // and patches values is the toolbelt directory.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require dirname(__DIR__, 3) . '/vendor/autoload.php';
 
 $mago = 'mago';
 $filter = null;

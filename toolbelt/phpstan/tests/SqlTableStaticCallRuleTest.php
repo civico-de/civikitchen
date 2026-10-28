@@ -15,6 +15,9 @@ use PHPStan\Testing\RuleTestCase;
  */
 final class SqlTableStaticCallRuleTest extends RuleTestCase
 {
+
+    use ScansFixtures;
+
     private ?SqlSchema $schema = null;
 
     public function testUnknownCoreTablesAreReported(): void

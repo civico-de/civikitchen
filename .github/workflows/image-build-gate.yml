@@ -14,6 +14,8 @@ on:
       - 'docker/**'
       - 'toolbelt/**'
       - 'packages/**'
+      - 'composer.json'
+      - 'composer.lock'
       - '.dockerignore'
       - '.github/workflows/image-build-gate.yml'
       - '.github/workflows/build-dev-images.yml'

@@ -36,7 +36,7 @@ final class ProfileProvisioner
         private readonly Runner $runner = new Runner(),
         $stderr = null,
     ) {
-        $this->inspector = new ExtensionInspector($checkoutRoot . '/packages/civikitchen-scenario-schema/vendor/autoload.php');
+        $this->inspector = new ExtensionInspector($checkoutRoot . '/vendor/autoload.php');
         $this->git = new Files($checkoutRoot, $runner);
         $this->stderr = $stderr ?? STDERR;
     }

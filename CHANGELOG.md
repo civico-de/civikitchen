@@ -39,6 +39,15 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Changed
 
+- The toolbelt's composer-installed tools (phpstan with its extensions,
+  rector, psalm, composer-dependency-analyser, the mago extension SDK) and the
+  scenario YAML parser come from one composer root at the repository root,
+  installed to `/opt/civikitchen/vendor`. `/opt/composer` is gone;
+  `phpstan` and `composer-dependency-analyser` stay on PATH. Point a
+  `phpstan.neon` include at `/opt/civikitchen/vendor/…`: the old
+  `/opt/civikitchen/toolbelt/phpstan-root` stays as a link until v2, and
+  `ckconform` warns about it. The `.civikitchen-ci` checkout installs with
+  `composer install --no-dev` at its root.
 - The images ship `oxlint-tsgolint` 7.0.2005, built with Go 1.26.9, which
   fixes three of the Go stdlib CVEs the image scan excused. The scan's
   exception for CiviCRM core's PhpSpreadsheet 5.8.1 covers the WordPress,

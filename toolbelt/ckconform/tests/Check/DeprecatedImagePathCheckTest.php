@@ -47,17 +47,18 @@ final class DeprecatedImagePathCheckTest extends CheckTestCase
     /** @return iterable<string, array{string, string}> */
     public static function movedPaths(): iterable
     {
-        yield 'engine root' => ['/opt/civikitchen-phpstan/vendor/phpstan/phpstan-strict-rules/rules.neon', 'phpstan-root'];
-        yield 'phpstan extension' => ['php /opt/civikitchen-phpstan-ext/tools/gen-route-catalog.php .', 'phpstan'];
-        yield 'psalm stubs' => ['<file name="/opt/civikitchen-psalm/stubs/Guzzle.php" />', 'psalm'];
-        yield 'deps config' => ["'/opt/civikitchen-composer-deps.php'", 'lib/composer-deps.php'];
+        yield 'engine root' => ['/opt/civikitchen-phpstan/vendor/phpstan/phpstan-strict-rules/rules.neon', '/opt/civikitchen'];
+        yield 'phpstan root' => ['/opt/civikitchen/toolbelt/phpstan-root/vendor/phpstan/phpstan-strict-rules/rules.neon', '/opt/civikitchen'];
+        yield 'phpstan extension' => ['php /opt/civikitchen-phpstan-ext/tools/gen-route-catalog.php .', '/opt/civikitchen/toolbelt/phpstan'];
+        yield 'psalm stubs' => ['<file name="/opt/civikitchen-psalm/stubs/Guzzle.php" />', '/opt/civikitchen/toolbelt/psalm'];
+        yield 'deps config' => ["'/opt/civikitchen-composer-deps.php'", '/opt/civikitchen/toolbelt/lib/composer-deps.php'];
     }
 
     /** @dataProvider movedPaths */
     public function testNamesTheReplacementForEachMovedPath(string $line, string $replacement): void
     {
         $reporter = $this->run_(new DeprecatedImagePathCheck(), $this->repo(['tools/run.sh' => $line . "\n"], git: true));
-        $this->assertWarns($reporter, 'use /opt/civikitchen/toolbelt/' . $replacement);
+        $this->assertWarns($reporter, 'use ' . $replacement);
     }
 
     public function testWarnsOnAProfileMountedBelowTheV1ProfileDirectory(): void

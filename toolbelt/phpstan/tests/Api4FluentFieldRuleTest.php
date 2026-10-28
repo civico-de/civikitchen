@@ -28,6 +28,9 @@ use PHPStan\Testing\RuleTestCase;
  */
 final class Api4FluentFieldRuleTest extends RuleTestCase
 {
+
+    use ScansFixtures;
+
     public function testAddressFieldsOnContactAreReportedAndJoinsAreNot(): void
     {
         $this->analyse(

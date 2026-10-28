@@ -1,0 +1,52 @@
+{
+    "name": "civikitchen/civikitchen",
+    "description": "CiviKitchen's one composer root: the YAML parser every ck tool needs, and the pinned PHP quality tools the images ship as dev requirements.",
+    "license": "AGPL-3.0-or-later",
+    "require": {
+        "php": ">=8.1",
+        "composer/semver": "^3.4",
+        "symfony/yaml": "^6.4.44"
+    },
+    "require-dev": {
+        "carthage-software/mago": "1.55.0",
+        "civikitchen/phpstan-ck-legacy": "*",
+        "phpat/phpat": "0.12.4",
+        "phpstan/extension-installer": "1.4.3",
+        "phpstan/phpstan": "2.2.5",
+        "phpstan/phpstan-deprecation-rules": "2.0.5",
+        "phpstan/phpstan-phpunit": "2.0.18",
+        "phpstan/phpstan-strict-rules": "2.0.12",
+        "rector/rector": "2.4.6",
+        "shipmonk/composer-dependency-analyser": "1.8.4",
+        "spaze/phpstan-disallowed-calls": "v4.14.0",
+        "vimeo/psalm": "6.16.1"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "toolbelt/phpstan"
+        }
+    ],
+    "autoload-dev": {
+        "psr-4": {
+            "CiviKitchen\\Mago\\": "toolbelt/mago-ext/src/",
+            "CiviKitchen\\Rector\\": "toolbelt/rector/src/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "phpstan/extension-installer": true
+        },
+        "platform": {
+            "php": "8.1.31"
+        },
+        "sort-packages": true
+    },
+    "extra": {
+        "phpstan/extension-installer": {
+            "ignore": [
+                "phpstan/phpstan-strict-rules"
+            ]
+        }
+    }
+}

@@ -25,7 +25,7 @@ set -uo pipefail
 . "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../lib/ckcommon.sh"
 
 PSALM_DIR="${ck_root}/psalm"
-PSALM_BIN="${PSALM_DIR}/vendor/bin/psalm"
+PSALM_BIN="${ck_root}/../vendor/bin/psalm"
 DEFAULT_CONFIG="${PSALM_DIR}/psalm-taint.xml.dist"
 
 usage() {

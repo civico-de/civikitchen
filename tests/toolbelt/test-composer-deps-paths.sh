@@ -1,12 +1,12 @@
 #!/bin/bash
-# ckdeps with the bundled config and the real analyser (toolbelt/ckdeps-root):
+# ckdeps with the bundled config and the real analyser (the root composer.json):
 # which directories of an extension root count as the extension's own code.
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-analyser_bin="${root}/toolbelt/ckdeps-root/vendor/bin"
+analyser_bin="${root}/vendor/bin"
 [ -x "${analyser_bin}/composer-dependency-analyser" ] \
-  || { echo "run: composer install --working-dir=toolbelt/ckdeps-root" >&2; exit 1; }
+  || { echo "run: composer install" >&2; exit 1; }
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 

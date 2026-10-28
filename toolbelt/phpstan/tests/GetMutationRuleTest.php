@@ -14,6 +14,9 @@ use PHPStan\Testing\RuleTestCase;
  */
 final class GetMutationRuleTest extends RuleTestCase
 {
+
+    use ScansFixtures;
+
     private const ADVICE = ' — a route a browser can GET must not change data — check the request method, '
         . 'or document the exception with @phpstan-ignore ck.route.mutationOnGet.';
 

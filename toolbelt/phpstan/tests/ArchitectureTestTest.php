@@ -95,7 +95,7 @@ final class ArchitectureTestTest extends TestCase
      */
     private function analyse(string $extDir): array
     {
-        $phpstan = dirname(__DIR__) . '/vendor/bin/phpstan';
+        $phpstan = dirname(__DIR__, 3) . '/vendor/bin/phpstan';
         $env = 'CK_EXT_DIR=' . escapeshellarg($extDir);
         $cd = 'cd ' . escapeshellarg(self::CONSUMER);
         exec(sprintf('%s && %s %s clear-result-cache -c phpstan.neon 2>&1', $cd, escapeshellarg(PHP_BINARY), escapeshellarg($phpstan)), $cleared, $status);

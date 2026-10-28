@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# A login shell resets PATH (/etc/profile drops /opt/composer/vendor/bin), and
+# A login shell resets PATH (/etc/profile drops what the image prepends), and
 # proc_open then fails with a raw PHP warning about posix_spawn that reads like a
 # memory or seccomp problem. The tools must name the missing program instead.
 

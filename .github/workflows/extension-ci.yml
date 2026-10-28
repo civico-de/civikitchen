@@ -335,7 +335,7 @@ jobs:
             exit 0
           fi
           composer install --no-dev --no-interaction --no-progress --classmap-authoritative \
-            --working-dir=.civikitchen-ci/packages/civikitchen-scenario-schema
+            --working-dir=.civikitchen-ci
           ckconform="$GITHUB_WORKSPACE/.civikitchen-ci/toolbelt/bin/ckconform"
           # Refuses an unsafe output path, an unpinned Bun or a missing bun.lock up front.
           (cd "$CK_WD" && php "$ckconform" --dist-paths > /dev/null)
@@ -443,7 +443,7 @@ jobs:
         run: |
           set -euo pipefail
           composer install --no-dev --no-interaction --no-progress --classmap-authoritative \
-            --working-dir="$GITHUB_WORKSPACE/.civikitchen-ci/packages/civikitchen-scenario-schema"
+            --working-dir="$GITHUB_WORKSPACE/.civikitchen-ci"
           if [ -n "$CK_POLICY_DEFAULTS" ]; then
             export CK_DEFAULT_CONFIG="$GITHUB_WORKSPACE/.civikitchen-siblings/policy/civikitchen.yaml"
           fi

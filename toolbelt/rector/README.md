@@ -1,23 +1,9 @@
 # rector setup
 
-CiviCRM-specific modernization rules plus the off-the-shelf sets, installed
-into `/opt/civikitchen/toolbelt/rector` and run by `ckmodernize`. `composer.lock` fixes
-the tree so a rebuild cannot silently change what gets rewritten.
+CiviCRM-specific modernization rules plus the off-the-shelf sets, shipped
+in `/opt/civikitchen/toolbelt/rector` and run by `ckmodernize`.
 
-## Why each pin
+## Pins
 
-| Package | Why |
-| --- | --- |
-| `rector/rector` | Pinned so a rebuild can't change the rewrites a repo gets. |
-| `phpstan/phpstan` | CEILING: rector reads a private property (`$container`) of phpstan's `RichParser` that 2.2.6 removed, and its own constraint (`^2.2.2`) is loose enough to pick it up — every `ckmodernize` run then dies with `MissingPrivatePropertyException`. Pinned here until rector stops reaching into that internal. |
-
-The lock is resolved against PHP 8.1.31 (`config.platform.php`), the floor the
-images support — not against whatever PHP the maintainer runs. Without it a
-re-lock on a newer laptop can pull a transitive that refuses to start on an
-8.1/8.2 image, which is how `cktaint` was broken (see toolbelt/psalm/README.md).
-
-## Bumping
-
-Edit `composer.json`, run `composer update --working-dir=toolbelt/rector` and
-commit both files. Check `ckmodernize` actually runs afterwards — the phpstan
-coupling above is not expressible as a constraint.
+rector and the phpstan version it may see are pinned in the repository root's
+`composer.json`; `docs/building.md` explains the phpstan ceiling.

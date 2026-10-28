@@ -13,6 +13,9 @@ use PHPStan\Testing\RuleTestCase;
  */
 final class TransactionalTestDdlRuleTest extends RuleTestCase
 {
+
+    use ScansFixtures;
+
     private const ADVICE = ' — MySQL commits implicitly on DDL, which ends the test transaction and leaves the rows '
         . 'behind — move it to setUpHeadless().';
 

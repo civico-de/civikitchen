@@ -23,10 +23,9 @@ lives in `toolbelt/install-dev-tools.sh` and follows the newest mago release.
 | Mutation testing (`ckmutate`) | infection | infection |
 | Unused and missing dependencies (`ckdeps`) | composer-dependency-analyser | composer-dependency-analyser |
 
-At the end, the phpstan-root composer root and the phpstan extension package
+At the end, phpstan, its extensions and the phpstan extension package
 leave the images. phpcs, PHPCompatibility and the civicrm/coder clone are
-already gone. `ckdeps` has its own small composer root in
-`toolbelt/ckdeps-root`.
+already gone. `ckdeps` comes from the root composer.json.
 
 ## Evidence so far
 

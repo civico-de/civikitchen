@@ -426,7 +426,7 @@ php -r '
   $job = \Symfony\Component\Yaml\Yaml::parseFile($argv[2])["jobs"]["release"];
   assert($job["with"] === ["composer_app_repositories" => "exampledep", "composer_install" => true]);
   assert(count($job["secrets"]) === 2);
-' "$root/packages/civikitchen-scenario-schema/vendor/autoload.php" "$arel"
+' "$root/vendor/autoload.php" "$arel"
 "$root/scaffold/ckinit.php" --check "$adopt" >/dev/null
 
 # Repo-owned content --update cannot place: nothing is written, both modes name it.
@@ -555,7 +555,7 @@ assert_release_jobs() {
       fwrite(STDERR, "release jobs are \"$actual\", expected \"{$argv[3]}\"\n");
       exit(1);
     }
-  ' "$root/packages/civikitchen-scenario-schema/vendor/autoload.php" \
+  ' "$root/vendor/autoload.php" \
     "$mono/.github/workflows/release.yml" "$1"
 }
 assert_release_jobs "addon[base](working_directory='addon',stage='build') base[](working_directory='base',stage='build') publish[addon,base](stage='publish')"
@@ -629,7 +629,7 @@ assert_root_jobs() {
       fwrite(STDERR, "root jobs are \"$actual\", expected \"{$argv[3]}\"\n");
       exit(1);
     }
-  ' "$root/packages/civikitchen-scenario-schema/vendor/autoload.php" \
+  ' "$root/vendor/autoload.php" \
     "$mono/.github/workflows/ci.yml" "$1"
 }
 

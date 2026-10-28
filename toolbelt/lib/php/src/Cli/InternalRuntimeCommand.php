@@ -35,7 +35,7 @@ final class InternalRuntimeCommand implements Command
         if (isset(self::PROVISION[$operation])) {
             return $this->provision($operation, $arguments);
         }
-        $autoload = $this->checkoutRoot . '/packages/civikitchen-scenario-schema/vendor/autoload.php';
+        $autoload = $this->checkoutRoot . '/vendor/autoload.php';
         $inspector = new ExtensionInspector($autoload);
         try {
             if ($operation === 'composer-install') {

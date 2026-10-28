@@ -16,6 +16,6 @@ spl_autoload_register(static function (string $class): void {
   }
 });
 
-require_once dirname(__DIR__) . '/vendor/autoload.php';
+require_once dirname(__DIR__, 3) . '/vendor/autoload.php';
 // The API rules check the target class before they emit it.
 require_once __DIR__ . '/stubs/api4.php';

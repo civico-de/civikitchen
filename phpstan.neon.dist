@@ -15,11 +15,8 @@ parameters:
     - packages/civicrm-profile-schema/validate.php
   bootstrapFiles:
     - %env.CK_PHPUNIT_PHAR%
-    - packages/civikitchen-scenario-schema/vendor/autoload.php
-    - toolbelt/mago-ext/vendor/autoload.php
-    - toolbelt/rector/vendor/autoload.php
-    - toolbelt/ckdeps-root/vendor/autoload.php
+    - vendor/autoload.php
   scanDirectories:
     - %env.CIVICRM_CORE_DIR%
     # rector ships the rule-definition contracts inside its own vendor tree.
-    - toolbelt/rector/vendor/rector/rector/vendor/symplify/rule-doc-generator-contracts/src
+    - vendor/rector/rector/vendor/symplify/rule-doc-generator-contracts/src

@@ -18,21 +18,9 @@
 toolbelt/oxlint/node_modules
 toolbelt/oxfmt/node_modules
 
-# Same story for the phpstan extension: composer installs it inside the image
-# from this path repo, so a vendor/ tree a local test run left behind is the
-# host's, not the image's.
-toolbelt/phpstan/vendor
-toolbelt/phpstan/composer.lock
-packages/civikitchen-scenario-schema/vendor
-
-# Host-built artifacts from running the tool test suites, or from re-locking a
-# tool root, out of a checkout. The composer.lock files next to them are the
-# opposite: they MUST reach the image — they are what the installs read.
-toolbelt/psalm/vendor
-toolbelt/rector/vendor
-toolbelt/phpstan-root/vendor
-toolbelt/ckdeps-root/vendor
-toolbelt/mago-ext/vendor
+# The composer root's vendor/ from a local test run is the host's, not the
+# image's; composer.lock is the opposite: it MUST reach the image.
+/vendor
 toolbelt/mago-ext/tests/.work
 toolbelt/ckconform/.phpunit.result.cache
 toolbelt/phpstan/.phpunit.result.cache

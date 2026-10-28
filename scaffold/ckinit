@@ -25,16 +25,18 @@ for arg in "$@"; do
   esac
 done
 
-schema=packages/civikitchen-scenario-schema
+# The YAML parser installs into the checkout's vendor/; a vendor/ already there
+# (the dev tools, after a make run) is used as it is.
+mkdir -p "$checkout/vendor"
 run=(docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp
-     -v "$checkout:/civikitchen:ro" -v "$checkout/$schema:/civikitchen/$schema")
+     -v "$checkout:/civikitchen:ro" -v "$checkout/vendor:/civikitchen/vendor")
 if [ -n "${CK_DEFAULT_CONFIG:-}" ]; then
   [ -f "$CK_DEFAULT_CONFIG" ] || die "CK_DEFAULT_CONFIG is not a file: $CK_DEFAULT_CONFIG"
   run+=(-v "$(cd "$(dirname "$CK_DEFAULT_CONFIG")" && pwd -P)/$(basename "$CK_DEFAULT_CONFIG"):/ck-default-config:ro"
         -e CK_DEFAULT_CONFIG=/ck-default-config)
 fi
 
-script="composer install -q --no-dev --no-interaction --working-dir=/civikitchen/$schema \
+script="{ [ -f /civikitchen/vendor/autoload.php ] || composer install -q --no-dev --no-interaction --working-dir=/civikitchen; } \
   && exec php /civikitchen/scaffold/ckinit.php \"\$@\""
 
 if [ -z "$target" ]; then

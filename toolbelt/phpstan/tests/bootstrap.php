@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 /**
  * The rule tests need phpstan's own testing harness, the catalog drift tests
- * do not. `composer install` in this directory provides both; without it the
+ * do not. `composer install` in the repository root provides both; without it the
  * package still autoloads from src/ so nothing has to be installed to run
  * the drift gates.
  */
-// The composer autoload knows src/ and the fixtures, but not the test
-// support classes (shared base cases) in this directory.
+// The composer autoload knows src/, but not the test support classes in
+// this directory; the fixtures reach phpstan through fixtures.neon.
 spl_autoload_register(static function (string $class): void {
     $prefix = 'CiviKitchen\\PHPStan\\Tests\\';
     if (!str_starts_with($class, $prefix)) {
@@ -21,7 +21,7 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
-$vendor = dirname(__DIR__) . '/vendor/autoload.php';
+$vendor = dirname(__DIR__, 3) . '/vendor/autoload.php';
 if (is_file($vendor)) {
     require_once $vendor;
 

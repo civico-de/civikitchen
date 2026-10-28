@@ -16,9 +16,9 @@ require_once $validator;
 function ck_scenario_parse_yaml(string $file): array {
   static $yamlLoaded = FALSE;
   if (!$yamlLoaded) {
-    $yamlAutoload = __DIR__ . '/vendor/autoload.php';
+    $yamlAutoload = dirname(__DIR__, 2) . '/vendor/autoload.php';
     if (!is_file($yamlAutoload)) {
-      throw new RuntimeException('scenario YAML parser dependency is missing; run composer install --working-dir=packages/civikitchen-scenario-schema');
+      throw new RuntimeException('scenario YAML parser dependency is missing; run composer install --no-dev');
     }
     require_once $yamlAutoload;
     $yamlLoaded = TRUE;

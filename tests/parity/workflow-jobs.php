@@ -14,7 +14,7 @@ declare(strict_types=1);
  */
 function ck_workflow_parsed(string $file): array
 {
-    require_once dirname(__DIR__, 2) . '/packages/civikitchen-scenario-schema/vendor/autoload.php';
+    require_once dirname(__DIR__, 2) . '/vendor/autoload.php';
 
     $document = Symfony\Component\Yaml\Yaml::parseFile($file);
 

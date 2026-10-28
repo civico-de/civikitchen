@@ -109,24 +109,32 @@ docker build -f docker/buildkit/Dockerfile \
 
 ## Bumping a dev tool
 
-Composer-installable tools are pinned in committed `composer.json` and
-`composer.lock` pairs, one per install root. Each root has a README that says
-what its pins are for. To bump a tool, edit the `composer.json`, re-lock, and
-commit both files, for example after
-`composer update --working-dir=toolbelt/phpstan-root`.
+Every composer-installable tool is pinned in the one `composer.json` and
+`composer.lock` at the repository root. `require` holds only the YAML parser
+the ck tools need everywhere, so CI jobs outside the images install it with
+`composer install --no-dev`. The quality tools the images ship sit in
+`require-dev`. To bump one, edit `composer.json`, run `composer update` with the
+package name, and commit both files.
 
-| Root | Tools |
+| Package | Why this pin |
 | --- | --- |
-| `toolbelt/ckdeps-root` | composer-dependency-analyser (ckdeps) |
-| `toolbelt/phpstan-root` | phpstan and the extensions every image ships |
-| `toolbelt/rector` | rector, and the phpstan version it may see |
-| `toolbelt/psalm` | psalm, the taint engine for cktaint |
-| `toolbelt/mago-ext` | the mago extension SDK, pinned to the mago binary in `versions.env` |
+| `phpstan/phpstan` | Between a floor and a ceiling. `phpstan-phpunit` 2.0.18 needs at least 2.2.3. rector reads a private property of phpstan's `RichParser` that 2.2.6 removed, so every `ckmodernize` run dies with `MissingPrivatePropertyException` above 2.2.5. Check that `ckmodernize` still runs after a bump. |
+| `phpstan/phpstan-deprecation-rules` | Reports every call into code marked `@deprecated`, which is how deprecated CiviCRM symbols are caught without a maintained list. |
+| `phpstan/extension-installer` | Registers the phpstan extensions in the root automatically, so no repository adds an `includes:` line. |
+| `phpstan/phpstan-strict-rules` | Opt-in per repository, hence the `extra.phpstan/extension-installer.ignore` entry: installed, not registered. See `docs/extension-standards.md`. |
+| `phpstan/phpstan-phpunit`, `phpat/phpat`, `spaze/phpstan-disallowed-calls` | Inert until a repository has tests, architecture rules or a ban config, so they register automatically. |
+| `civikitchen/phpstan-ck-legacy` | The CiviKitchen phpstan extension in `toolbelt/phpstan`, joined as a path repository. |
+| `rector/rector` | Pinned so a rebuild cannot change the rewrites `ckmodernize` applies. |
+| `vimeo/psalm` | The taint engine for `cktaint`. Its `php` constraint is patch-level, which is why the platform floor below is 8.1.31. |
+| `carthage-software/mago` | The mago extension SDK, pinned to the mago binary in `versions.env`. |
+| `shipmonk/composer-dependency-analyser` | The analyser behind `ckdeps`. |
 
-Every root resolves its lock against PHP 8.1.31 (`config.platform.php`), the
-lowest version the images support. A re-lock on a newer laptop therefore
-cannot pull in a transitive dependency that refuses to start on an 8.1 or 8.2
-image.
+The lock resolves against PHP 8.1.31 (`config.platform.php`), the lowest
+version the images support. A re-lock on a newer laptop therefore cannot pull
+in a transitive dependency that refuses to start on an 8.1 or 8.2 image;
+resolved against 8.3, psalm picks a `sebastian/diff` that needs 8.3 and dies at
+startup on older images. infection is the one tool outside the root: it
+resolves per image PHP, which one lock cannot express.
 
 The lock is the pin. It fixes the transitive tree too, so a daily image
 rebuild cannot move a gate under a repository that did not change. These

@@ -27,7 +27,7 @@ set -uo pipefail
 . "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../lib/ckcommon.sh"
 
 RECTOR_DIR="${ck_root}/rector"
-RECTOR_BIN="${RECTOR_DIR}/vendor/bin/rector"
+RECTOR_BIN="${ck_root}/../vendor/bin/rector"
 DEFAULT_CONFIG="${RECTOR_DIR}/rector.php"
 
 usage() {

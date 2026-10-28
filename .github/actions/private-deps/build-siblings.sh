@@ -27,7 +27,7 @@ plan() {
       [ -f "$ckconform" ] \
         || { echo "sibling builds: $ckconform is missing — check civikitchen out with toolbelt/ and packages/ beside .github/actions" >&2; exit 1; }
       composer install --no-dev --no-interaction --no-progress --classmap-authoritative \
-        --working-dir="$ci_root/packages/civikitchen-scenario-schema"
+        --working-dir="$ci_root"
       parser_ready=1
     fi
     tool=$(cd "$dir" && php "$ckconform" --policy dist_build_tool) || unreadable "$dir" civikitchen.yaml

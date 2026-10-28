@@ -4,22 +4,24 @@
 #   - composer (the phar the Makefile's suites run on too)
 #   - civix    (CiviCRM extension scaffolding/build tool)
 #   - phpunit  (pinned to 9 for CiviCRM compatibility)
-#   - phpstan  (isolated; static analysis incl. the deprecation rules and
+#   - phpstan  (static analysis incl. the deprecation rules and
 #              CiviKitchen's `@ck-legacy` deprecated-scope resolver)
-#   - rector   (isolated; powers `ckmodernize` — rector's PHP-version + quality
+#   - rector   (powers `ckmodernize` — rector's PHP-version + quality
 #              sets plus CiviKitchen's CiviCRM footgun rules)
-#   - psalm    (isolated; powers `cktaint` — used ONLY as a taint engine, with
+#   - psalm    (powers `cktaint` — used ONLY as a taint engine, with
 #              CiviCRM source/sink/escape stubs)
-#   - infection (isolated; powers `ckmutate` — mutation testing, opt-in floor)
+#   - composer-dependency-analyser (powers `ckdeps`)
+#     ... these four, the mago extension SDK and the YAML parser come from the
+#     one root composer.json + lock beside toolbelt/
+#   - infection (own root; powers `ckmutate` — mutation testing, opt-in floor)
 #   - mago     (Rust binary; PHP half of `ckfmt`, the linter of `cklint`,
 #              the engine of `ckanalyze` and `ckcompat`)
-#   - composer-dependency-analyser (global composer root; powers `ckdeps`)
 #   - oxlint   (npm toolchain + tsgolint Go binary; powers `ckeslint`)
 #   - oxfmt    (npm toolchain; JS/TS half of `ckfmt`)
 #
 # Prerequisites (handled per image):
 #   - php, curl, git on PATH
-#   - /opt/composer/vendor/bin on PATH (so composer-dependency-analyser is picked up)
+#   - composer.json + composer.lock copied beside toolbelt/
 set -euo pipefail
 
 # Pins with more than one consumer come from versions.env, which Make `include`s
@@ -29,10 +31,12 @@ set -euo pipefail
 # consumer and stays here, next to the comment that explains it.
 #
 # The image carries the toolbelt at /opt/civikitchen/toolbelt, laid out as in
-# the checkout, so versions.env and every tool root sit beside this script.
+# the checkout, so versions.env sits beside this script and the composer root
+# one level up.
 # The CK_ prefix is why a --build-arg still wins — the file's values land in
 # CK_*, and the ${VAR:-...} defaults below only fall back to them.
 TOOLBELT="$(cd "$(dirname "$0")" && pwd)"
+CK_ROOT="$(dirname "${TOOLBELT}")"
 # shellcheck source=versions.env
 . "${TOOLBELT}/versions.env"
 
@@ -42,9 +46,8 @@ TOOLBELT="$(cd "$(dirname "$0")" && pwd)"
 # tools would drift too, so a rebuild could silently bump phpstan to a new
 # major and turn a green `phpstan analyse` red with no code change.
 #
-# Everything composer can install is pinned in a committed composer.json +
-# composer.lock instead of here — toolbelt/ckdeps-root, toolbelt/phpstan-root,
-# toolbelt/rector and toolbelt/psalm, each with a README explaining its pins.
+# Everything composer can install is pinned in the committed root composer.json
+# + composer.lock instead of here; docs/building.md explains each pin.
 # A lock beats a variable: it fixes the transitive tree too, and it is a
 # reviewable diff rather than a resolution that happens at build time. What
 # stays below is what composer cannot pin — phars, a binary release, a git ref
@@ -139,94 +142,33 @@ chmod +x /usr/local/bin/mago
 rm -rf /tmp/mago.tar.gz "/tmp/mago-${MAGO_VERSION}-${MAGO_ARCH}-unknown-linux-gnu"
 
 # ---------------------------------------------------------------------------
-# composer-dependency-analyser (from packagist), the engine behind `ckdeps`.
+# The composer root: phpstan with the extensions every image ships, rector,
+# psalm, the mago extension SDK, the ckdeps analyser and the YAML parser, all
+# from the committed lock. The CiviKitchen phpstan extension (toolbelt/phpstan)
+# joins as a path repository, so extension-installer registers it like the
+# upstream rules — for every project this phpstan analyses, without a neon line.
 #
 # COMPOSER_HOME is scoped to this script so it doesn't leak into the runtime
 # image — users who run `composer install` inside a container later
-# shouldn't be steered at /opt/composer (they can't write its cache as
-# www-data, and it breaks multi-stage builds where a non-root stage runs
-# composer).
-export COMPOSER_HOME=/opt/composer
+# shouldn't be steered at its cache.
+export COMPOSER_HOME=/tmp/civikitchen-composer
 export COMPOSER_ALLOW_SUPERUSER=1
+composer install --working-dir="${CK_ROOT}" --no-interaction --no-progress
 
-# From the committed composer.json + lock the Dockerfile COPYs to
-# COMPOSER_HOME — see toolbelt/ckdeps-root/README.md for the pin.
-composer global install --no-interaction --no-progress
-
-# ---------------------------------------------------------------------------
-# rector (isolated install in its own dir) — powers `ckmodernize`. Beside its
-# config and CiviCRM rules in toolbelt/rector, we add the pinned rector and dump
-# the autoload.
-# From the committed lock (toolbelt/rector), which also holds rector's phpstan
-# at the last release before it lost the private property rector reaches into.
-composer install --working-dir="${TOOLBELT}/rector" --no-interaction --no-progress
-
-# ---------------------------------------------------------------------------
-# phpstan (isolated install, same shape as rector above).
-#
-# Not the standalone phar: phpstan extensions are composer
-# packages, and the phar cannot load one. The deprecation rules are worth that
-# switch — they are the only thing that catches calls into the ~640 symbols
-# CiviCRM core marks @deprecated, and they need no list anyone has to maintain.
-#
-# extension-installer is a composer plugin, so it needs allow-plugins, declared
-# in its composer.json. It writes a GeneratedConfig.php into its own vendor
-# tree, which means the rules are active for every project this phpstan
-# analyses without a single project neon mentioning them.
-PHPSTAN_DIR="${TOOLBELT}/phpstan-root"
-# CiviKitchen's own phpstan extension (@ck-legacy deprecated-scope resolver).
-# It joins the install as a composer path
-# repository so extension-installer registers it exactly like the upstream
-# rules — see docs/extension-standards.md. Its composer.json carries an
-# explicit `version` because the COPYed directory has no git history for
-# composer to derive one from.
-PHPSTAN_EXT_DIR="${TOOLBELT}/phpstan"
-# The engine and the upstream extensions come from the committed lock in
-# PHPSTAN_DIR (toolbelt/phpstan-root/README.md explains
-# each pin, including why strict-rules is installed but not auto-registered).
-composer install --working-dir="${PHPSTAN_DIR}" --no-interaction --no-progress
-# Only the local extension is added at build time — it cannot be in the lock,
-# because its path exists in the image, not in the checkout. Adding it does not
-# move the locked tree: every version above is exact, so this resolves to
-# "1 install, 0 updates".
-composer config --working-dir="${PHPSTAN_DIR}" --no-plugins \
-    repositories.civikitchen-phpstan path "${PHPSTAN_EXT_DIR}"
-composer require --working-dir="${PHPSTAN_DIR}" --no-interaction --no-progress \
-    "civikitchen/phpstan-ck-legacy:*"
-
-# Goes through composer's bin proxy — the documented entry point for a composer
-# install, and the one that keeps working if a future extension does need the
-# autoloader. (The bundled phar happens to find the registered rules too, but
-# nothing promises that.)
-cat > /usr/local/bin/phpstan <<EOF
+# Through composer's bin proxies, the documented entry point of a composer
+# install. Wrappers rather than vendor/bin on PATH, which would expose every
+# transitive binary too.
+for tool in phpstan composer-dependency-analyser; do
+    cat > "/usr/local/bin/${tool}" <<EOF
 #!/bin/sh
-exec php ${PHPSTAN_DIR}/vendor/bin/phpstan "\$@"
+exec php ${CK_ROOT}/vendor/bin/${tool} "\$@"
 EOF
-chmod +x /usr/local/bin/phpstan
-
-# CiviKitchen's mago extension (linter rules and analyzer plugins), registered
-# by toolbelt/mago/mago.toml. Only the extension SDK, from the committed lock;
-# the contract logic it shares is read in place from toolbelt/phpstan/src.
-composer install --working-dir="${TOOLBELT}/mago-ext" --no-interaction --no-progress
+    chmod +x "/usr/local/bin/${tool}"
+done
 
 # ---------------------------------------------------------------------------
-# psalm (isolated install in its own dir) — powers `cktaint`, installed beside
-# its taint config and CiviCRM stubs in toolbelt/psalm from the committed lock.
-#
-# Isolated, NOT `composer global require` alongside the ckdeps analyser, and deliberately not
-# near phpstan: psalm pulls ~50 packages of its own (amphp, nikic/php-parser,
-# felixfbecker/…), and the phpstan tree above is what the static-analysis gate
-# every extension depends on — it must not be perturbed by another tool's
-# dependency resolution. Two engines, two roots, no shared resolution.
-# From the committed lockfile: psalm drags ~50 transitive packages, and a
-# monthly rebuild re-resolving them would be exactly the drift the pins exist
-# to prevent (oxlint installs from its lockfile for the same reason).
-composer install --working-dir="${TOOLBELT}/psalm" --no-interaction --no-progress
-
-# ---------------------------------------------------------------------------
-# infection (isolated install, same shape as rector/psalm) — powers `ckmutate`.
-# Isolated for the same reason psalm is: it brings its own parser and ~30
-# packages, and the phpstan tree is the gate every extension depends on.
+# infection (its own root) — powers `ckmutate`. It follows the image's PHP
+# version (see the require below), which the one root lock cannot express.
 INFECTION_DIR=/opt/civikitchen-infection
 mkdir -p "${INFECTION_DIR}"
 [ -f "${INFECTION_DIR}/composer.json" ] || echo '{}' > "${INFECTION_DIR}/composer.json"
@@ -302,6 +244,8 @@ npm ci --prefix "${OXFMT_DIR}" --no-audit --no-fund --loglevel=error
 # configs may still name or mount into; ckconform's deprecated-image-path warns
 # about them, and v2 drops them.
 ln -s "${TOOLBELT}"/bin/ck* /usr/local/bin/
+# phpstan-root was the phpstan install root; its vendor/ is the root one now.
+ln -s .. "${TOOLBELT}/phpstan-root"
 for link in ckconform:ckconform rector:rector phpstan:phpstan-root \
     phpstan-ext:phpstan phpstan-config:phpstan-config psalm:psalm oxlint:oxlint \
     oxfmt:oxfmt mago:mago composer-deps.php:lib/composer-deps.php; do
@@ -310,5 +254,5 @@ done
 mkdir -p /usr/local/share/civikitchen
 ln -s "$(dirname "${TOOLBELT}")/docker/profiles" /usr/local/share/civikitchen/profiles
 
-rm -rf /opt/composer/cache ~/.npm
-chmod -R a+rX /opt/composer "${TOOLBELT}" "${INFECTION_DIR}" /usr/local/bin/mago
+rm -rf "${COMPOSER_HOME}" ~/.npm
+chmod -R a+rX "${CK_ROOT}/vendor" "${TOOLBELT}" "${INFECTION_DIR}" /usr/local/bin/mago

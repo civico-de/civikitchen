@@ -239,7 +239,7 @@ for leg in build-dev-images:scenario-test-standalone build-cms-images:scenario-t
     inside && /^  [a-zA-Z0-9_-]+:/ { exit }
     inside { print }
   ' "$root/.github/workflows/${leg%%:*}.yml")
-  grep -Fq 'composer install --no-interaction --no-progress --working-dir=packages/civikitchen-scenario-schema' <<<"$steps" \
+  grep -Fq 'composer install --no-dev --no-interaction --no-progress' <<<"$steps" \
     || { echo "$job does not install the locked scenario YAML parser" >&2; exit 1; }
 done
 

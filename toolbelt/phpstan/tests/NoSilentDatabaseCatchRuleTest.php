@@ -13,6 +13,9 @@ use PHPStan\Testing\RuleTestCase;
  */
 final class NoSilentDatabaseCatchRuleTest extends RuleTestCase
 {
+
+    use ScansFixtures;
+
     private const SILENT = 'Catch around a database call neither rethrows nor logs at error level — a failed query '
         . 'becomes a substituted value the caller cannot tell from real data. '
         . 'Rethrow, or \\Civi::log()->error() with the context.';

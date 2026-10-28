@@ -170,7 +170,7 @@ fi
 # 2. No phpcs in the toolbelt: cklint and ckcompat run on mago. buildkit's own
 #    clone keeps its phpcs, which no ck tool calls.
 echo "== no phpcs =="
-if [ -e /opt/composer/vendor/bin/phpcs ]; then fail "the toolbelt still installs phpcs"; else ok "the toolbelt installs no phpcs"; fi
+if [ -e /opt/civikitchen/vendor/bin/phpcs ]; then fail "the toolbelt still installs phpcs"; else ok "the toolbelt installs no phpcs"; fi
 
 # ---------------------------------------------------------------------------
 # 3. ck scenario parses a canonical civikitchen.yaml
@@ -1862,18 +1862,18 @@ else
     TPL_SRC="${WORKDIR}/template_gate"
     mkdir -p "${TPL_SRC}"
     # Writable copy: ckinit reads its policy helper out of toolbelt/ and its YAML
-    # parser out of packages/, both by path relative to scaffold/.
-    cp -R "${CK_SRC}/scaffold" "${CK_SRC}/packages" "${CK_SRC}/toolbelt" "${TPL_SRC}/"
+    # parser out of the root vendor/, both by path relative to scaffold/.
+    cp -R "${CK_SRC}/scaffold" "${CK_SRC}/packages" "${CK_SRC}/toolbelt" \
+        "${CK_SRC}/composer.json" "${CK_SRC}/composer.lock" "${TPL_SRC}/"
     TPL_EXT="${TPL_SRC}/example_ext"
     mkdir -p "${TPL_EXT}"
     printf '%s\n' '<extension key="org.acme.example_ext" type="module"><file>example_ext</file><license>AGPL-3.0</license></extension>' \
         > "${TPL_EXT}/info.xml"
     # ckinit's YAML parser lives in a gitignored vendor/, so the checkout CI
     # mounts here usually has none.
-    TPL_SCHEMA="${TPL_SRC}/packages/civikitchen-scenario-schema"
-    if [[ ! -f "${TPL_SCHEMA}/vendor/autoload.php" ]]; then
-        composer install --no-interaction --no-progress --quiet \
-            --working-dir "${TPL_SCHEMA}" >/dev/null 2>&1 || true
+    if [[ ! -f "${TPL_SRC}/vendor/autoload.php" ]]; then
+        composer install --no-dev --no-interaction --no-progress --quiet \
+            --working-dir "${TPL_SRC}" >/dev/null 2>&1 || true
     fi
     # extra.strauss opts the extension into the files ckinit writes only on request.
     if TPL_OUT="$("${TPL_SRC}/scaffold/ckinit.php" "${TPL_EXT}" 2>&1)" \

@@ -10,7 +10,7 @@ declare(strict_types=1);
  * Usage: php gitlab-mr-jobs.php <pipeline.yml> [<pipeline.yml> ...]
  */
 
-require_once dirname(__DIR__, 2) . '/packages/civikitchen-scenario-schema/vendor/autoload.php';
+require_once dirname(__DIR__, 2) . '/vendor/autoload.php';
 
 const CK_GITLAB_GLOBAL_KEYS = [
     'after_script', 'before_script', 'cache', 'default', 'image', 'include',
