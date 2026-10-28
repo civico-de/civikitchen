@@ -403,6 +403,18 @@ vulnerabilities:
       composer.lock. Recheck after the next Joomla release.
     expired_at: 2027-01-31
 
+  - id: CVE-2026-109413
+    paths:
+      - "home/buildkit/buildkit/**"
+    statement: >-
+      symfony/yaml 5.4.23-5.4.53 in buildkit's own vendor/, its civicredits and
+      bknix-ci-cleanup tools, and Joomla's vendor tree. The parser flaw needs
+      attacker-controlled YAML; these parse their own shipped configuration.
+      Pinned by upstream lockfiles. Scoped: the root vendor/ carries a fixed
+      6.4.48, so a regression there still surfaces. Recheck after a buildkit
+      rebuild or the next Joomla release.
+    expired_at: 2027-01-31
+
   - id: CVE-2026-45304
     statement: >-
       symfony/yaml 5.4.23, same tree — alias expansion memory exhaustion, same
