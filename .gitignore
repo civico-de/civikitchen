@@ -21,3 +21,5 @@ site/
 # regenerated locally only to refresh the lockfile beside them.
 toolbelt/*/vendor/
 /vendor/
+# rector 2.8 test runs leave a lock per fixture directory.
+.fixture.lock

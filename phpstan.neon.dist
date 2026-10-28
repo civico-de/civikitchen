@@ -18,5 +18,3 @@ parameters:
     - vendor/autoload.php
   scanDirectories:
     - %env.CIVICRM_CORE_DIR%
-    # rector ships the rule-definition contracts inside its own vendor tree.
-    - vendor/rector/rector/vendor/symplify/rule-doc-generator-contracts/src

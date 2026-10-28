@@ -13,19 +13,19 @@ use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar;
+use PhpParser\Node\Stmt\ClassMethod;
+use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
+use PhpParser\ParserFactory;
 use PHPStan\Reflection\ExtendedMethodReflection;
 use PHPStan\Reflection\FunctionReflection;
 use PHPStan\Reflection\MethodReflection;
 use Rector\Contract\Rector\ConfigurableRectorInterface;
-use Rector\PhpParser\AstResolver;
 use Rector\PhpParser\Node\Value\ValueResolver;
 use Rector\Rector\AbstractRector;
 use Rector\Reflection\ReflectionResolver;
-use Rector\ValueObject\PhpVersionFeature;
+use Rector\ValueObject\PhpVersion;
 use Rector\VersionBonding\Contract\MinPhpVersionInterface;
-use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
-use Symplify\RuleDocGenerator\ValueObject\RuleDefinition;
 
 /**
  * Drop positional arguments that only repeat a parameter's default, and name
@@ -71,7 +71,6 @@ final class PositionalDefaultsToNamedArgsRector extends AbstractRector implement
   public function __construct(
     private readonly ValueResolver $valueResolver,
     private readonly ReflectionResolver $reflectionResolver,
-    private readonly AstResolver $astResolver,
   ) {}
 
   /**
@@ -82,7 +81,8 @@ final class PositionalDefaultsToNamedArgsRector extends AbstractRector implement
   }
 
   public function provideMinPhpVersion(): int {
-    return PhpVersionFeature::NAMED_ARGUMENTS;
+    // Named arguments arrived in PHP 8.0.
+    return PhpVersion::PHP_80;
   }
 
   public function getNodeTypes(): array {
@@ -201,19 +201,33 @@ final class PositionalDefaultsToNamedArgsRector extends AbstractRector implement
     return $node instanceof StaticCall && $node->class instanceof Name && !$this->isName($node->class, 'static');
   }
 
-  /** The callee's body counts its arguments, or cannot be read to rule it out. */
+  /**
+   * The callee's body counts its arguments, or cannot be read to rule it out.
+   * Parsed plainly: rector's AstResolver re-decorates the file under refactor
+   * and drops its pending changes. Any same-named callee in the file counts.
+   */
   private function readsArgumentList(FunctionReflection|MethodReflection $reflection): bool {
-    $callee = $reflection instanceof FunctionReflection
-      ? $this->astResolver->resolveFunctionFromFunctionReflection($reflection)
-      : $this->astResolver->resolveClassMethodFromMethodReflection($reflection);
-    if ($callee === NULL) {
+    $file = $reflection instanceof FunctionReflection ? $reflection->getFileName() : $reflection->getDeclaringClass()->getFileName();
+    $source = $file !== NULL && is_file($file) ? file_get_contents($file) : FALSE;
+    $stmts = $source === FALSE ? NULL : (new ParserFactory())->createForHostVersion()->parse($source);
+    if ($stmts === NULL) {
       return TRUE;
     }
-
-    return (new NodeFinder())->findFirst(
-      $callee->stmts ?? [],
-      fn (Node $n): bool => $n instanceof FuncCall && $this->isNames($n, ['func_get_args', 'func_num_args', 'func_get_arg']),
-    ) !== NULL;
+    $finder = new NodeFinder();
+    // Functions reflect fully qualified, declarations carry the short name.
+    $short = strtolower(substr((string) strrchr('\\' . $reflection->getName(), '\\'), 1));
+    $found = FALSE;
+    foreach ($finder->find($stmts, static fn (Node $n): bool => $n instanceof ClassMethod || $n instanceof Function_) as $callee) {
+      if (!($callee instanceof ClassMethod || $callee instanceof Function_) || $callee->name->toLowerString() !== $short) {
+        continue;
+      }
+      $found = TRUE;
+      if ($finder->findFirst($callee->getStmts() ?? [], static fn (Node $n): bool => $n instanceof FuncCall && $n->name instanceof Name
+        && in_array($n->name->toLowerString(), ['func_get_args', 'func_num_args', 'func_get_arg'], TRUE)) !== NULL) {
+        return TRUE;
+      }
+    }
+    return !$found;
   }
 
   /**
@@ -226,17 +240,4 @@ final class PositionalDefaultsToNamedArgsRector extends AbstractRector implement
     }
     return $default === NULL ? $this->valueResolver->isNull($expr) : $this->valueResolver->isValue($expr, $default);
   }
-
-  public function getRuleDefinition(): RuleDefinition {
-    return new RuleDefinition(
-      'Drop positional arguments that repeat the parameter default and name the ones behind them',
-      [
-        new CodeSample(
-          "CRM_Utils_Request::retrieve('delete', 'String', NULL, FALSE, NULL, 'POST');",
-          "CRM_Utils_Request::retrieve('delete', 'String', method: 'POST');"
-        ),
-      ]
-    );
-  }
-
 }

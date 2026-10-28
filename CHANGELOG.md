@@ -48,6 +48,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
   `/opt/civikitchen/toolbelt/phpstan-root` stays as a link until v2, and
   `ckconform` warns about it. The `.civikitchen-ci` checkout installs with
   `composer install --no-dev` at its root.
+- rector 2.8.1 and phpstan 2.3.3. rector no longer bundles symfony/yaml,
+  which the image scan reported (CVE-2026-109413).
 - The images ship `oxlint-tsgolint` 7.0.2005, built with Go 1.26.9, which
   fixes three of the Go stdlib CVEs the image scan excused. The scan's
   exception for CiviCRM core's PhpSpreadsheet 5.8.1 covers the WordPress,

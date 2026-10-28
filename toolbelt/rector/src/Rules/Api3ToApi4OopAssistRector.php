@@ -12,8 +12,6 @@ use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\Int_;
 use PhpParser\Node\Scalar\String_;
-use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
-use Symplify\RuleDocGenerator\ValueObject\RuleDefinition;
 
 /**
  * Like Api3ToApi4AssistRector, but emits the idiomatic OOP builder form:
@@ -87,17 +85,4 @@ final class Api3ToApi4OopAssistRector extends AbstractApi3GetAssistRector {
   private function bool(bool $value): ConstFetch {
     return new ConstFetch(new Name($value ? 'true' : 'false'));
   }
-
-  public function getRuleDefinition(): RuleDefinition {
-    return new RuleDefinition(
-      'Assisted, partial api3->api4 migration of literal get() calls to the OOP builder form (preview only; preserves checkPermissions + limit defaults)',
-      [
-        new CodeSample(
-          "civicrm_api3('Contact', 'get', ['first_name' => 'Bob', 'return' => ['id']]);",
-          "\\Civi\\Api4\\Contact::get(FALSE)->addWhere('first_name', '=', 'Bob')->addSelect('id')->setLimit(25)->execute();"
-        ),
-      ]
-    );
-  }
-
 }

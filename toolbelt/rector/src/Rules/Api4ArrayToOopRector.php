@@ -10,8 +10,6 @@ use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Scalar\String_;
-use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
-use Symplify\RuleDocGenerator\ValueObject\RuleDefinition;
 
 /**
  * Convert the api4 ARRAY form to the idiomatic OO builder — fully SAFE: same API
@@ -158,17 +156,4 @@ final class Api4ArrayToOopRector extends AbstractApiCallAssistRector {
 
     return ['addWhere', array_map(static fn (Node\Expr $cell): Arg => new Arg($cell), $cells)];
   }
-
-  public function getRuleDefinition(): RuleDefinition {
-    return new RuleDefinition(
-      'Convert api4 array-form calls to the idiomatic OO builder form (same semantics)',
-      [
-        new CodeSample(
-          "civicrm_api4('Contact', 'get', ['where' => [['x', '=', 1]], 'limit' => 5]);",
-          "\\Civi\\Api4\\Contact::get()->addWhere('x', '=', 1)->setLimit(5)->execute();"
-        ),
-      ]
-    );
-  }
-
 }

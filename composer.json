@@ -12,11 +12,11 @@
         "civikitchen/phpstan-ck-legacy": "*",
         "phpat/phpat": "0.12.4",
         "phpstan/extension-installer": "1.4.3",
-        "phpstan/phpstan": "2.2.5",
+        "phpstan/phpstan": "2.3.3",
         "phpstan/phpstan-deprecation-rules": "2.0.5",
         "phpstan/phpstan-phpunit": "2.0.18",
         "phpstan/phpstan-strict-rules": "2.0.12",
-        "rector/rector": "2.4.6",
+        "rector/rector": "2.8.1",
         "shipmonk/composer-dependency-analyser": "1.8.4",
         "spaze/phpstan-disallowed-calls": "v4.14.0",
         "vimeo/psalm": "6.16.1"

@@ -13,8 +13,6 @@ use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\Int_;
 use PhpParser\Node\Scalar\String_;
-use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
-use Symplify\RuleDocGenerator\ValueObject\RuleDefinition;
 
 /**
  * ASSISTED, deliberately partial api3 -> api4 migration to the ARRAY form
@@ -71,17 +69,4 @@ final class Api3ToApi4AssistRector extends AbstractApi3GetAssistRector {
 
     return new FuncCall(new Name('civicrm_api4'), $indexById ? [...$args, new Arg(new String_('id'))] : $args);
   }
-
-  public function getRuleDefinition(): RuleDefinition {
-    return new RuleDefinition(
-      'Assisted, partial api3->api4 migration of literal get() calls to the array form (preview only; preserves checkPermissions + limit defaults)',
-      [
-        new CodeSample(
-          "civicrm_api3('Contact', 'get', ['first_name' => 'Bob', 'return' => ['id']]);",
-          "civicrm_api4('Contact', 'get', ['where' => [['first_name', '=', 'Bob']], 'select' => ['id'], 'limit' => 25, 'checkPermissions' => false]);"
-        ),
-      ]
-    );
-  }
-
 }

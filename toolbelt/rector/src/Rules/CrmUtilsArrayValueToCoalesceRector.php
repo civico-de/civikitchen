@@ -18,8 +18,6 @@ use PHPStan\Type\ObjectType;
 use PHPStan\Type\TypeCombinator;
 use Rector\PhpParser\Node\Value\ValueResolver;
 use Rector\Rector\AbstractRector;
-use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
-use Symplify\RuleDocGenerator\ValueObject\RuleDefinition;
 
 /**
  * Rewrite the deprecated CRM_Utils_Array::value('k', $arr) into
@@ -62,12 +60,4 @@ final class CrmUtilsArrayValueToCoalesceRector extends AbstractRector {
 
     return new Coalesce(new ArrayDimFetch($args['list'], $args['key']), new ConstFetch(new Name('null')));
   }
-
-  public function getRuleDefinition(): RuleDefinition {
-    return new RuleDefinition(
-      'Replace deprecated CRM_Utils_Array::value() with the null-coalescing operator',
-      [new CodeSample("CRM_Utils_Array::value('k', \$a);", "\$a['k'] ?? null;")]
-    );
-  }
-
 }

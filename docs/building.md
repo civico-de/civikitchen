@@ -118,7 +118,7 @@ package name, and commit both files.
 
 | Package | Why this pin |
 | --- | --- |
-| `phpstan/phpstan` | Between a floor and a ceiling. `phpstan-phpunit` 2.0.18 needs at least 2.2.3. rector reads a private property of phpstan's `RichParser` that 2.2.6 removed, so every `ckmodernize` run dies with `MissingPrivatePropertyException` above 2.2.5. Check that `ckmodernize` still runs after a bump. |
+| `phpstan/phpstan` | Moves with rector, which runs on phpstan's internals: rector 2.8.1 needs at least 2.3.2. Check that `ckmodernize` still runs after a bump of either. |
 | `phpstan/phpstan-deprecation-rules` | Reports every call into code marked `@deprecated`, which is how deprecated CiviCRM symbols are caught without a maintained list. |
 | `phpstan/extension-installer` | Registers the phpstan extensions in the root automatically, so no repository adds an `includes:` line. |
 | `phpstan/phpstan-strict-rules` | Opt-in per repository, hence the `extra.phpstan/extension-installer.ignore` entry: installed, not registered. See `docs/extension-standards.md`. |
