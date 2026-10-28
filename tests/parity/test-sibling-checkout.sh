@@ -194,4 +194,24 @@ rc=0
 [ "$rc" = 0 ] || fail "checkout from a nested working directory failed: $(cat "$out")"
 [ -f "$ws/$dir/info.xml" ] || fail "sibling not checked out at the workspace root: $(cat "$out")"
 
+# A sibling with files in Git LFS, on a runner whose git-lfs filter is
+# installed but may not fetch them: the remote here holds no LFS object at all.
+command -v git-lfs >/dev/null || fail "git-lfs is required for the LFS leg"
+export GIT_CONFIG_GLOBAL="$work/gitconfig"
+git lfs install --skip-repo >/dev/null
+media="$remotes/org/media"
+git init --quiet -b main "$media"
+git -C "$media" config user.email test@example.org
+git -C "$media" config user.name 'CiviKitchen test'
+printf '<extension key="de.example.media" type="module"/>\n' > "$media/info.xml"
+echo '*.png filter=lfs diff=lfs merge=lfs -text' > "$media/.gitattributes"
+pointer=$(printf 'version https://git-lfs.github.com/spec/v1\noid sha256:%064d\nsize 1' 0)
+echo "$pointer" > "$media/shot.png"
+git -C "$media" add info.xml .gitattributes shot.png
+git -C "$media" commit --quiet -m 'media'
+run_real lfs org/media
+[ "$rc" = 0 ] || fail "sibling with an unfetchable LFS file failed (rc=$rc): $(cat "$out")"
+[ "$(cat "$ws/.civikitchen-siblings/de.example.media/shot.png")" = "$pointer" ] \
+  || fail "LFS file not left as its pointer"
+
 echo "sibling checkout suite OK"

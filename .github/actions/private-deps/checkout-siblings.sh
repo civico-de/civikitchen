@@ -20,6 +20,10 @@ set -euo pipefail
 # pattern, and an unquoted expansion is what splits the list.
 set -f
 
+# A sibling is mounted for its code: files it keeps in Git LFS stay pointers,
+# as with actions/checkout's default lfs: false.
+export GIT_LFS_SKIP_SMUDGE=1
+
 # The toolbelt is checked out beside .github/actions, as build-siblings.sh needs it too.
 ck="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/toolbelt/bin/ck"
 

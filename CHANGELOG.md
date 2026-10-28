@@ -94,6 +94,10 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Fixed
 
+- `sibling_repo` checks a sibling out without its Git LFS files, which stay
+  pointers, as with actions/checkout's default. A sibling that kept files in
+  LFS failed the job wherever the runner had git-lfs installed but could not
+  download them.
 - `CIVIKITCHEN_LOCALES` no longer hangs on a stalled download of the core
   language archive: a transfer under 10 kB/s for 30 s aborts, and a failed
   download is retried up to three times before provisioning fails.

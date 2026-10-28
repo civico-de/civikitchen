@@ -1086,6 +1086,8 @@ builds it: `bun install --frozen-lockfile`, then `bun run build`, on the Bun
 its package.json pins and on node_version. Every declared output must exist
 afterwards, and siblings that build must pin the same Bun. A failed build
 fails the job. A sibling without a declaration is mounted as checked out.
+Files a sibling keeps in Git LFS stay pointers, as with actions/checkout's
+default `lfs: false`.
 A sibling's civikitchen.yaml is read by the civikitchen version your workflow
 pins, so it must validate against that version; a key only a newer version
 knows fails the job. The checkouts are not treated as your code, and no
