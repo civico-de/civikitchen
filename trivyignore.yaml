@@ -60,6 +60,27 @@ vulnerabilities:
       and delete this entry once an npm release ships >= 6.29.1.
     expired_at: 2027-01-31
 
+  - id: CVE-2026-109383
+    paths:
+      - "usr/lib/node_modules/npm/**"
+    statement: >-
+      Certificate validation bypass in undici when an Agent drops its TLS
+      options. node-gyp is npm's only undici caller and passes one TLS option,
+      a custom CA, and only for --cafile, which no image or tool sets; its
+      default Agent validates against the system store. Same recheck and
+      deletion as CVE-2026-109869.
+    expired_at: 2027-01-31
+
+  - id: CVE-2026-87018
+    paths:
+      - "usr/lib/node_modules/npm/**"
+    statement: >-
+      Denial of service in undici via TLS renegotiation with a mismatched
+      certificate. Reached only through node-gyp's fetch of Node headers; the
+      worst case is a failed native-addon build in a dev container. Same
+      recheck and deletion as CVE-2026-109869.
+    expired_at: 2027-01-31
+
   # -------------------------------------------------------------------------
   # Go stdlib inside the oxlint-tsgolint binary
   #
