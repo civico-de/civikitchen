@@ -37,6 +37,9 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\TestListener;
 use PHPUnit\Framework\TestListenerDefaultImplementation;
 
+/**
+ * @deprecated Goes with PHPUnit 9's listener API, which CiviCRM's test harness runs on.
+ */
 final class TransactionCanaryListener implements TestListener {
 
   use TestListenerDefaultImplementation;
@@ -46,8 +49,6 @@ final class TransactionCanaryListener implements TestListener {
   private ?\PDO $probe = NULL;
 
   private bool $disabled = FALSE;
-
-  private string $disabledReason = '';
 
   private ?string $token = NULL;
 
@@ -65,8 +66,12 @@ final class TransactionCanaryListener implements TestListener {
     if (!class_exists('CRM_Core_DAO', FALSE)) {
       return;
     }
-    if ($this->probe() === NULL) {
-      $this->fail($test, "transaction canary could not open its own database connection — {$this->disabledReason}");
+    try {
+      $this->probe();
+    }
+    catch (\Throwable $e) {
+      $this->disabled = TRUE;
+      $this->fail($test, 'transaction canary could not open its own database connection — ' . $e->getMessage());
       return;
     }
 
@@ -133,35 +138,27 @@ final class TransactionCanaryListener implements TestListener {
     $this->probe->exec('DELETE FROM ' . self::TABLE);
   }
 
-  private function probe(): ?\PDO {
-    if ($this->probe !== NULL || $this->disabled) {
-      return $this->probe;
+  private function probe(): void {
+    if ($this->probe !== NULL) {
+      return;
     }
-    try {
-      // The site connection is the authority on which database the test run
-      // actually landed in (civicrm_test, if the bootstrap guard did its job);
-      // CIVICRM_DSN only supplies credentials and host.
-      $database = \CRM_Core_DAO::singleValueQuery('SELECT DATABASE()');
-      $dsn = defined('CIVICRM_DSN') ? (string) CIVICRM_DSN : '';
-      $parts = parse_url($dsn);
-      if (!is_array($parts) || !isset($parts['host']) || !is_string($database) || $database === '') {
-        throw new \RuntimeException('cannot derive connection parameters from CIVICRM_DSN');
-      }
-      $pdo = new \PDO(
-        sprintf('mysql:host=%s;port=%d;dbname=%s', $parts['host'], (int) ($parts['port'] ?? 3306), $database),
-        urldecode((string) ($parts['user'] ?? '')),
-        urldecode((string) ($parts['pass'] ?? '')),
-        [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION, \PDO::ATTR_EMULATE_PREPARES => FALSE],
-      );
-      $this->probe = $pdo;
-      $this->createTable();
+    // The site connection is the authority on which database the test run
+    // actually landed in (civicrm_test, if the bootstrap guard did its job);
+    // CIVICRM_DSN only supplies credentials and host.
+    $database = \CRM_Core_DAO::singleValueQuery('SELECT DATABASE()');
+    $dsn = defined('CIVICRM_DSN') ? (string) CIVICRM_DSN : '';
+    $parts = parse_url($dsn);
+    if (!is_array($parts) || !isset($parts['host']) || !is_string($database) || $database === '') {
+      throw new \RuntimeException('cannot derive connection parameters from CIVICRM_DSN');
     }
-    catch (\Throwable $e) {
-      $this->disabled = TRUE;
-      $this->disabledReason = $e->getMessage();
-      $this->probe = NULL;
-    }
-    return $this->probe;
+    $pdo = new \PDO(
+      sprintf('mysql:host=%s;port=%d;dbname=%s', $parts['host'], (int) ($parts['port'] ?? 3306), $database),
+      urldecode((string) ($parts['user'] ?? '')),
+      urldecode((string) ($parts['pass'] ?? '')),
+      [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION, \PDO::ATTR_EMULATE_PREPARES => FALSE],
+    );
+    $this->probe = $pdo;
+    $this->createTable();
   }
 
   /**

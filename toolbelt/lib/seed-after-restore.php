@@ -33,7 +33,7 @@ $step('extension upgrades', static function (): void {
 });
 
 $step('triggers and caches', static function (): void {
-  CRM_Core_Invoke::rebuildMenuAndCaches(TRUE);
+  Civi::rebuild(['*' => TRUE, 'sessions' => FALSE])->execute();
 });
 
 $step('smart groups', static function (): void {

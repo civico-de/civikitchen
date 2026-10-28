@@ -41,7 +41,7 @@ final class ArchitectureTest
 
         return PHPat::rule()
             ->classes(Selector::all())
-            ->shouldNotDependOn()
+            ->shouldNot()->dependOn()
             ->classes(Selector::classname('~^(CRM_|Civi\\\\)~', true))
             ->excluding(
                 Selector::classname(ExtensionBoundary::coreRegex(), true),
@@ -58,7 +58,7 @@ final class ArchitectureTest
 
         return PHPat::rule()
             ->classes(Selector::all())
-            ->shouldNotExtend()
+            ->shouldNot()->extend()
             ->classes(...array_map(static fn (string $class) => Selector::classname($class), ExtensionBoundary::LEGACY_UI_BASES))
             ->because(ExtensionBoundary::LEGACY_UI_BECAUSE);
     }
@@ -68,7 +68,7 @@ final class ArchitectureTest
     {
         return PHPat::rule()
             ->classes(Selector::classname('~\x00~', true))
-            ->shouldNotDependOn()
+            ->shouldNot()->dependOn()
             ->classes(Selector::classname('~\x00~', true))
             ->because('inert outside an extension root');
     }
