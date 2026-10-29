@@ -14,10 +14,14 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
-## [1.54.1] - 2026-10-29
+## [1.55.0] - 2026-10-29
 
 ### Changed
 
+- The standalone images are built for the current CiviCRM stable, 6.19 and
+  6.17 only. `:standalone-6.16` and `:standalone-6.18` are no longer rebuilt;
+  their last build stays pullable but gets neither CiviCRM security releases
+  nor tool-belt updates.
 - A failed job prints the state, the last 200 log lines and the healthcheck
   results of every container in its stack instead of the app's log alone, so
   a service that a `compose_file` adds shows why it never turned healthy.
@@ -2543,8 +2547,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.54.1...HEAD
-[1.54.1]: https://github.com/civico-de/civikitchen/compare/v1.54.0...v1.54.1
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.55.0...HEAD
+[1.55.0]: https://github.com/civico-de/civikitchen/compare/v1.54.0...v1.55.0
 [1.54.0]: https://github.com/civico-de/civikitchen/compare/v1.53.0...v1.54.0
 [1.53.0]: https://github.com/civico-de/civikitchen/compare/v1.52.0...v1.53.0
 [1.52.0]: https://github.com/civico-de/civikitchen/compare/v1.51.0...v1.52.0
