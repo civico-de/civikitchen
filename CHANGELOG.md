@@ -14,6 +14,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.54.1] - 2026-10-29
+
 ### Changed
 
 - A failed job prints the state, the last 200 log lines and the healthcheck
@@ -2541,7 +2543,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.54.0...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.54.1...HEAD
+[1.54.1]: https://github.com/civico-de/civikitchen/compare/v1.54.0...v1.54.1
 [1.54.0]: https://github.com/civico-de/civikitchen/compare/v1.53.0...v1.54.0
 [1.53.0]: https://github.com/civico-de/civikitchen/compare/v1.52.0...v1.53.0
 [1.52.0]: https://github.com/civico-de/civikitchen/compare/v1.51.0...v1.52.0
