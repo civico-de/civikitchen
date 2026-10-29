@@ -947,9 +947,13 @@ jobs:
           sed -n '/^### Lifecycle gate/,$p' "$RUNNER_TEMP/cklifecycle.md" >> "$GITHUB_STEP_SUMMARY" || true
 
       # A failed stack is a stack trace of nothing without its logs.
-      - name: App logs on failure
+      - name: Stack logs on failure
         if: failure()
-        run: docker compose -f "$CK_COMPOSE_FILE" logs app | tail -200
+        run: |
+          docker compose -f "$CK_COMPOSE_FILE" ps -a
+          docker compose -f "$CK_COMPOSE_FILE" logs --tail 200
+          # A failing healthcheck's own output shows in no log.
+          docker compose -f "$CK_COMPOSE_FILE" ps -aq | xargs -r docker inspect --format '{{.Name}}: {{json .State.Health}}'
 
       # Job-scoped project names mean no later run's `down -v` ever finds this
       # stack; leaked networks exhaust Docker's address pools on self-hosted runners.
@@ -1128,9 +1132,13 @@ jobs:
           [ "$status" = installed ] \
             || { echo "upgrade: extension ended up '$status', expected 'installed'" >&2; exit 1; }
 
-      - name: App logs on failure
+      - name: Stack logs on failure
         if: failure()
-        run: docker compose -f "$CK_COMPOSE_FILE" logs app | tail -200
+        run: |
+          docker compose -f "$CK_COMPOSE_FILE" ps -a
+          docker compose -f "$CK_COMPOSE_FILE" logs --tail 200
+          # A failing healthcheck's own output shows in no log.
+          docker compose -f "$CK_COMPOSE_FILE" ps -aq | xargs -r docker inspect --format '{{.Name}}: {{json .State.Health}}'
 
       # Job-scoped project names mean no later run's `down -v` ever finds this
       # stack; leaked networks exhaust Docker's address pools on self-hosted runners.
@@ -1388,9 +1396,13 @@ jobs:
              ckschemadiff dump \"\${CIVICRM_DB_NAME:-civicrm}\" /tmp/ck-schema-fresh.sql
              ckschemadiff diff /tmp/ck-schema-fresh.sql /tmp/ck-schema-upgraded.sql"
 
-      - name: App logs on failure
+      - name: Stack logs on failure
         if: failure()
-        run: docker compose -f "$CK_COMPOSE_FILE" logs app | tail -200
+        run: |
+          docker compose -f "$CK_COMPOSE_FILE" ps -a
+          docker compose -f "$CK_COMPOSE_FILE" logs --tail 200
+          # A failing healthcheck's own output shows in no log.
+          docker compose -f "$CK_COMPOSE_FILE" ps -aq | xargs -r docker inspect --format '{{.Name}}: {{json .State.Health}}'
 
       # Job-scoped project names mean no later run's `down -v` ever finds this
       # stack; leaked networks exhaust Docker's address pools on self-hosted runners.
@@ -1521,9 +1533,13 @@ jobs:
             "git config --global --add safe.directory $CK_REPO_PATH
              cd \"$CK_EXT_PATH\" && ckmutate"
 
-      - name: App logs on failure
+      - name: Stack logs on failure
         if: failure()
-        run: docker compose -f "$CK_COMPOSE_FILE" logs app | tail -200
+        run: |
+          docker compose -f "$CK_COMPOSE_FILE" ps -a
+          docker compose -f "$CK_COMPOSE_FILE" logs --tail 200
+          # A failing healthcheck's own output shows in no log.
+          docker compose -f "$CK_COMPOSE_FILE" ps -aq | xargs -r docker inspect --format '{{.Name}}: {{json .State.Health}}'
 
       # Job-scoped project names mean no later run's `down -v` ever finds this
       # stack; leaked networks exhaust Docker's address pools on self-hosted runners.
@@ -1819,9 +1835,13 @@ jobs:
             echo "no tests/upgrade/assert.php: the upgrade itself passed, but nothing checked what became of the extension's own records."
           fi
 
-      - name: App logs on failure
+      - name: Stack logs on failure
         if: failure()
-        run: docker compose -f "$CK_COMPOSE_FILE" logs app | tail -200
+        run: |
+          docker compose -f "$CK_COMPOSE_FILE" ps -a
+          docker compose -f "$CK_COMPOSE_FILE" logs --tail 200
+          # A failing healthcheck's own output shows in no log.
+          docker compose -f "$CK_COMPOSE_FILE" ps -aq | xargs -r docker inspect --format '{{.Name}}: {{json .State.Health}}'
 
       # Job-scoped project names mean no later run's `down -v` ever finds this
       # stack; leaked networks exhaust Docker's address pools on self-hosted runners.
@@ -2014,9 +2034,13 @@ jobs:
         run: |
           sed -n '/^### Lifecycle gate/,$p' "$RUNNER_TEMP/cklifecycle.md" >> "$GITHUB_STEP_SUMMARY" || true
 
-      - name: App logs on failure
+      - name: Stack logs on failure
         if: failure()
-        run: docker compose -f "$CK_COMPOSE_FILE" logs app | tail -200
+        run: |
+          docker compose -f "$CK_COMPOSE_FILE" ps -a
+          docker compose -f "$CK_COMPOSE_FILE" logs --tail 200
+          # A failing healthcheck's own output shows in no log.
+          docker compose -f "$CK_COMPOSE_FILE" ps -aq | xargs -r docker inspect --format '{{.Name}}: {{json .State.Health}}'
 
       # Job-scoped project names mean no later run's `down -v` ever finds this
       # stack; leaked networks exhaust Docker's address pools on self-hosted runners.
@@ -2250,9 +2274,13 @@ jobs:
       # No override needed to find the stack: the project name comes from the
       # compose file, and this way the step still works when the failure was
       # the override step itself.
-      - name: App logs on failure
+      - name: Stack logs on failure
         if: failure()
-        run: docker compose -f "$CK_COMPOSE_FILE" logs app | tail -200
+        run: |
+          docker compose -f "$CK_COMPOSE_FILE" ps -a
+          docker compose -f "$CK_COMPOSE_FILE" logs --tail 200
+          # A failing healthcheck's own output shows in no log.
+          docker compose -f "$CK_COMPOSE_FILE" ps -aq | xargs -r docker inspect --format '{{.Name}}: {{json .State.Health}}'
 
       # Job-scoped project names mean no later run's `down -v` ever finds this
       # stack; leaked networks exhaust Docker's address pools on self-hosted runners.

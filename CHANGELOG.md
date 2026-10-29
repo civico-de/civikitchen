@@ -14,6 +14,12 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Changed
+
+- A failed job prints the state, the last 200 log lines and the healthcheck
+  results of every container in its stack instead of the app's log alone, so
+  a service that a `compose_file` adds shows why it never turned healthy.
+
 ## [1.54.0] - 2026-10-28
 
 ### Added
