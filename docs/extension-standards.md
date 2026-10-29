@@ -1251,7 +1251,7 @@ differently and saved searches' stored params stop being valid.
 Configure it with the oldest minor you claim:
 
 ```yaml
-      core_upgrade_from: ghcr.io/civico-de/civikitchen:standalone-6.16
+      core_upgrade_from: ghcr.io/civico-de/civikitchen:standalone-6.17
 ```
 
 The target is the run's image, or the compose file's default. If both are the
@@ -1317,13 +1317,13 @@ jobs:
       # The default ci job runs here too, on the moving edge.
       image: ghcr.io/civico-de/civikitchen:standalone
       # Oldest minor from info.xml <compatibility>.
-      matrix_images: ghcr.io/civico-de/civikitchen:standalone-6.16
+      matrix_images: ghcr.io/civico-de/civikitchen:standalone-6.17
       lifecycle: true
       upgrade_from_last_release: true
       # Skips itself when the extension owns no tables.
       schema_parity: true
       # Installed on the oldest minor, then upgraded to the image above.
-      core_upgrade_from: ghcr.io/civico-de/civikitchen:standalone-6.16
+      core_upgrade_from: ghcr.io/civico-de/civikitchen:standalone-6.17
       # playwright: true          # browser tests, needs a test:e2e script
       # matrix_playwright: true   # one more boot per matrix image
       # No-op without policy.mutation.minimum_msi; set .paths too.
