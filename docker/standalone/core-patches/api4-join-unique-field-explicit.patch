@@ -1,0 +1,65 @@
+An APIv4 join whose ON clause links a unique field of the joined entity, for
+example ['activity.edition', '=', 'campaign.name'], also gets a guessed FK
+condition (campaign_id = campaign.id) and then matches nothing.
+
+Since 6.19.3 only a link to the joined entity's id counts as explicit.
+
+Upstream: https://github.com/civicrm/civicrm-core/pull/37815
+Since: 6.19.4
+
+diff --git a/Civi/Api4/Query/Api4SelectQuery.php b/Civi/Api4/Query/Api4SelectQuery.php
+index 0bf1fb9e98..e8b880111c 100644
+--- a/Civi/Api4/Query/Api4SelectQuery.php
++++ b/Civi/Api4/Query/Api4SelectQuery.php
+@@ -17,6 +17,7 @@ use Civi\Api4\Service\Schema\Joiner;
+ use Civi\Api4\Utils\FormattingUtil;
+ use Civi\Api4\Utils\CoreUtil;
+ use Civi\Api4\Utils\SelectUtil;
++use Civi\Schema\EntityRepository;
+ 
+ /**
+  * Constructs SELECT FROM queries for API4 GET actions.
+@@ -584,10 +585,10 @@ class Api4SelectQuery extends Api4Query {
+         elseif (!empty($joinEntityFields[$joinFieldName]['dfk_entities']) && (in_array($otherSideEntity, $joinEntityFields[$joinFieldName]['dfk_entities'], TRUE) || in_array(CoreUtil::getApiNameFromTableName($otherSideTable), $joinEntityFields[$joinFieldName]['dfk_entities'], TRUE))) {
+           $isFK = TRUE;
+         }
+-        // 4. Link to joinEntity's id from a field that is not a known FK (e.g. SepaMandate.entity_id -> Contribution.id)
++        // 4. Link to a unique field of joinEntity from a field that is not a known FK (e.g. SepaMandate.entity_id -> Contribution.id)
+         // Counts as explicit so no FK condition is guessed; without $aclStack the joined entity keeps all its ACL clauses.
+-        // A literal id is a filter, not a link, so it does not count.
+-        elseif ($joinFieldName === 'id' && $otherSideField) {
++        // A literal value is a filter, not a link, so it does not count.
++        elseif ($otherSideField && $this->isUniqueField($joinTable, $joinFieldName)) {
+           return TRUE;
+         }
+ 
+@@ -632,6 +633,29 @@ class Api4SelectQuery extends Api4Query {
+     return array_merge($acls, $conditions);
+   }
+ 
++  /**
++   * Whether one value of the field identifies at most one record: the id or a single-column unique index.
++   *
++   * @param string|null $tableName
++   * @param string $fieldName
++   * @return bool
++   */
++  private function isUniqueField(?string $tableName, string $fieldName): bool {
++    if ($fieldName === 'id') {
++      return TRUE;
++    }
++    $entityName = $tableName ? (EntityRepository::getTableIndex()[$tableName] ?? NULL) : NULL;
++    if (!$entityName) {
++      return FALSE;
++    }
++    foreach ((array) \Civi::entity($entityName)->getMeta('indices') as $index) {
++      if (!empty($index['unique']) && array_keys($index['fields'] ?? []) === [$fieldName]) {
++        return TRUE;
++      }
++    }
++    return FALSE;
++  }
++
+   /**
+    * Join via a Bridge table using a join within a join
+    *

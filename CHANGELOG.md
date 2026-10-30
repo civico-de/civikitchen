@@ -19,6 +19,10 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - ckconform's config-without-runner follows the repo's own shell scripts a
   workflow runs by path, and the scripts those call, so a phpunit or phpstan
   step inside `tests/run-phpunit.sh` counts as running its config.
+- APIv4 joins whose ON clause links a unique field of the joined entity, such
+  as a campaign's `name`, match rows again on standalone images with CiviCRM
+  6.19.4 or newer, through a core patch until a release carries the upstream
+  fix.
 
 ## [1.55.0] - 2026-10-29
 
