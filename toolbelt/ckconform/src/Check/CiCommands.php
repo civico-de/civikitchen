@@ -8,8 +8,9 @@ use CiviKitchen\Ckconform\Context;
 
 /**
  * What the CI jobs judging this extension actually run: their workflow and
- * GitLab pipeline text without comments, the gates behind `ck` subcommands and the shared CI, and
- * the npm and composer scripts they invoke by name, followed transitively.
+ * GitLab pipeline text without comments, the gates behind `ck` subcommands and the shared CI,
+ * the npm and composer scripts they invoke by name, and the repo's own shell scripts they invoke
+ * by path, followed transitively.
  */
 final class CiCommands
 {
@@ -151,21 +152,68 @@ final class CiCommands
             'npm' => self::scripts($context, 'package.json'),
             'composer' => self::scripts($context, 'composer.json'),
         ];
+        $shellScripts = self::shellScripts($context);
         $seen = [];
-        for ($pending = $text; $pending !== '';) {
-            $found = '';
-            foreach (self::invocations($pending) as [$manager, $name]) {
-                if (isset($seen[$manager][$name]) || !isset($tables[$manager][$name])) {
-                    continue;
+        // A script's own calls name their siblings relative to its directory, the workflow's from the root.
+        for ($pending = ['' => $text]; $pending !== [];) {
+            $found = [];
+            foreach ($pending as $directory => $body) {
+                foreach (self::invocations($body) as [$manager, $name]) {
+                    if (isset($seen[$manager][$name]) || !isset($tables[$manager][$name])) {
+                        continue;
+                    }
+                    $seen[$manager][$name] = true;
+                    $found[''] = ($found[''] ?? '') . implode("\n", $tables[$manager][$name]) . "\n";
                 }
-                $seen[$manager][$name] = true;
-                $found .= implode("\n", $tables[$manager][$name]) . "\n";
+                foreach ($shellScripts as $script) {
+                    if (isset($seen['sh'][$script]) || !self::namesScript($body, $script, $directory)) {
+                        continue;
+                    }
+                    $seen['sh'][$script] = true;
+                    $scriptDirectory = dirname($script) === '.' ? '' : dirname($script);
+                    $found[$scriptDirectory] = ($found[$scriptDirectory] ?? '')
+                        . self::withoutComments($context->read($script) ?? '') . "\n";
+                }
             }
-            $text .= $found;
+            $text .= implode("\n", $found);
             $pending = $found;
         }
 
         return $text;
+    }
+
+    /** @return list<string> tracked shell scripts: a `.sh` file or one with a shell shebang, outside vendor/ */
+    private static function shellScripts(Context $context): array
+    {
+        $scripts = [];
+        foreach ($context->trackedFiles() as $file) {
+            if (str_starts_with($file, 'vendor/') || str_contains($file, '/vendor/') || str_contains($file, 'node_modules/')) {
+                continue;
+            }
+            $isScript = str_ends_with($file, '.sh')
+                || preg_match('/^#![^\n]*\b(?:ba|z|da|k)?sh\b/', (string) substr($context->read($file) ?? '', 0, 64)) === 1;
+            if ($isScript) {
+                $scripts[] = $file;
+            }
+        }
+
+        return $scripts;
+    }
+
+    /** Whether $text names $script by its repo path, or by its path relative to $directory. */
+    private static function namesScript(string $text, string $script, string $directory): bool
+    {
+        $paths = [$script];
+        if ($directory !== '' && str_starts_with($script, $directory . '/')) {
+            $paths[] = substr($script, strlen($directory) + 1);
+        }
+        foreach ($paths as $path) {
+            if (preg_match('/(?<![\w.-])(?:\.\/)?' . preg_quote($path, '/') . '(?![\w\/.-])/', $text) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @return list<array{0: 'npm'|'composer', 1: string}> script invocations: `npm test`, `yarn run x`, `composer x`, `@x` */

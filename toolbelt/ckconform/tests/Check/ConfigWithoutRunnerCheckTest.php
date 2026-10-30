@@ -367,5 +367,38 @@ final class ConfigWithoutRunnerCheckTest extends CheckTestCase
         $this->assertFails($this->run_(new ConfigWithoutRunnerCheck(), $context), 'playwright.config.ts');
     }
 
+    /** A repo script the workflow runs by path counts with what it runs, siblings it sources included. */
+    public function testAShellScriptTheWorkflowRunsCountsAsInvokingTheTool(): void
+    {
+        $direct = $this->runnerRepo('tests/run-phpunit.sh', [
+            'phpunit.xml.dist' => '<phpunit/>',
+            'tests/run-phpunit.sh' => "#!/usr/bin/env bash\ncd \"$(dirname \"$0\")\"\ndocker compose exec -T app phpunit --configuration phpunit.xml.dist\n",
+        ]);
+        $this->assertPasses($this->run_(new ConfigWithoutRunnerCheck(), $direct));
+
+        $sourced = $this->runnerRepo('./ci/check', [
+            'phpstan.neon.dist' => 'parameters:',
+            'ci/check' => "#!/usr/bin/env bash\n. ./analyse.sh\n",
+            'ci/analyse.sh' => "phpstan analyse\n",
+        ]);
+        $this->assertPasses($this->run_(new ConfigWithoutRunnerCheck(), $sourced));
+    }
+
+    /** A script nothing in CI calls, or one that names the tool only in a comment, runs nothing. */
+    public function testAShellScriptCountsOnlyWhenCalledAndOnlyForItsCommands(): void
+    {
+        $uncalled = $this->runnerRepo('cklint', [
+            'phpunit.xml.dist' => '<phpunit/>',
+            'tests/run-phpunit.sh' => "#!/usr/bin/env bash\nphpunit\n",
+        ]);
+        $this->assertFails($this->run_(new ConfigWithoutRunnerCheck(), $uncalled), 'phpunit.xml.dist');
+
+        $commented = $this->runnerRepo('tests/run.sh', [
+            'phpunit.xml.dist' => '<phpunit/>',
+            'tests/run.sh' => "#!/usr/bin/env bash\n# runs phpunit some day\necho skipped\n",
+        ]);
+        $this->assertFails($this->run_(new ConfigWithoutRunnerCheck(), $commented), 'phpunit.xml.dist');
+    }
+
     private const GITLAB_CALLER = "include:\n  - remote: https://raw.githubusercontent.com/civico-de/civikitchen/v1/ci/gitlab/extension-ci.yml\n";
 }
