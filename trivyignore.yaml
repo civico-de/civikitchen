@@ -279,6 +279,16 @@ vulnerabilities:
       Recheck after a buildkit rebuild.
     expired_at: 2027-01-31
 
+  - id: CVE-2026-116689
+    paths:
+      - "home/buildkit/buildkit/**"
+    statement: >-
+      follow-redirects 1.16.1 via karma@6.4.4 -> http-proxy@1.18.1. The leak
+      needs a caller that passes a cross-realm sensitiveHeaders array;
+      http-proxy passes no sensitiveHeaders at all, and the chain runs only in
+      hand-run karma. Recheck after a buildkit rebuild; 1.16.2 clears it.
+    expired_at: 2027-01-31
+
   - id: CVE-2026-27903
     paths:
       - "home/buildkit/buildkit/**"
