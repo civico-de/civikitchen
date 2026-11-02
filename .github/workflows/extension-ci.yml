@@ -251,6 +251,9 @@ jobs:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-key
       cancel-in-progress: true
     runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
+    # Every job stops at 120 minutes, about twice the longest measured healthy job;
+    # the default of 6 hours lets a hung job hold its runner.
+    timeout-minutes: 120
     # No defaults.run.working-directory here, unlike every other job: a
     # working_directory that does not exist has to produce the message below
     # rather than a runner error about a missing directory.
@@ -377,6 +380,7 @@ jobs:
       cancel-in-progress: true
     if: ${{ inputs.check_template }}
     runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 120
     defaults:
       run:
         working-directory: ${{ inputs.working_directory }}
@@ -483,6 +487,7 @@ jobs:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-osv
       cancel-in-progress: true
     runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 120
     defaults:
       run:
         working-directory: ${{ inputs.working_directory }}
@@ -580,6 +585,7 @@ jobs:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-security
       cancel-in-progress: true
     runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 120
     defaults:
       run:
         working-directory: ${{ inputs.working_directory }}
@@ -633,6 +639,7 @@ jobs:
       cancel-in-progress: true
     needs: key
     runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 120
     # Inputs enter shell commands through the environment, never by expression
     # interpolation inside `run:` — an interpolated input IS the script text.
     env:
@@ -983,6 +990,7 @@ jobs:
     needs: key
     if: ${{ inputs.upgrade_from_last_release }}
     runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 120
     env:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
@@ -1182,6 +1190,7 @@ jobs:
     needs: key
     if: ${{ inputs.schema_parity }}
     runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 120
     env:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
@@ -1438,6 +1447,7 @@ jobs:
     needs: key
     if: ${{ inputs.mutation }}
     runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 120
     env:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
@@ -1575,6 +1585,7 @@ jobs:
     needs: key
     if: ${{ inputs.core_upgrade_from != '' }}
     runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 120
     env:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
@@ -1873,6 +1884,7 @@ jobs:
     if: ${{ inputs.matrix_images != '' || inputs.playwright || inputs.matrix_playwright }}
     needs: key
     runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 120
     outputs:
       images: ${{ steps.parse.outputs.images }}
       playwright_images: ${{ steps.parse.outputs.playwright_images }}
@@ -1930,6 +1942,7 @@ jobs:
     # compat-images also runs for the browser legs alone, with no compat legs.
     if: ${{ inputs.matrix_images != '' }}
     runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 120
     strategy:
       # One old CiviCRM failing must not hide the result for the new one.
       fail-fast: false
@@ -2076,6 +2089,7 @@ jobs:
     needs: [compat-images, key]
     if: ${{ inputs.playwright }}
     runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 120
     # Legs show as `playwright (<image>)`; a `name:` expression would show
     # verbatim on the skipped job in every run without playwright.
     strategy:

@@ -14,6 +14,11 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Changed
+
+- Every `extension-ci.yml` job stops after 120 minutes instead of GitHub's 6-hour default, so a
+  hung job no longer holds its runner.
+
 ## [1.56.0] - 2026-11-02
 
 ### Added
