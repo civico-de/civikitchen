@@ -23,10 +23,9 @@ for i in $(seq 1 60); do
     [ "$i" -eq 60 ] && { echo "bake.sh: MariaDB never became ready" >&2; exit 1; }
     sleep 1
 done
-# Setting the root password revokes the empty-password/unix_socket auth that
-# Debian's backgrounded /etc/mysql/debian-start still uses, so it logs a
-# harmless "ERROR 1045 ... 'root'@'localhost' (using password: NO)" right after.
-mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'root'; FLUSH PRIVILEGES;"
+# Keep unix_socket next to the password: Debian's /etc/mysql/debian-start
+# connects as root over the socket without one.
+mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED VIA unix_socket OR mysql_native_password USING PASSWORD('root'); FLUSH PRIVILEGES;"
 
 # Drupal 11.4+ (Standard profile) installs the new Navigation module instead of
 # Toolbar, so the 'access toolbar' permission no longer exists and upstream

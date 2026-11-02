@@ -14,6 +14,12 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Fixed
+
+- The demo images' embedded MariaDB accepts root over the Unix socket next to
+  the password, so Debian's start-up check runs instead of logging
+  `ERROR 1045 ... (using password: NO)` on every boot.
+
 ## [1.55.1] - 2026-10-30
 
 ### Fixed

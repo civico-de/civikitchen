@@ -85,6 +85,8 @@ if grep -qiE 'InnoDB.*(crash recovery|Starting crash recovery|Recovering)' "${LO
 else
     echo "  ✓ embedded MariaDB started clean (no InnoDB recovery)"
 fi
+check "debian-start reaches root over the socket (no ERROR 1045)" \
+    "! grep -qF \"Access denied for user 'root'@'localhost'\" '${LOGFILE}'"
 
 # 5+6) Runtime profile apply worked, per profile in the (possibly
 # comma-separated) list: its first enabled extension is installed. Across all
