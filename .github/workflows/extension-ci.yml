@@ -1677,6 +1677,8 @@ jobs:
               volumes:
                 - ck-core-upgrade-private:/var/www/html/private
             db:
+              # The CI stack keeps its datadir in RAM; the swap needs it on the volume.
+              tmpfs: !reset []
               volumes:
                 - ck-core-upgrade-db:/var/lib/mysql
 

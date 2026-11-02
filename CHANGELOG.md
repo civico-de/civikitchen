@@ -14,6 +14,14 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Changed
+
+- The template's CI stack keeps the MariaDB datadir in a tmpfs. The test
+  database is thrown away with the stack anyway; in RAM, schema rebuilds and
+  every commit stop waiting for an fsync, which on slow runner disks dominates
+  DDL-heavy suites. `ckinit --update` brings the managed db block along; the
+  core-upgrade job still carries its database across the swap on a volume.
+
 ### Fixed
 
 - The demo images' embedded MariaDB accepts root over the Unix socket next to

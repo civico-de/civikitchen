@@ -33,6 +33,10 @@ services:
 
   db:
     image: mariadb:11.4
+    # The test database is thrown away with the stack; in RAM no commit waits
+    # for an fsync, which slow CI disks charge for every CiviCRM request.
+    tmpfs:
+      - /var/lib/mysql
     environment:
       MYSQL_ROOT_PASSWORD: root
     healthcheck:
