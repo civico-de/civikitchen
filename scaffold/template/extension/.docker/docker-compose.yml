@@ -107,7 +107,7 @@ services:
   # and MinkBase reaches it at its default localhost:9222.
   browser:
     profiles: [browser]
-    image: chromedp/headless-shell:151.0.7922.109
+    image: chromedp/headless-shell:152.0.7939.3
     network_mode: service:app
     # Docker's default 64 MB /dev/shm makes Chrome drop script loads on
     # asset-heavy pages (net::ERR_INSUFFICIENT_RESOURCES); the image README advises 2G.
