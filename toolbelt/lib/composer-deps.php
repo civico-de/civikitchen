@@ -24,7 +24,7 @@ use ShipMonk\ComposerDependencyAnalyser\Config\ErrorType;
 // copy. Enumerated, so a library core does not hand out stays reportable.
 $configuration = (new Configuration())
   ->ignoreUnknownClassesRegex(
-    '~^(CRM_|Civi(?:\\\\|$)|CiviCRM|CiviMix\\\\|GuzzleHttp\\\\|Psr\\\\'
+    '~^(CRM_|Civi(?:\\\\|$)|CiviCRM|CiviMix\\\\|API_(?:Exception|Wrapper)$|GuzzleHttp\\\\|Psr\\\\'
     . '|Symfony\\\\Component\\\\(?:Config|DependencyInjection|EventDispatcher|Filesystem|Finder|Process|VarDumper)\\\\'
     . '|Symfony\\\\Contracts\\\\'
     . '|(?i:HTML_(?:Common|QuickForm)(?:_|$)|PEAR(?:_(?:Error|ErrorStack|Exception))?$'

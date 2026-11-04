@@ -19,6 +19,16 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - Every `extension-ci.yml` job stops after 120 minutes instead of GitHub's 6-hour default, so a
   hung job no longer holds its runner.
 
+### Fixed
+
+- `ckanalyze` analyses the files the repo's phpstan config analyses: its `paths`, less its
+  `excludePaths`, which phpstan itself resolves. Stand-alone scripts outside those paths
+  (a CMS setup shell, proxy endpoints) no longer report findings; like phpstan, the analysis
+  still reads their symbols. Without a phpstan config
+  the scope stays every PHP file outside `tests/`.
+- `ckdeps` no longer reports `API_Wrapper` and `API_Exception` as unknown classes: core's
+  class loader provides both.
+
 ## [1.56.0] - 2026-11-02
 
 ### Added

@@ -217,7 +217,8 @@ requirements.
 
 The shadow phase is running. `ckanalyze` runs `mago analyze` in `ck ci` after
 phpstan without gating. Its findings report as shadow, but a crash still
-fails. It analyzes what phpstan's main pass analyzes. It reads core, civix
+fails. It analyzes what phpstan's main pass analyzes: `phpstan dump-parameters`
+resolves the paths and exclusions of the repo's config. It reads core, civix
 files, `vendor/`, siblings and `policy.vendored_paths` for their symbols. A
 first run over 38 extension repos on 2026-10-11 completed on every one.
 mixed-assignment and the other mixed-* codes made up most findings. Next came

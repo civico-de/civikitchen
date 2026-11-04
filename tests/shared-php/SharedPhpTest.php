@@ -574,6 +574,53 @@ final class SharedPhpTest extends TestCase
         }
     }
 
+    public function testAnalyzeKeepsToTheFilesPhpstanAnalyses(): void
+    {
+        $core = $this->temporary . '/core';
+        mkdir($core);
+        touch($core . '/Civi.php');
+        file_put_contents($this->temporary . '/composer.json', '{"require":{"php":">=8.2"}}');
+        putenv('CIVICRM_CORE_DIR=' . $core);
+        $before = getcwd();
+        chdir($this->temporary);
+        try {
+            touch('phpstan.neon.dist');
+            $root = (string) getcwd();
+            $runner = new AnalyzeRunner();
+            $runner->files = "CRM/Widget/Legacy.php\nCRM/Widget/Page.php\nCivi/Widget.php\nbin/setup.php\nwidget.php\n";
+            $runner->phpstanParameters = (string) json_encode([
+                'paths' => ["{$root}/Civi", "{$root}/CRM", "{$root}/widget.php"],
+                'excludePaths' => ['analyse' => ["{$root}/CRM/*/Legacy.php"], 'analyseAndScan' => []],
+            ]);
+            self::assertSame(0, (new AnalyzeCommand(dirname(__DIR__, 2), $runner))->run([]));
+            self::assertStringContainsString("paths = [\"CRM/Widget/Page.php\", \"Civi/Widget.php\", \"widget.php\"]\n", $runner->config);
+            self::assertMatchesRegularExpression('~^includes = \[.*"CRM/Widget/Legacy\.php", "bin/setup\.php"\]$~m', $runner->config);
+
+            // The template's `paths: [.]` resolves to the bare root; its globs stay unresolved.
+            $template = new AnalyzeRunner();
+            $template->files = "CRM/Widget/DAO/Thing.php\nCivi/Widget.php\nfrontend/node_modules/pkg/x.php\nvendor/lib.php\n";
+            $template->phpstanParameters = (string) json_encode([
+                'paths' => [$root],
+                'excludePaths' => ['analyse' => ["{$root}/CRM/*/DAO/*"], 'analyseAndScan' => ['*/node_modules/*', "{$root}/vendor"]],
+            ]);
+            self::assertSame(0, (new AnalyzeCommand(dirname(__DIR__, 2), $template))->run([]));
+            self::assertStringContainsString("paths = [\"Civi/Widget.php\"]\n", $template->config);
+            self::assertStringNotContainsString('node_modules', $template->config);
+            self::assertStringNotContainsString('vendor/lib.php', $template->config);
+
+            // A config phpstan cannot read fails the run instead of widening the scope.
+            $broken = new AnalyzeRunner();
+            ob_start();
+            $status = (new AnalyzeCommand(dirname(__DIR__, 2), $broken))->run([]);
+            ob_end_clean();
+            self::assertSame(2, $status);
+            self::assertSame([], $broken->command);
+        } finally {
+            putenv('CIVICRM_CORE_DIR');
+            chdir($before === false ? dirname(__DIR__, 2) : $before);
+        }
+    }
+
     public function testAnalyzeReadsRequiredExtensionsForTheirSymbols(): void
     {
         $core = $this->temporary . '/core';
@@ -1694,6 +1741,11 @@ final class AnalyzeRunner extends Runner
     /** @var array<string, string> */
     public array $environment = [];
 
+    public string $files = "CRM/Widget/DAO/Thing.php\nCivi/Widget.php\nlib/upstream.php\nphpstanBootstrap.php\ntests/phpunit/WidgetTest.php\nwidget.civix.php\n";
+
+    /** What `phpstan dump-parameters --json` prints; null makes it fail. */
+    public ?string $phpstanParameters = null;
+
     public function __construct(private readonly string $cvRoot = '')
     {
     }
@@ -1708,14 +1760,19 @@ final class AnalyzeRunner extends Runner
             return ['status' => 0, 'output' => "true\n"];
         }
         if (str_contains($joined, 'ls-files')) {
-            return ['status' => 0, 'output' => "CRM/Widget/DAO/Thing.php\nCivi/Widget.php\nlib/upstream.php\nphpstanBootstrap.php\ntests/phpunit/WidgetTest.php\nwidget.civix.php\n"];
+            return ['status' => 0, 'output' => $this->files];
         }
         return ['status' => 0, 'output' => ''];
     }
 
-    /** policy.vendored_paths */
+    /** policy.vendored_paths, and phpstan's resolved parameters */
     public function captureSeparate(array $command, ?array $environment = null, ?string $workingDirectory = null): array
     {
+        if ($command[0] === 'phpstan') {
+            return $this->phpstanParameters === null
+                ? ['status' => 1, 'stdout' => '', 'stderr' => "Invalid configuration\n"]
+                : ['status' => 0, 'stdout' => $this->phpstanParameters, 'stderr' => ''];
+        }
         return ['status' => 0, 'stdout' => str_ends_with($command[0], 'ckconform') ? "lib -- unmodified upstream\n" : '', 'stderr' => ''];
     }
 

@@ -72,6 +72,10 @@ $expected = [
   'Civi' => 1,
   'Civi\Api4\Contact' => 1,
   'CiviMix\Schema\AutomaticUpgrader' => 1,
+  // CRM_Core_ClassLoader loads the two legacy api/ names; an API_Wrapper serves hook_civicrm_apiWrappers.
+  'API_Wrapper' => 1,
+  'API_Exception' => 1,
+  'API_Request' => 0,
   'GuzzleHttp\Client' => 1,
   'Psr\Log\LoggerInterface' => 1,
   // Core's own composer.json ships these; an extension decorating the

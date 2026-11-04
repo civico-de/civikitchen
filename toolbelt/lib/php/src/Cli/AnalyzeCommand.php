@@ -41,6 +41,20 @@ final class AnalyzeCommand implements Command
         // phpstan's main pass leaves the suite to phpstan-tests; the same scope keeps the two comparable.
         $isTest = static fn(string $file): bool => preg_match('#(^|/)tests/#', $file) === 1 || $file === 'phpstanBootstrap.php';
         $paths = array_values(array_filter($repository->source(['php'], [], true, true), static fn(string $file): bool => !$isTest($file)));
+        try {
+            $scope = $this->phpstanScope();
+        } catch (\RuntimeException $e) {
+            return $this->error($e->getMessage());
+        }
+        $symbolsOnly = [];
+        if ($scope !== null) {
+            // Files phpstan does not analyse still lend their symbols, as phpstan's autoloader would.
+            $root = getcwd() . '/';
+            $scanned = array_values(array_filter($paths, static fn(string $file): bool => !self::matches($root . $file, $scope['analyseAndScan'])));
+            $analysed = static fn(string $file): bool => self::matches($root . $file, $scope['paths']) && !self::matches($root . $file, $scope['analyse']);
+            $paths = array_values(array_filter($scanned, $analysed));
+            $symbolsOnly = array_values(array_diff($scanned, $paths));
+        }
         if ($paths === []) {
             echo "ckanalyze: no PHP files to analyze.\n";
             return 0;
@@ -54,7 +68,7 @@ final class AnalyzeCommand implements Command
             $replaced[] = $core . substr((string) $stub, strlen($stubs));
         }
         sort($replaced);
-        $includes = [$core, ...($coreVendor === null || str_starts_with($coreVendor, $core . '/') ? [] : [$coreVendor]), $stubs, ...$generated];
+        $includes = [$core, ...($coreVendor === null || str_starts_with($coreVendor, $core . '/') ? [] : [$coreVendor]), $stubs, ...$generated, ...$symbolsOnly];
         foreach (['vendor', '.civikitchen-siblings', ...$repository->vendoredPrefixes()] as $symbolsOnly) {
             if (file_exists($symbolsOnly)) {
                 $includes[] = $symbolsOnly;
@@ -97,6 +111,47 @@ final class AnalyzeCommand implements Command
         }
     }
 
+    /**
+     * The files phpstan's default config analyses, as phpstan itself resolves
+     * them (absolute paths and globs); null without such a config.
+     *
+     * @return array{paths: list<string>, analyse: list<string>, analyseAndScan: list<string>}|null
+     */
+    private function phpstanScope(): ?array
+    {
+        if (array_filter(['phpstan.neon', 'phpstan.neon.dist', 'phpstan.dist.neon'], is_file(...)) === []) {
+            return null;
+        }
+        $dump = $this->runner->captureSeparate(['phpstan', 'dump-parameters', '--json']);
+        $parameters = json_decode($dump['stdout'], true);
+        if ($dump['status'] !== 0 || !is_array($parameters) || !is_array($parameters['paths'] ?? null)) {
+            throw new \RuntimeException("phpstan dump-parameters failed, so the files phpstan analyses are unknown:\n" . $dump['stderr']);
+        }
+        $strings = static fn(mixed $list): array => array_values(array_map(strval(...), is_array($list) ? $list : []));
+        $excludes = is_array($parameters['excludePaths'] ?? null) ? $parameters['excludePaths'] : [];
+        return [
+            'paths' => $strings($parameters['paths']),
+            'analyse' => $strings($excludes['analyse'] ?? []),
+            'analyseAndScan' => $strings($excludes['analyseAndScan'] ?? []),
+        ];
+    }
+
+    /**
+     * phpstan's path semantics on an absolute path: the file itself, a directory
+     * above it, or an fnmatch() glob.
+     *
+     * @param list<string> $patterns
+     */
+    private static function matches(string $file, array $patterns): bool
+    {
+        foreach ($patterns as $pattern) {
+            if ($file === $pattern || str_starts_with($file, rtrim($pattern, '/') . '/') || fnmatch($pattern, $file)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private function error(string $message): int
     {
         fwrite(STDERR, "ckanalyze: {$message}\n");
@@ -108,7 +163,9 @@ final class AnalyzeCommand implements Command
         return <<<'TXT'
 ckanalyze - static analysis with mago analyze and the CiviKitchen plugins.
 
-  ckanalyze               analyze the extension's PHP outside tests/
+  ckanalyze               analyze the extension's PHP outside tests/, limited
+                          to phpstan's paths and excludePaths when the repo
+                          has a phpstan.neon(.dist)
 
 Run from the extension root inside the image; untracked files count. CiviCRM
 core (CIVICRM_CORE_DIR, else /var/www/html/core, else cv's [civicrm.root]),
