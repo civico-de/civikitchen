@@ -30,6 +30,9 @@ except that a break the consumers are adjusted for ships as a minor, marked
   the scope stays every PHP file outside `tests/`.
 - `ckdeps` no longer reports `API_Wrapper` and `API_Exception` as unknown classes: core's
   class loader provides both.
+- The standalone and git images build again on CiviCRM 6.19.5 and master. Both ship the
+  fix for APIv4 joins on a unique field in a revised form, which the image's own core
+  patch for it neither matched nor applied to; that patch is gone.
 
 ## [1.56.0] - 2026-11-02
 
