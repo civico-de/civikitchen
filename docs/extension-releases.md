@@ -353,5 +353,5 @@ ckrelease info   key|file|version|dist-name
 
 It ships in the images, so `docker compose exec app ckrelease check` works in
 a dev stack. It also runs from a checkout with bash, git, php and unzip, once
-`scaffold/ck make tools` (or a composer install in packages/civikitchen-scenario-schema)
-has fetched the YAML parser. Run any declared build first.
+`scaffold/ck make tools` (or a composer install at the repository root) has
+fetched the YAML parser. Run any declared build first.
