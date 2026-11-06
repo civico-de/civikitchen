@@ -75,6 +75,8 @@ TRIPLE := $(ARCH)-unknown-linux-gnu
 # one hash per architecture there.
 MAGO_SHA256 := $(CK_MAGO_SHA256_$(PLATFORM))
 MAGO := $(CACHE)/mago-$(CK_MAGO_VERSION)
+# Versioned like the others, so a bump fetches the new release.
+ACTIONLINT := $(CACHE)/actionlint-$(CK_ACTIONLINT_VERSION)
 
 # Composer, uv and Node are fetched pinned too; composer is the images' release
 # (versions.env). Their directories lead every recipe's PATH.
@@ -420,8 +422,8 @@ lint-shell-portability: ## Reject host-incompatible BSD sed in-place syntax
 # actionlint reads workflows as YAML+shell; zizmor reads them as a threat model
 # — unpinned actions, expression injection into run blocks, tokens wider than
 # the job needs. Exemptions and their reasons live in zizmor.yml.
-lint-actions: $(CACHE)/actionlint $(UVX) ## actionlint + zizmor over the workflows
-	$(CACHE)/actionlint -color
+lint-actions: $(ACTIONLINT) $(UVX) ## actionlint + zizmor over the workflows
+	$(ACTIONLINT) -color
 	$(call pyrun,zizmor,$(CK_ZIZMOR_VERSION)) --no-online-audits --config zizmor.yml \
 	  .github/workflows .github/actions scaffold/template/extension/.github/workflows
 
@@ -507,7 +509,7 @@ $(VENDOR_STAMP): composer.json composer.lock toolbelt/phpstan/composer.json | $(
 release-image-paths: $(VENDOR_STAMP) ## Print build-dev-images.yml's push trigger paths (read by scripts/release.sh)
 	@php scripts/image-trigger-paths.php
 
-tools: $(PHPUNIT) $(MAGO) $(CACHE)/actionlint $(SHELLCHECK) $(COMPOSER) $(UVX) $(NODE) $(VENDOR_STAMP) $(OXLINT_STAMP) ## Pre-fetch the pinned tools and the composer root
+tools: $(PHPUNIT) $(MAGO) $(ACTIONLINT) $(SHELLCHECK) $(COMPOSER) $(UVX) $(NODE) $(VENDOR_STAMP) $(OXLINT_STAMP) ## Pre-fetch the pinned tools and the composer root
 
 $(SHELLCHECK):
 	@mkdir -p $(CACHE)
@@ -566,12 +568,13 @@ $(PHPUNIT):
 	echo "$(CK_PHPUNIT_SHA256)  $@.tmp" | sha256sum -c --strict -
 	mv $@.tmp $@
 
-$(CACHE)/actionlint:
+$(ACTIONLINT):
 	@mkdir -p $(CACHE)
 	curl -fsSL -o $(CACHE)/download-actionlint.bash \
 	  "https://raw.githubusercontent.com/rhysd/actionlint/v$(CK_ACTIONLINT_VERSION)/scripts/download-actionlint.bash"
 	echo "$(CK_ACTIONLINT_INSTALLER_SHA256)  $(CACHE)/download-actionlint.bash" | sha256sum -c --strict -
 	bash $(CACHE)/download-actionlint.bash $(CK_ACTIONLINT_VERSION) $(CACHE)
+	mv $(CACHE)/actionlint $@
 
 # All four catalogs must pin the SAME release, or the drift gates would each
 # test a different core and none of them would say so. The namespace generator
