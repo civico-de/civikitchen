@@ -27,6 +27,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 ### Fixed
 
 - A re-run of a release replaces the release notes along with the assets.
+- `ckanalyze` no longer reports non-documented-property for hook parameters read from
+  `GenericHookEvent`, matching phpstan; a subclass still documents its fields.
 
 ### Changed
 

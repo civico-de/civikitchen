@@ -220,13 +220,16 @@ keys per entity. `DAOGetAction::addJoin()` takes `$bridge` as
 `string|array|null`, because core defaults it to NULL and reads an array as
 the first join condition. The standalone boot test checks both on the image.
 
-Two filter hooks remove false findings. `DynamicPropertiesFilterHook` drops
+Three filter hooks remove false findings. `DynamicPropertiesFilterHook` drops
 mago's missing-magic-method finding on a documented `@property` of a class
 that allows dynamic properties. Every DAO does so through DB_DataObject
 (mago#2483). `Api4ResultFilterHook` drops mago's invalid-type-cast finding on
 `(array) $result`. Casting an ArrayObject returns its rows, not its
 properties. This was measured on PHP 8.5, also for a subclass with a public
-property.
+property. `GenericHookEventFilterHook` drops non-documented-property on
+`GenericHookEvent` itself, which carries every hook parameter as a magic
+property, as phpstan's `universalObjectCratesClasses` does. A subclass
+documents its fields with `@property` and keeps the finding.
 
 Still to come are patches for `CRM_Core_DAO::executeQuery()`, fetchAll and
 singleValueQuery. They will carry the types those methods return on the
