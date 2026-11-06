@@ -469,6 +469,20 @@ echo '<?php' > "${RELDIR}/greeter.php"
 echo '<?php' > "${RELDIR}/tests/phpunit/GreeterTest.php"
 echo 'x' > "${RELDIR}/phpunit.xml.dist"
 echo 'must-not-ship' > "${RELDIR}/.env.custom"
+cat > "${RELDIR}/CHANGELOG.md" <<'MD'
+# Changelog
+
+## [Unreleased]
+
+## [1.3.0] - 2026-01-05
+
+### Added
+
+- Greets.
+
+[Unreleased]: https://example.org/compare/v1.3.0...HEAD
+[1.3.0]: https://example.org/releases/tag/v1.3.0
+MD
 # Keep enough entries after info.xml to fill a pipe buffer. This reproduces the
 # Composer-sized archive where `printf entries | grep -q info.xml` used to make
 # printf die with SIGPIPE under pipefail, falsely reporting a missing info.xml.
@@ -505,6 +519,15 @@ if (cd "${RELDIR}" && ckrelease check --version v9.9.9) >/dev/null 2>&1; then
     fail "ckrelease accepted a tag that disagrees with info.xml"
 else
     ok "ckrelease rejects a tag that disagrees with info.xml"
+fi
+
+# The changelog section is the release notes, so a release without one stops.
+sed -i 's/^## \[1\.3\.0\]/## [1.2.0]/; s/^\[1\.3\.0\]:/[1.2.0]:/' "${RELDIR}/CHANGELOG.md"
+CKREL_OUT="$( (cd "${RELDIR}" && ckrelease check --version v1.3.0) 2>&1 || true)"
+if grep -q 'version 1.3.0 has no changelog section' <<< "${CKREL_OUT}"; then
+    ok "ckrelease rejects a version the changelog does not document"
+else
+    fail "ckrelease accepted an undocumented version (output: ${CKREL_OUT:0:300})"
 fi
 
 # ---------------------------------------------------------------------------

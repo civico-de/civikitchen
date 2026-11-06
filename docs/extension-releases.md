@@ -9,13 +9,14 @@ ships in the images, so a laptop and GitHub Actions build the same archive.
 
 ## What a release is
 
-1. A commit that bumps the version in info.xml, composer.json and, if the repo
-   keeps one, CHANGELOG.md. A human writes and reviews it; no tool can derive
-   compatibility from a diff
+1. A commit that bumps the version in info.xml and composer.json and moves the
+   [Unreleased] entries of CHANGELOG.md under the new version. A human writes
+   and reviews it; no tool can derive compatibility from a diff
    ([ADR-0002](adr/0002-a-release-is-a-human-version-and-a-tag.md)).
 2. A tag named v plus that version.
 3. Everything after the tag, automated: the consistency check, the archive, an
-   install into a real CiviCRM, and the GitHub release.
+   install into a real CiviCRM, and the GitHub release, whose notes are the
+   version's changelog section.
 
 The release-tags check in ckconform fails on any version info.xml has carried
 that the repo moved past without tagging.
@@ -62,7 +63,7 @@ Inputs and secrets go below the marker, where they survive updates:
     with:
       # The install needs a payment processor no headless site can reach.
       smoke_test: false
-      require_changelog: true
+      draft: true
 ```
 
 An older caller without markers is rewritten onto the template, keeping its
@@ -104,11 +105,44 @@ extensions releases them together from one caller at its root; see
 | `dry_run` | `false` | Builds the current info.xml version without a tag; the publish job lists the archives instead of publishing. |
 | `image` | empty | The smoke-test image. When empty: the standalone image of the minor in policy.civicrm, otherwise the v1 image. Setting both is an error. |
 | `smoke_test` | `true` | Disable only for an extension whose install cannot be reached this way, and say why in the caller. |
-| `require_changelog` | `false` | Fails when the repo has no CHANGELOG.md. |
 | `draft` | `false` | Publishes the GitHub release as a draft. |
 | `composer_install` | `false` | Installs the lockfile without dev packages and bundles the vendor tree. |
 | `composer_app_repositories` | unset | Repository names within the caller's owner, comma- or newline-separated. Required with the App secrets; it is the token allowlist. |
 | `composer_app_id`, `composer_app_private_key` | unset | A GitHub App with contents read, installed on the private dependency repos, for private Composer packages and staged dependency releases. Pass both under secrets; one without the other fails the run. |
+
+## The changelog
+
+Every repository keeps one CHANGELOG.md at its root, in the
+[Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/) form, nothing
+else. ckinit seeds it; `ckchangelog --help` prints the grammar:
+
+```markdown
+## [Unreleased]
+
+## [1.3.0] - 2026-01-05
+
+### Added
+
+- One bullet per change a site notices.
+
+[Unreleased]: https://github.com/<owner>/<repo>/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/<owner>/<repo>/compare/v1.2.0...v1.3.0
+```
+
+- `## [Unreleased]` comes first, exactly once. Versions follow in descending
+  SemVer order, each dated and with at least one of the sections Added,
+  Changed, Deprecated, Removed, Fixed or Security.
+- Every version has a link reference, and so does Unreleased once a version
+  exists.
+- ckconform's changelog check runs the grammar in CI and fails when the tag of
+  the info.xml version exists without a section.
+- `ckrelease check` (and therefore every tag) fails unless the version has a
+  section dated today or earlier and Unreleased is empty. `ckrelease dist`
+  reads the changelog from the ref it archives, not from the working tree.
+- The publish job uses that section as the GitHub release notes.
+
+`ckchangelog lint`, `ckchangelog release <v>` and `ckchangelog section <v>`
+run the same parser outside CI.
 
 ## Cutting one
 
@@ -311,7 +345,7 @@ off visibly in the caller with smoke_test: false.
 ## `ckrelease` outside CI
 
 ```
-ckrelease check  [--version <v>] [--require-changelog]
+ckrelease check  [--version <v>]
 ckrelease dist   [--version <v>] [--ref <ref>] [--output <dir>]
 ckrelease verify <zip> [--version <v>]
 ckrelease info   key|file|version|dist-name

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use CiviKitchen\Toolbelt\Cli\AnalyzeCommand;
 use CiviKitchen\Toolbelt\Cli\Application;
+use CiviKitchen\Toolbelt\Cli\ChangelogCommand;
 use CiviKitchen\Toolbelt\Cli\CompatibilityCommand;
 use CiviKitchen\Toolbelt\Cli\CoverageCommand;
 use CiviKitchen\Toolbelt\Cli\FormatCommand;
@@ -911,6 +912,7 @@ final class SharedPhpTest extends TestCase
     public function testReleaseVersionStripsExactlyOneVPrefix(): void
     {
         file_put_contents($this->temporary . '/info.xml', '<extension key="org.example.safe"><file>safe</file><version>1.2.3</version></extension>');
+        $this->releasedChangelog($this->temporary, '1.2.3');
         $before = getcwd();
         chdir($this->temporary);
         try {
@@ -921,6 +923,31 @@ final class SharedPhpTest extends TestCase
         } finally {
             chdir($before === false ? dirname(__DIR__, 2) : $before);
         }
+    }
+
+    public function testChangelogLintsReleasesAndPrintsASection(): void
+    {
+        $this->releasedChangelog($this->temporary, '1.2.3');
+        $this->write($this->temporary, 'broken.md', "# Changelog\n\n## [1.0] - 2026-01-01\n");
+        $file = $this->temporary . '/CHANGELOG.md';
+        $run = static function (array $arguments): array {
+            ob_start();
+            $status = (new ChangelogCommand())->run($arguments);
+            return [$status, (string) ob_get_clean()];
+        };
+
+        self::assertSame([0, "ckchangelog: {$file} is clean\n"], $run(['--file', $file, 'lint']));
+        self::assertSame([0, "ckchangelog: 1.2.3 is documented\n"], $run(['--file', $file, 'release', 'v1.2.3']));
+        self::assertSame([0, "### Added\n\n- First.\n"], $run(['--file', $file, 'section', '1.2.3']));
+        self::assertSame(1, $run(['--file', $file, 'section', '9.9.9'])[0]);
+        self::assertSame(1, $run(['--file', $file, 'release', '9.9.9'])[0]);
+        self::assertSame(1, $run(['--file', $this->temporary . '/broken.md', 'lint'])[0]);
+        self::assertSame(2, $run(['--file', $file, 'lint', 'extra'])[0]);
+        self::assertSame(2, $run(['--file', $file, 'publish'])[0]);
+        self::assertSame(2, $run(['--file'])[0]);
+        [$status, $help] = $run(['--help']);
+        self::assertSame(0, $status);
+        self::assertStringContainsString('## [Unreleased]', $help);
     }
 
     public function testReleaseAcceptsDashPrefixedArchiveAfterOptionTerminator(): void
@@ -1018,6 +1045,27 @@ final class SharedPhpTest extends TestCase
         self::assertStringContainsString("Git LFS pointers instead of files:\n  org.example.staged/handbook/images/shot.png\n", $cli['stderr']);
     }
 
+    public function testReleaseReadsTheChangelogOfTheArchivedRef(): void
+    {
+        $repository = $this->stagedRepository(['ang/app.bundle.js']);
+        $this->write($repository, 'ang/app.bundle.js', 'built();');
+        $committed = (string) file_get_contents($repository . '/CHANGELOG.md');
+        $this->write($repository, 'CHANGELOG.md', "# Changelog\n\n## [Unreleased]\n");
+        $this->git($repository, 'add', 'CHANGELOG.md');
+        $this->git($repository, '-c', 'user.name=ck', '-c', 'user.email=ck@example.org', 'commit', '-q', '-m', 'undocumented');
+        // A documented working tree does not stand in for the commit being archived.
+        $this->write($repository, 'CHANGELOG.md', $committed);
+
+        $cli = (new Runner())->captureSeparate(
+            ['php', dirname(__DIR__, 2) . '/toolbelt/bin/ckrelease', 'dist', '--output', $this->temporary . '/cli'],
+            null,
+            $repository,
+        );
+        self::assertSame(1, $cli['status']);
+        self::assertStringContainsString('HEAD:CHANGELOG.md is not ready for 1.0.0', $cli['stderr']);
+        self::assertSame(0, $this->releaseDist($repository, 'HEAD~1')[0]);
+    }
+
     public function testReleaseStagesOntoATreeThatAlreadyBundlesVendor(): void
     {
         $repository = $this->stagedRepository(['ang/app.bundle.js']);
@@ -1041,6 +1089,7 @@ final class SharedPhpTest extends TestCase
         $this->write($repository, 'base/.gitignore', "/vendor/\n");
         $this->write($repository, 'addon/info.xml', '<extension key="org.example.addon"><file>addon</file><version>1.0.0</version></extension>');
         $this->write($repository, 'addon/addon.php', '<?php');
+        $this->releasedChangelog($repository, '1.0.0');
         $this->git($repository, 'init', '-q');
         $this->git($repository, 'add', '-A');
         $this->git($repository, '-c', 'user.name=ck', '-c', 'user.email=ck@example.org', 'commit', '-q', '-m', 'fixture');
@@ -1214,6 +1263,7 @@ final class SharedPhpTest extends TestCase
         $root = $this->temporary . '/release';
         mkdir($root . '/.git', 0700, true);
         file_put_contents($root . '/info.xml', '<extension key="org.example.safe"><file>safe</file><version>1.2.3</version></extension>');
+        $this->releasedChangelog($root, '1.2.3');
         // Fails the ref check, so the run stops right after the guarded rev-parses.
         $runner = new class () extends Runner {
             /** @var list<list<string>> */
@@ -1596,6 +1646,7 @@ final class SharedPhpTest extends TestCase
         $this->write($repository, 'tests/StagedTest.php', '<?php');
         $this->write($repository, 'package.json', '{"packageManager": "bun@1.4.0"}');
         $this->write($repository, 'bun.lock', '{}');
+        $this->releasedChangelog($repository, '1.0.0');
         $this->write($repository, '.gitignore', "/ang/\n/dist/\n/vendor/\n");
         $this->write($repository, 'civikitchen.yaml', "version: 1\npolicy:\n  dist:\n    build:\n      tool: bun\n      outputs:\n"
             . implode('', array_map(static fn (string $output): string => "        - {$output}\n", $outputs)));
@@ -1603,6 +1654,13 @@ final class SharedPhpTest extends TestCase
         $this->git($repository, 'add', '-A');
         $this->git($repository, '-c', 'user.name=ck', '-c', 'user.email=ck@example.org', 'commit', '-q', '-m', 'fixture');
         return $repository;
+    }
+
+    private function releasedChangelog(string $repository, string $version): void
+    {
+        $this->write($repository, 'CHANGELOG.md', "# Changelog\n\n## [Unreleased]\n\n## [{$version}] - 2026-01-01\n\n"
+            . "### Added\n\n- First.\n\n[Unreleased]: https://example.org/compare/v{$version}...HEAD\n"
+            . "[{$version}]: https://example.org/releases/tag/v{$version}\n");
     }
 
     private function write(string $repository, string $path, string $contents): void

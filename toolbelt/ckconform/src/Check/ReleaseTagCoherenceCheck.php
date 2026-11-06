@@ -7,7 +7,7 @@ namespace CiviKitchen\Ckconform\Check;
 use CiviKitchen\Ckconform\Check;
 use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
-use CiviKitchen\Ckconform\SemVer;
+use CiviKitchen\Toolbelt\Version\SemVer;
 
 /**
  * `info.xml` ahead of the newest tag means the release commit was written and

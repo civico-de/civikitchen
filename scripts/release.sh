@@ -30,7 +30,7 @@ ok "main, clean, in sync with origin at ${head}"
 if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then die "tag ${tag} exists locally"; fi
 ok "${tag} is free locally and on origin"
 
-bash .github/scripts/changelog-check.sh --release "$version" >/dev/null || die "changelog gate failed"
+toolbelt/bin/ckchangelog release "$version" >/dev/null || die "changelog gate failed"
 ok "changelog has a [${version}] section and an empty [Unreleased]"
 scaffold/ck make test-ckinit >/dev/null || die "ckinit suite failed"
 ok "ckinit suite passed"

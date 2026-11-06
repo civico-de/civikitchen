@@ -396,8 +396,8 @@ test-cms-families: $(VENDOR_STAMP) ## Build CMS Images skips exactly the familie
 test-resolve-civicrm-git: ## The git-built images track master and the newest release branch
 	bash tests/parity/test-resolve-civicrm-git.sh
 
-test-changelog: ## Changelog gate: grammar, release mode and section extraction
-	bash tests/parity/test-changelog-check.sh
+test-changelog: ## ckchangelog: grammar, release gate and section extraction
+	bash tests/toolbelt/test-ckchangelog.sh
 
 test-extension-docs: $(UVX) ## extension-docs.py: a site per language with fallback, nav from frontmatter
 	CK_ZENSICAL_VERSION=$(CK_ZENSICAL_VERSION) bash tests/extension-docs/test-extension-docs.sh
@@ -425,11 +425,11 @@ lint-actions: $(CACHE)/actionlint $(UVX) ## actionlint + zizmor over the workflo
 	$(call pyrun,zizmor,$(CK_ZIZMOR_VERSION)) --no-online-audits --config zizmor.yml \
 	  .github/workflows .github/actions scaffold/template/extension/.github/workflows
 
-# The release job runs the same script with --release, so a tag whose version
+# The release job runs the same tool with release, so a tag whose version
 # has no section fails before anything is pushed. Structure is checked here so
 # a malformed file is a red PR, not a red release.
 lint-changelog: ## CHANGELOG.md follows the Keep a Changelog grammar
-	.github/scripts/changelog-check.sh --lint
+	toolbelt/bin/ckchangelog lint
 
 # The site is built from docs/ by zensical.toml; --strict fails on a link to a
 # missing page or anchor. No --clean: it empties .cache/, this Makefile's tool cache.

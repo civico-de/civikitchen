@@ -69,7 +69,7 @@ grep -q 'ck dependencies' <<<"${deps_help}"
 for tool in ckboot ckcoretest cktestreset; do
   bash "${root}/toolbelt/bin/${tool}" --help | grep -q "^${tool} - " || { echo "${tool} --help printed no usage" >&2; exit 1; }
 done
-for alias in ckanalyze ckcivix ckcompat ckconform ckcoverage ckdeps ckeslint ckfmt cklifecycle cklint ckmigrate ckmutate ckphpunit ckprofile ckrelease ckscenario ckschemadiff cksmarty; do
+for alias in ckanalyze ckchangelog ckcivix ckcompat ckconform ckcoverage ckdeps ckeslint ckfmt cklifecycle cklint ckmigrate ckmutate ckphpunit ckprofile ckrelease ckscenario ckschemadiff cksmarty; do
   [ -L "${root}/toolbelt/bin/${alias}" ] || { echo "${alias} is not a symlink" >&2; exit 1; }
   [ "$(readlink "${root}/toolbelt/bin/${alias}")" = ck ] || { echo "${alias} does not target ck" >&2; exit 1; }
 done

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Toolbelt\Cli;
 
+use CiviKitchen\Toolbelt\Changelog\Changelog;
 use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
 use CiviKitchen\Toolbelt\Repository\Files;
@@ -46,7 +47,7 @@ final class ReleaseCommand implements Command
             fwrite(STDERR, ($command === '' ? '' : "ckrelease: unknown command: {$command}\n") . $this->usage());
             return 2;
         }
-        $options = ['version' => '', 'ref' => 'HEAD', 'output' => '.ckrelease', 'requireChangelog' => false];
+        $options = ['version' => '', 'ref' => 'HEAD', 'output' => '.ckrelease'];
         $positionals = [];
         $literal = false;
         while ($arguments !== []) {
@@ -58,10 +59,6 @@ final class ReleaseCommand implements Command
             if (!$literal && in_array($argument, ['-h', '--help'], true)) {
                 echo $this->usage();
                 return 0;
-            }
-            if (!$literal && $argument === '--require-changelog') {
-                $options['requireChangelog'] = true;
-                continue;
             }
             $names = ['--version' => 'version', '--ref' => 'ref', '--output' => 'output'];
             if (!$literal && isset($names[$argument])) {
@@ -84,9 +81,9 @@ final class ReleaseCommand implements Command
 
         return match ($command) {
             'info' => $this->info($positionals),
-            'check' => $this->check((string) $options['version'], (bool) $options['requireChangelog']),
-            'dist' => $this->dist((string) $options['version'], (bool) $options['requireChangelog'], (string) $options['ref'], (string) $options['output']),
-            'verify' => $this->verifyCommand($positionals, (string) $options['version'], (bool) $options['requireChangelog']),
+            'check' => $this->check((string) $options['version']),
+            'dist' => $this->dist((string) $options['version'], (string) $options['ref'], (string) $options['output']),
+            'verify' => $this->verifyCommand($positionals, (string) $options['version']),
         };
     }
 
@@ -161,7 +158,8 @@ final class ReleaseCommand implements Command
         return 0;
     }
 
-    private function check(string $wantedVersion, bool $requireChangelog): int
+    /** With a $ref the changelog is read from it: the archive's notes must come from what it archives. */
+    private function check(string $wantedVersion, ?string $ref = null): int
     {
         $failed = false;
         if ($wantedVersion !== '' && $wantedVersion !== $this->metadata['version']) {
@@ -179,18 +177,19 @@ final class ReleaseCommand implements Command
                 $failed = true;
             }
         }
-        if (is_file('CHANGELOG.md')) {
-            if (str_contains((string) file_get_contents('CHANGELOG.md'), $this->metadata['version'])) {
-                echo "ckrelease: CHANGELOG.md mentions {$this->metadata['version']}.\n";
-            } else {
-                fwrite(STDERR, "ckrelease: FAIL - CHANGELOG.md has no entry for {$this->metadata['version']}.\n");
-                $failed = true;
-            }
-        } elseif ($requireChangelog) {
-            fwrite(STDERR, "ckrelease: FAIL - no CHANGELOG.md (required by --require-changelog).\n");
+        $version = $wantedVersion !== '' ? $wantedVersion : $this->metadata['version'];
+        [$changelog, $content] = $this->changelog($ref);
+        if ($content === null) {
+            fwrite(STDERR, "ckrelease: FAIL - no {$changelog}; its section for the version is the release notes.\n");
             $failed = true;
         } else {
-            echo "ckrelease: no CHANGELOG.md - release notes come from --generate-notes.\n";
+            $errors = (new Changelog($changelog, $content))->releaseErrors($version, gmdate('Y-m-d'));
+            if ($errors === []) {
+                echo "ckrelease: {$changelog} documents {$version}.\n";
+            } else {
+                fwrite(STDERR, "ckrelease: FAIL - {$changelog} is not ready for {$version}:\n  " . implode("\n  ", $errors) . "\n");
+                $failed = true;
+            }
         }
         if ($failed) {
             return 1;
@@ -199,18 +198,18 @@ final class ReleaseCommand implements Command
         return 0;
     }
 
-    private function dist(string $version, bool $requireChangelog, string $ref, string $outputDirectory): int
+    private function dist(string $version, string $ref, string $outputDirectory): int
     {
-        $status = $this->check($version, $requireChangelog);
-        if ($status !== 0) {
-            return $status;
-        }
         $repository = new Files($this->checkoutRoot, $this->runner);
         if ($repository->git(['rev-parse', '--is-inside-work-tree'])['status'] !== 0) {
             return $this->error('not a git repository - the archive is built from tracked files.');
         }
         if ($repository->git(['rev-parse', '-q', '--verify', "{$ref}^{tree}"])['status'] !== 0) {
             return $this->error("cannot resolve ref: {$ref}");
+        }
+        $status = $this->check($version, $ref);
+        if ($status !== 0) {
+            return $status;
         }
         if (!is_dir($outputDirectory) && !mkdir($outputDirectory, 0777, true) && !is_dir($outputDirectory)) {
             return $this->error("cannot create output directory: {$outputDirectory}");
@@ -304,12 +303,12 @@ final class ReleaseCommand implements Command
     }
 
     /** @param list<string> $positionals */
-    private function verifyCommand(array $positionals, string $version, bool $requireChangelog): int
+    private function verifyCommand(array $positionals, string $version): int
     {
         if (count($positionals) !== 1) {
             return $this->error('verify needs exactly one archive path.');
         }
-        if ($version !== '' && ($status = $this->check($version, $requireChangelog)) !== 0) {
+        if ($version !== '' && ($status = $this->check($version)) !== 0) {
             return $status;
         }
         return $this->verify($positionals[0]);
@@ -411,13 +410,42 @@ final class ReleaseCommand implements Command
         return 1;
     }
 
+    /** CHANGELOG.md of the repository: one tag, one changelog, also for several extensions. */
+    /**
+     * The changelog's name and content, from the working tree or from $ref; null content when
+     * there is none.
+     *
+     * @return array{string, ?string}
+     */
+    private function changelog(?string $ref): array
+    {
+        if ($ref === null) {
+            $path = self::changelogPath();
+            return [$path, is_file($path) ? (string) file_get_contents($path) : null];
+        }
+        $name = "{$ref}:" . Changelog::FILE;
+        $shown = $this->runner->captureSeparate((new Files($this->checkoutRoot, $this->runner))->gitCommand(['show', $name]));
+        return [$name, $shown['status'] === 0 ? $shown['stdout'] : null];
+    }
+
+    private static function changelogPath(): string
+    {
+        $directory = (string) getcwd();
+        for ($up = $directory; $up !== dirname($up); $up = dirname($up)) {
+            if (file_exists($up . '/.git')) {
+                return $up === $directory ? Changelog::FILE : $up . '/' . Changelog::FILE;
+            }
+        }
+        return Changelog::FILE;
+    }
+
     private function usage(): string
     {
         return <<<'TXT'
 ckrelease - release helper for CiviCRM extensions (version check, dist zip).
 
-  ckrelease check  [--version <v>] [--require-changelog]
-  ckrelease dist   [--version <v>] [--ref <ref>] [--output <dir>] [--require-changelog]
+  ckrelease check  [--version <v>]
+  ckrelease dist   [--version <v>] [--ref <ref>] [--output <dir>]
   ckrelease verify <zip> [--version <v>]
   ckrelease info   key|file|version|dist-name
 TXT;

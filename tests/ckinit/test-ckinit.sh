@@ -365,7 +365,7 @@ rewrite_with_sed 's|^# END CIVIKITCHEN MANAGED caller$|# END CIVIKITCHEN MANAGED
     with:\
       # The install needs a payment processor no headless site has.\
       smoke_test: false\
-      require_changelog: true|' "$rel"
+      draft: true|' "$rel"
 "$root/scaffold/ckinit.php" --check "$work/legacy" >/dev/null
 rewrite_with_sed "s|tags: \\['v\\[0-9\\]+.*$|tags: ['v*.*.*']|" "$rel"
 if "$root/scaffold/ckinit.php" --check "$work/legacy" >/dev/null 2>&1; then
@@ -377,7 +377,7 @@ grep -q 'updated   .github/workflows/release.yml' <<<"$out"
 grep -qF "'v[0-9]+.[0-9]+.[0-9]+-*'" "$rel"
 grep -q '# The install needs a payment processor no headless site has.' "$rel"
 grep -q 'smoke_test: false' "$rel"
-grep -q 'require_changelog: true' "$rel"
+grep -q 'draft: true' "$rel"
 "$root/scaffold/ckinit.php" --check "$work/legacy" >/dev/null
 # A caller from before the markers: --update keeps the job's inputs and secrets
 # as written, comments included, and replaces the rest with the template.
@@ -519,6 +519,16 @@ git -C "$work/single" init -q
 make_extension "$work/single"
 "$root/scaffold/ckinit.php" "$work/single" >/dev/null
 test -f "$work/single/renovate.json"
+test -f "$work/single/CHANGELOG.md"
+# An existing changelog is history: seeding keeps it and does not count it as a conflict, even with --force.
+mkdir -p "$work/history"
+git -C "$work/history" init -q
+make_extension "$work/history"
+printf '# Changelog\n\nkept\n' > "$work/history/CHANGELOG.md"
+"$root/scaffold/ckinit.php" "$work/history" >/dev/null
+grep -qx 'kept' "$work/history/CHANGELOG.md" || { echo "seeding replaced an existing changelog" >&2; exit 1; }
+"$root/scaffold/ckinit.php" --force "$work/history" >/dev/null
+grep -qx 'kept' "$work/history/CHANGELOG.md" || { echo "--force replaced an existing changelog" >&2; exit 1; }
 if grep -q -- '- \.\./\.\.:/civikitchen-repo' "$work/single/.docker/docker-compose.ci.yml"; then
   echo "single-extension repo got the /civikitchen-repo mount" >&2
   exit 1
@@ -560,7 +570,7 @@ assert_release_jobs() {
 }
 assert_release_jobs "addon[base](working_directory='addon',stage='build') base[](working_directory='base',stage='build') publish[addon,base](stage='publish')"
 # No root-only file below the root: GitHub and Renovate never read them there.
-for stray in renovate.json .github/workflows/ci.yml .github/workflows/release.yml; do
+for stray in CHANGELOG.md renovate.json .github/workflows/ci.yml .github/workflows/release.yml; do
   if [ -e "$mono/base/$stray" ]; then
     echo "root-only file was written into an extension directory: $stray" >&2
     exit 1
@@ -570,6 +580,12 @@ done
 grep -q -- '- \.\./\.\.:/civikitchen-repo' "$mono/base/.docker/docker-compose.ci.yml"
 grep -q -- '- \.\./\.\.:/civikitchen-repo' "$mono/base/.docker/docker-compose.yml"
 "$root/scaffold/ckinit.php" --check "$mono" >/dev/null
+# The root changelog is seeded: once written, it is the repository's own.
+grep -q '^## \[Unreleased\]$' "$mono/CHANGELOG.md"
+printf '\n### Added\n\n- A feature.\n' >> "$mono/CHANGELOG.md"
+"$root/scaffold/ckinit.php" --check "$mono" >/dev/null
+"$root/scaffold/ckinit.php" --update "$mono" >/dev/null
+grep -q '^- A feature\.$' "$mono/CHANGELOG.md"
 
 # A removed mount is drift in the monorepo case.
 rewrite_with_sed '\|../..:/civikitchen-repo|d' "$mono/addon/.docker/docker-compose.ci.yml"

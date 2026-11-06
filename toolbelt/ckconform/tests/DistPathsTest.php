@@ -19,7 +19,8 @@ final class DistPathsTest extends CheckTestCase
     {
         $excluded = DistPaths::excluded($this->repo([]));
         $template = dirname(__DIR__, 3) . '/scaffold/template/extension';
-        $scaffolded = array_diff(scandir($template) ?: [], ['.', '..', 'composer.json']);
+        // composer.json and the changelog are meant for the site that installs the release.
+        $scaffolded = array_diff(scandir($template) ?: [], ['.', '..', 'composer.json', 'CHANGELOG.md']);
         // The configs a ck* tool reads from the repo root, beyond what the template scaffolds.
         $read = ['mago.toml', 'phpunit-unit.xml.dist', 'composer-dependency-analyser.php', '.oxlintrc.json', 'vitest.config.ts'];
         foreach ([...$scaffolded, ...$read] as $path) {

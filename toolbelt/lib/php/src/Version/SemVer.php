@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace CiviKitchen\Ckconform;
+namespace CiviKitchen\Toolbelt\Version;
 
 /**
  * SemVer 2.0 precedence (semver.org §11). version_compare() is not it: it

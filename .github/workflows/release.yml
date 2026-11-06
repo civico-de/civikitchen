@@ -75,7 +75,7 @@ jobs:
       - name: Check the changelog carries this version
         env:
           TAG: ${{ steps.tag.outputs.tag }}
-        run: .github/scripts/changelog-check.sh --release "${TAG#v}"
+        run: toolbelt/bin/ckchangelog release "${TAG#v}"
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -157,6 +157,6 @@ jobs:
             echo "release ${TAG} already exists"
             exit 0
           fi
-          .github/scripts/changelog-check.sh --section "${TAG#v}" > "${RUNNER_TEMP}/notes.md"
+          toolbelt/bin/ckchangelog section "${TAG#v}" > "${RUNNER_TEMP}/notes.md"
           gh release create "${TAG}" --verify-tag --title "${TAG}" \
             --notes-file "${RUNNER_TEMP}/notes.md"

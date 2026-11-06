@@ -70,10 +70,6 @@ on:
           way (and say so in the caller).
         type: boolean
         default: true
-      require_changelog:
-        description: 'Fail when the repo has no CHANGELOG.md at all'
-        type: boolean
-        default: false
       draft:
         description: 'Publish the GitHub release as a draft'
         type: boolean
@@ -134,7 +130,6 @@ jobs:
     env:
       # Inputs reach the shell through the environment, never through expression
       # interpolation inside `run:` — an interpolated input IS the script text.
-      CK_REQUIRE_CHANGELOG: ${{ inputs.require_changelog }}
       CK_RELEASE_REF: HEAD
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -439,15 +434,11 @@ jobs:
           CK_RELEASE_VERSION: ${{ steps.key.outputs.version }}
         run: |
           set -euo pipefail
-          args=()
-          if [ "$CK_REQUIRE_CHANGELOG" = 'true' ]; then
-            args+=(--require-changelog)
-          fi
           # dist runs the consistency check itself and refuses to build without
           # it, so there is no way to publish an archive that skipped it.
           # An empty version (dry run) builds whatever info.xml carries.
           php "$GITHUB_WORKSPACE"/.civikitchen-ci/toolbelt/bin/ckrelease dist \
-            --version "$CK_RELEASE_VERSION" --ref "$CK_RELEASE_REF" --output "$CK_DIST" "${args[@]}"
+            --version "$CK_RELEASE_VERSION" --ref "$CK_RELEASE_REF" --output "$CK_DIST"
 
       # Merged: an artifact is extracted flat or into a subdirectory depending
       # on how many match, so each sibling is picked by its exact archive name.
@@ -672,9 +663,8 @@ jobs:
           fi
           (cd "$CK_DIST" && sha256sum --check --strict ./*.sha256)
 
-      # --generate-notes is the delegation the issue asked for: GitHub already
-      # writes decent notes from merged PRs, and a release that exists is
-      # re-runnable (upload --clobber) instead of erroring on the second try.
+      # The notes are the version's CHANGELOG.md section, which dist already
+      # checked; a release that exists is re-runnable (upload --clobber).
       # The checkout is shallow without tags; the API lists them. Left to gh, a
       # late release of an older version or a pre-release takes Latest by date.
       - name: Publish the GitHub release
@@ -712,6 +702,7 @@ jobs:
           flags=$(.civikitchen-ci/.github/scripts/release-publish-flags.sh "$tag" \
             < "$RUNNER_TEMP/release-tags.txt")
           echo "$flags"
+          php .civikitchen-ci/toolbelt/bin/ckchangelog section "$tag" > "$RUNNER_TEMP/release-notes.md"
           if [ "$CK_DRY_RUN" = true ]; then
             echo "dry run: release $tag would carry"
             ls -1 "$CK_DIST"
@@ -729,13 +720,14 @@ jobs:
           if [ "$prerelease" = 'true' ]; then
             args+=(--prerelease)
           fi
-          # A re-run only replaces assets: upload leaves Latest and pre-release
-          # as the first run set them, even if a higher tag was released since.
+          # A re-run replaces assets and notes: Latest and pre-release stay as
+          # the first run set them, even if a higher tag was released since.
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            echo "release $GITHUB_REF_NAME exists — replacing its assets"
+            echo "release $GITHUB_REF_NAME exists — replacing its assets and notes"
             gh release upload "$GITHUB_REF_NAME" "$CK_DIST"/* --clobber
+            gh release edit "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"
           else
             gh release create "$GITHUB_REF_NAME" \
-              --verify-tag --title "$GITHUB_REF_NAME" --generate-notes \
+              --verify-tag --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md" \
               "${args[@]}" "$CK_DIST"/*
           fi

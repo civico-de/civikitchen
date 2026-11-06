@@ -14,6 +14,28 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- **Breaking:** every extension repository keeps a CHANGELOG.md at its root in the
+  Keep a Changelog 1.1.0 form. ckconform's new `changelog` check runs the grammar and fails
+  when the tagged info.xml version has no section; `ckinit` seeds the file in new repositories
+  and reports it missing in existing ones.
+- **Breaking:** ckconform's new `handbook` check asks a released repository with a public licence
+  (not empty, not Proprietary) for `handbook/index.md` and a job calling `extension-docs.yml`.
+- `ckchangelog lint|release|section` runs the changelog grammar outside CI.
+
+### Fixed
+
+- A re-run of a release replaces the release notes along with the assets.
+
+### Changed
+
+- **Breaking:** `ckrelease check` and the release workflow always require the version's
+  changelog section, dated today or earlier, with `[Unreleased]` empty. The
+  `require_changelog` input and `ckrelease check --require-changelog` are gone; drop them
+  from callers.
+- The GitHub release notes are the version's changelog section instead of generated notes.
+
 ## [1.56.1] - 2026-11-04
 
 ### Changed

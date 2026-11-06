@@ -49,6 +49,7 @@ final class Application
             'ckcoverage' => 'coverage',
             'ckschemadiff' => 'schema',
             'ckrelease' => 'release',
+            'ckchangelog' => 'changelog',
             'cklifecycle' => 'lifecycle',
             'ckcompat' => 'compatibility',
             'ckfmt' => 'format',
@@ -95,6 +96,9 @@ final class Application
         }
         if ($command === 'schema') {
             return (new SchemaDiffCommand($this->runner))->run($arguments);
+        }
+        if ($command === 'changelog') {
+            return (new ChangelogCommand())->run($arguments);
         }
         if ($command === 'release') {
             return (new ReleaseCommand($this->checkoutRoot, $this->runner))->run($arguments);
@@ -174,6 +178,7 @@ ck — CiviKitchen extension-development toolbelt
   ck modernize [args]     civix/Rector modernization
   ck migrate              move a repo off retired CiviKitchen tools
   ck release [args]       extension release artifact
+  ck changelog [args]     CHANGELOG.md grammar, release gate and release notes
   ck profile [args]       validate/list runtime profiles
   ck seed [args]          restore seed data from snapshots, store, status
   ck config [args]        validate civikitchen.yaml

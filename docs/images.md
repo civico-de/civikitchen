@@ -27,7 +27,7 @@ plus the development toolchain:
     - cklifecycle and ckschemadiff for the compatibility jobs
       ([Compatibility](extension-standards.md#compatibility-test-the-range-you-claim))
     - the scheduled ckmutate ([Tests and coverage](extension-standards.md#tests-and-coverage))
-    - ckrelease ([Releasing an extension](extension-releases.md))
+    - ckrelease and ckchangelog ([Releasing an extension](extension-releases.md))
 - On the standalone image only:
     - cktestreset rebuilds the headless test database
       ([Headless tests](extension-development.md#headless-tests))

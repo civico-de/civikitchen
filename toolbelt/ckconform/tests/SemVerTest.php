@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CiviKitchen\Ckconform\Tests;
 
-use CiviKitchen\Ckconform\SemVer;
+use CiviKitchen\Toolbelt\Version\SemVer;
 use PHPUnit\Framework\TestCase;
 
 final class SemVerTest extends TestCase

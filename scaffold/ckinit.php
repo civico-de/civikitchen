@@ -43,6 +43,7 @@ const MANAGED_FILES = [
  */
 const SEEDED_FILES = [
   '.gitignore',
+  'CHANGELOG.md',
   'civikitchen.yaml',
   '.docker/docker-compose.yml',
   '.docker/profiles/dev/profile.json',
@@ -71,11 +72,15 @@ const OPTIONAL_FILES = [
  * below the root they are neither written nor checked; the root pass owns them.
  */
 const ROOT_ONLY_FILES = [
+  'CHANGELOG.md',
   '.github/workflows/ci.yml',
   '.github/workflows/release.yml',
   '.gitlab-ci.yml',
   'renovate.json',
 ];
+
+/** One changelog per repository: seeded at the root, then the repository's own. */
+const ROOT_CHANGELOG = 'CHANGELOG.md';
 
 /** The files only one CI host reads; policy.ci picks the set (absent: GitHub). */
 const GITHUB_FILES = [
@@ -356,6 +361,10 @@ foreach ($iterator as $item) {
   // only a newly created caller gets from here.
   if ($relative === '.gitlab-ci.yml' && isset($policy['database']) && !file_exists($destination)) {
     $rendered .= "variables:\n  CK_DB_IMAGE: {$databaseImage}\n";
+  }
+  // An existing changelog is release history: no mode, not even --force, rewrites it.
+  if ($relative === ROOT_CHANGELOG && file_exists($destination)) {
+    continue;
   }
   $files[] = [$destination, $relative, $item->getPerms() & 0777, $rendered];
   if ($mode === 'seed' && (file_exists($destination) || is_link($destination)) && !$force) {
@@ -927,6 +936,7 @@ function runRootPass(string $root, string $mode, bool $force, string $yamlAutolo
   $templateDir = __DIR__ . '/template/extension';
   $rootFiles = [
     '.gitattributes' => (string) file_get_contents($templateDir . '/.gitattributes'),
+    ROOT_CHANGELOG => (string) file_get_contents($templateDir . '/' . ROOT_CHANGELOG),
     '.github/workflows/ci.yml' => rootCallerYaml($extensions),
     'renovate.json' => str_replace(
       '__RENOVATE_PRESET__',
@@ -955,7 +965,7 @@ function runRootPass(string $root, string $mode, bool $force, string $yamlAutolo
   }
 
   if ($mode === 'seed' && !$force) {
-    $conflicts = array_filter(array_keys($rootFiles), static fn (string $r): bool => file_exists($root . '/' . $r));
+    $conflicts = array_filter(array_keys($rootFiles), static fn (string $r): bool => $r !== ROOT_CHANGELOG && file_exists($root . '/' . $r));
     if ($conflicts !== []) {
       fwrite(STDERR, "ckinit: refusing to overwrite existing files:\n  " . implode("\n  ", $conflicts) . "\n");
       fwrite(STDERR, "Re-run with --force, or --update to refresh just the template-managed files.\n");
@@ -985,7 +995,7 @@ function runRootPass(string $root, string $mode, bool $force, string $yamlAutolo
       continue;
     }
     $existing = (string) file_get_contents($destination);
-    if ($existing === $content) {
+    if ($existing === $content || $relative === ROOT_CHANGELOG) {
       continue;
     }
     $blocks = managedBlocks($content, $relative);

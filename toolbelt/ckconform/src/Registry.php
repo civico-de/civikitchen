@@ -34,6 +34,8 @@ final class Registry
         Check\ReleaseTagsCheck::class,
         Check\VersionFormatCheck::class,
         Check\UnreleasedShippedChangesCheck::class,
+        Check\ChangelogCheck::class,
+        Check\HandbookCheck::class,
         Check\MonorepoVersionLockstepCheck::class,
         Check\ConfigWithoutRunnerCheck::class,
         Check\RequiredExtensionsCheck::class,

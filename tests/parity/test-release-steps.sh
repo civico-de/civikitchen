@@ -239,6 +239,28 @@ PATH="$work/smoke-bin:$PATH" CK_LOG="$work/ck.log" CK_CLI="$ws/.civikitchen-ci/t
 step "$workflow" publish 'Publish the GitHub release'
 new_workspace publish
 dist="$work/dist" && mkdir -p "$dist" "$work/bin"
+notes="$work/runner/release-notes.md"
+cat > "$ws/CHANGELOG.md" <<'MD'
+# Changelog
+
+## [Unreleased]
+
+## [1.1.0-beta.1] - 2026-01-02
+
+### Added
+
+- A beta feature.
+
+## [1.0.0] - 2026-01-01
+
+### Added
+
+- The first release.
+
+[Unreleased]: https://example.org/compare/v1.1.0-beta.1...HEAD
+[1.1.0-beta.1]: https://example.org/compare/v1.0.0...v1.1.0-beta.1
+[1.0.0]: https://example.org/releases/tag/v1.0.0
+MD
 # archive <key> <version>
 archive() {
   mkdir -p "$work/src/$1"
@@ -278,21 +300,25 @@ case "$out" in *'the archives carry 1.0.0, but the tag is v1.0.1'*) ;; *) fail "
 # A real run: create with the computed flags, or replace the assets of an existing release.
 publish refs/tags/v1.0.0 false
 [ "$rc" -eq 0 ] || fail "publish failed: $out"
-grep -qx "release create v1.0.0 --verify-tag --title v1.0.0 --generate-notes --latest=true $dist/org.example.addon-1.0.0.zip $dist/org.example.base-1.0.0.zip" \
+grep -qx "release create v1.0.0 --verify-tag --title v1.0.0 --notes-file $notes --latest=true $dist/org.example.addon-1.0.0.zip $dist/org.example.base-1.0.0.zip" \
   "$work/gh.log" || fail "unexpected release create: $calls"
+printf '### Added\n\n- The first release.\n' | cmp -s - "$notes" || fail "the notes are not the 1.0.0 section: $(cat "$notes")"
 GH_TAGS='refs/tags/v0.9.0 refs/tags/v2.0.0' publish refs/tags/v1.0.0 false
 grep -q '^release create v1.0.0 .*--latest=false ' "$work/gh.log" || fail "an older version took Latest: $calls"
 publish refs/tags/v1.0.0 false true
-grep -q '^release create v1.0.0 .*--generate-notes --draft ' "$work/gh.log" || fail "a draft was not created as one: $calls"
+grep -q "^release create v1.0.0 .*--notes-file $notes --draft " "$work/gh.log" || fail "a draft was not created as one: $calls"
 case "$calls" in *--latest*) fail "a draft was given Latest: $calls" ;; esac
 GH_RELEASE_EXISTS=1 publish refs/tags/v1.0.0 false
 grep -qx "release upload v1.0.0 $dist/org.example.addon-1.0.0.zip $dist/org.example.base-1.0.0.zip --clobber" "$work/gh.log" \
   || fail "an existing release did not get its assets replaced: $calls"
+grep -qx "release edit v1.0.0 --notes-file $notes" "$work/gh.log" \
+  || fail "an existing release did not get the changelog section as notes: $calls"
 case "$calls" in *'release create'*) fail "an existing release was created again: $calls" ;; esac
 
 rm "$dist"/*.zip
 archive org.example.base 1.1.0-beta.1
 publish refs/tags/v1.1.0-beta.1 false
+grep -q 'A beta feature' "$notes" || fail "the pre-release notes are not its section: $(cat "$notes")"
 grep -q '^release create v1.1.0-beta.1 .*--latest=false --prerelease ' "$work/gh.log" || fail "a pre-release was not flagged: $calls"
 
 archive org.example.addon 1.1.0

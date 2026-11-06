@@ -422,6 +422,21 @@ Releases go through the shared extension-release.yml ([Releasing an
 extension](extension-releases.md)); the check release-workflow fails when no
 workflow calls it, unless `policy.release.mode: none` is set with a reason.
 
+### Changelog and handbook
+
+Every repository keeps one CHANGELOG.md at its root in the Keep a Changelog
+1.1.0 form; the changelog check runs its grammar and fails when the tagged
+info.xml version has no section
+([The changelog](extension-releases.md#the-changelog)). An opt-out through
+`ignore_checks` needs a reason like any other.
+
+A repository whose licence is neither empty nor Proprietary and that cuts
+releases is published, and the handbook check then asks for
+`handbook/index.md` plus a job calling
+`extension-docs.yml`
+([Documentation site](reusable-workflows.md#documentation-site)). A repository of several
+extensions and one on GitLab need only the index.
+
 ### Versions and tags
 
 The `<version>` in info.xml is X.Y.Z or `X.Y.Z-<pre-release>`: SemVer 2.0

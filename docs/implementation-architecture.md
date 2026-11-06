@@ -30,7 +30,7 @@ execution, errors and output. The older executable names are symlinks to
 `ck`. They are compatibility names, not separate programs. They are
 `ckprofile`, `ckdeps`, `ckconform`, `ckscenario`, `cklint`, `ckfmt`,
 `ckeslint`, `ckcompat`, `ckphpunit`, `ckcoverage`, `ckmutate`, `cklifecycle`,
-`ckschemadiff`, `cksmarty`, `ckcivix` and `ckrelease`.
+`ckschemadiff`, `cksmarty`, `ckcivix`, `ckrelease` and `ckchangelog`.
 
 The remaining shell commands are deliberate adapters to the operating system:
 

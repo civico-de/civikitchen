@@ -30,9 +30,10 @@ git init -q --bare "${work}/remote.git"
 git init -q "${work}/clone"
 cd "${work}/clone"
 git remote add origin https://github.com/owner/repo
-mkdir -p scripts scaffold .github/scripts .github/workflows docker
+mkdir -p scripts scaffold toolbelt/bin .github/workflows docker
 cp "${root}/scripts/release.sh" scripts/release.sh
-printf '#!/bin/bash\nexit 0\n' > .github/scripts/changelog-check.sh
+printf '#!/bin/bash\nexit 0\n' > toolbelt/bin/ckchangelog
+chmod +x toolbelt/bin/ckchangelog
 # The real trigger-path reader against this fixture; every other ck call passes.
 cat > scaffold/ck <<CK
 #!/bin/bash
