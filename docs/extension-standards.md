@@ -1063,6 +1063,42 @@ its own stack. If either is missing, the run fails instead of testing
 nothing. Each leg is named `playwright (<image>)`, and every report artifact
 after the first carries its index.
 
+### The shell e2e job
+
+`e2e: tests/e2e/run.sh` runs a shell suite in its own job, the same suite you
+run locally against the dev stack. The value is one or more script paths
+relative to the working directory, separated by spaces or newlines; they run in
+turn against one stack, and a failing suite does not stop the next.
+
+The job boots the template's CI stack and adds maildev to it. The site and
+maildev are published on free ports, bound to 127.0.0.1, and
+CIVIKITCHEN_SITE_URL names the site's port. The suite runs on the runner, with
+`COMPOSE_FILE` and `BASE_URL` set, so the managed tests/e2e/lib.sh reaches the
+stack with its `app`, `cv`, `sql`, `hit` and maildev helpers unchanged. The
+runner provides bash, curl, python3, the docker CLI and Node in node_version,
+and node_modules/ is installed under the same switches as in `ci` (npm_ci,
+js_tests, bun). Each suite's `out/` directory is uploaded on failure and kept
+for seven days, since it can hold credentials of the throwaway stack.
+
+A suite that needs more services, such as a second mail sink, names their
+Compose files in `e2e_compose`, relative to the working directory; they are
+merged over the e2e stack in order. Publish their ports as `127.0.0.1::1080`,
+and the suite finds the port with `docker compose port`, as lib.sh's
+`ck_published_url` does:
+
+```yaml
+# .docker/docker-compose.e2e.yml
+services:
+  maildev2:
+    image: maildev/maildev:2.2.1
+    ports: ["127.0.0.1::1080"]
+```
+
+The site's port is probed before the boot, because the install bakes it into
+the site's URLs. A parallel job on the same self-hosted runner can take it before
+the stack binds it; the boot then fails with "port is already allocated", and a
+re-run usually passes.
+
 ## Private dependencies
 
 The shared workflow needs no token, but an extension's dependencies may be
@@ -1170,8 +1206,8 @@ cannot use the token and fails with "repository not found".
 ### Which jobs use them
 
 Both inputs apply to every job that boots a stack: ci, matrix_images,
-mutation, upgrade_from_last_release, schema_parity, core_upgrade_from and
-playwright. The two jobs that move the working tree between commits re-run
+mutation, upgrade_from_last_release, schema_parity, core_upgrade_from,
+playwright and e2e. The two jobs that move the working tree between commits re-run
 the install after each move.
 
 composer.lock must be committed. The install runs on the runner's PHP and

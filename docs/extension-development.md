@@ -258,6 +258,10 @@ same way. The managed tests/e2e/lib.sh carries the shared plumbing:
 A suite's domain helpers go into `tests/e2e/lib.local.sh`, which lib.sh
 sources last. They can use everything above and override its defaults.
 
+CI runs a suite with the `e2e` input of extension-ci.yml, against the CI
+stack plus maildev; see
+[The shell e2e job](extension-standards.md#the-shell-e2e-job).
+
 The suites leave their evidence in `out/` next to themselves. The seeded
 `.gitignore` ignores `/tests/e2e/**/out/`; a repository whose `.gitignore`
 predates that adds the line by hand, since ckinit never rewrites it.

@@ -18,10 +18,10 @@ if ($files === []) {
     exit(2);
 }
 
-/** A step that runs the extension's PHP suite, its gates or its browser tests. */
+/** A step that runs the extension's PHP suite, its gates, its browser tests or its shell e2e suite. */
 function ck_runs_suite(array $step): bool
 {
-    return preg_match('/\b(ck ci|ckphpunit|ckmutate|test:e2e)\b/', (string) ($step['run'] ?? '')) === 1;
+    return preg_match('/\b(ck ci|ckphpunit|ckmutate|test:e2e)\b|bash "\$suite"/', (string) ($step['run'] ?? '')) === 1;
 }
 
 /** A step that builds the declared release output. */

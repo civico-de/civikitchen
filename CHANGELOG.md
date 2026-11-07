@@ -23,6 +23,10 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - **Breaking:** ckconform's new `handbook` check asks a released repository with a public licence
   (not empty, not Proprietary) for `handbook/index.md` and a job calling `extension-docs.yml`.
 - `ckchangelog lint|release|section` runs the changelog grammar outside CI.
+- extension-ci.yml's `e2e` input runs shell suites such as `tests/e2e/run.sh` in their own job,
+  against the CI stack plus maildev on free localhost ports, with the managed `tests/e2e/lib.sh`
+  unchanged.
+  `e2e_compose` merges the repository's own Compose files over that stack.
 
 ### Fixed
 

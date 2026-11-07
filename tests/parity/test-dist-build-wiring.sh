@@ -15,6 +15,7 @@ out=$(php "$CHECK" tests/parity/fixtures/workflow.dist-build-unwired.yml 2>&1) \
   && fail "checker passed a workflow whose jobs run the suite unbuilt"
 grep -q "'bare'" <<<"$out" || fail "checker did not name job 'bare' (got: $out)"
 grep -q "'late'" <<<"$out" || fail "checker did not name job 'late' (got: $out)"
+grep -q "'shell'" <<<"$out" || fail "checker did not name job 'shell' (got: $out)"
 grep -q "'built'" <<<"$out" && fail "checker flagged job 'built', which builds first"
 grep -q "'imaged'" <<<"$out" && fail "checker flagged job 'imaged', which builds first in the Playwright image"
 

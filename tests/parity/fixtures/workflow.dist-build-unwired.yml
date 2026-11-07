@@ -1,5 +1,6 @@
 # Fixture for the dist-build-wiring gate: `bare` runs PHPUnit without building,
-# `late` builds only after its suite ran, `built` and `imaged` do it right.
+# `late` builds only after its suite ran, `shell` runs the shell e2e suite
+# unbuilt, `built` and `imaged` do it right.
 name: Fixture
 on: workflow_call
 
@@ -18,6 +19,14 @@ jobs:
     steps:
       - name: PHPUnit
         run: docker compose exec -T app ckphpunit
+
+  shell:
+    needs: key
+    runs-on: ubuntu-latest
+    steps:
+      - name: e2e suites
+        run: |
+          for suite in $CK_E2E; do bash "$suite"; done
 
   late:
     needs: key

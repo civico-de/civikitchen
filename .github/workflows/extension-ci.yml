@@ -153,6 +153,23 @@ on:
           `playwright` or with empty matrix_images.
         type: boolean
         default: false
+      e2e:
+        description: >-
+          Shell suites relative to working_directory, separated by spaces or
+          newlines, e.g. tests/e2e/run.sh. They run in turn on the runner, in
+          their own job, against the CI stack plus maildev, with the site and
+          maildev on free localhost ports that the managed tests/e2e/lib.sh
+          picks up. Empty runs nothing.
+        type: string
+        default: ''
+      e2e_compose:
+        description: >-
+          Compose files relative to working_directory, separated by spaces or
+          newlines, merged over the e2e stack in order — services a suite
+          needs beyond the site and maildev, e.g. a second mail sink. Publish
+          their ports as 127.0.0.1::<port> so the host picks a free one.
+        type: string
+        default: ''
       extra_phpunit_config:
         description: >-
           Run one additional PHPUnit suite with this repository-relative XML
@@ -2064,6 +2081,183 @@ jobs:
           path: |
             ${{ inputs.working_directory }}/playwright-report/
             ${{ inputs.working_directory }}/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # The checkout holding the action is missing only when the job failed before any boot.
+      - name: Stack logs and teardown
+        if: ${{ always() && hashFiles('.civikitchen-siblings/ci/.github/actions/stack-down/action.yml') != '' }}
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-down
+        with:
+          logs: ${{ job.status == 'failure' }}
+
+  # --- Shell e2e suite (opt-in via e2e) -------------------------------------
+  #
+  # The suites under tests/e2e/ that run locally against the dev stack, here
+  # against the CI stack: the job adds maildev and publishes the site and
+  # maildev on free ports, bound to localhost only. The suite runs on the
+  # runner, where lib.sh reaches the stack through COMPOSE_FILE and BASE_URL.
+  # Its own job for the same reason as playwright: a red suite must not
+  # hide the PHPUnit result, and the published ports stay out of `ci`.
+  e2e:
+    # Cancelled only by this job in a newer run of the same caller workflow,
+    # ref, directory and image. Literal name: github.job is the caller's job id.
+    concurrency:
+      group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-e2e
+      cancel-in-progress: true
+    needs: key
+    if: ${{ inputs.e2e != '' }}
+    runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 120
+    env:
+      CK_COMPOSE_FILE: ${{ inputs.compose_file }}
+      CK_EXT_KEY: ${{ needs.key.outputs.key }}
+      CK_E2E: ${{ inputs.e2e }}
+      CK_E2E_COMPOSE: ${{ inputs.e2e_compose }}
+      CK_WORKDIR: ${{ inputs.working_directory }}
+      CIVIKITCHEN_IMAGE: ${{ needs.key.outputs.image }}
+      # One compose project per job — see the note in `ci`.
+      COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.key.outputs.key_slug }}-e2e
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Each suite's out/ directory is its evidence (lib.sh keeps it next to the suite).
+      - name: Validate inputs
+        id: suites
+        run: |
+          set -euo pipefail
+          [[ "$CK_EXT_KEY" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]] \
+            || { echo "invalid extension key: $CK_EXT_KEY" >&2; exit 1; }
+          echo "evidence<<CK_EVIDENCE" >> "$GITHUB_OUTPUT"
+          for suite in $CK_E2E; do
+            [[ "$suite" =~ ^[A-Za-z0-9_./-]+$ && "$suite" != /* && "$suite" != *../* && "$suite" != ../* ]] \
+              || { echo "invalid e2e entry (expected a path inside the working directory): $suite" >&2; exit 1; }
+            [ -f "$suite" ] || { echo "e2e names $suite, which is not a file in $PWD" >&2; exit 1; }
+            echo "$CK_WORKDIR/$(dirname "$suite")/**/out/" >> "$GITHUB_OUTPUT"
+          done
+          echo "CK_EVIDENCE" >> "$GITHUB_OUTPUT"
+          echo "compose<<CK_COMPOSE" >> "$GITHUB_OUTPUT"
+          for file in $CK_E2E_COMPOSE; do
+            [[ "$file" =~ ^[A-Za-z0-9_./-]+$ && "$file" != /* && "$file" != *../* && "$file" != ../* ]] \
+              || { echo "invalid e2e_compose entry (expected a path inside the working directory): $file" >&2; exit 1; }
+            [ -f "$file" ] || { echo "e2e_compose names $file, which is not a file in $PWD" >&2; exit 1; }
+            echo "$file" >> "$GITHUB_OUTPUT"
+          done
+          echo "CK_COMPOSE" >> "$GITHUB_OUTPUT"
+
+      # The shared steps — see the note on the same checkout in `ci`.
+      - name: Check out civikitchen for the shared steps
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          repository: civico-de/civikitchen
+          ref: ${{ job.workflow_sha }}
+          # toolbelt/ and packages/ hold the reader of the siblings' policy.dist.build.
+          sparse-checkout: |
+            .github/actions
+            toolbelt/bin
+            toolbelt/lib
+            toolbelt/ckconform/bin
+            toolbelt/ckconform/src
+            packages
+          path: .civikitchen-siblings/ci
+
+      # The pages under test load it. Before any token is minted: the build runs dependency code.
+      - name: Build the declared release output
+        if: ${{ needs.key.outputs.dist_build_tool == 'bun' }}
+        uses: ./.civikitchen-siblings/ci/.github/actions/release-build
+        with:
+          node_version: ${{ inputs.node_version }}
+          working_directory: ${{ inputs.working_directory }}
+
+      # Node for suites that call it on the runner; node_modules/ for pages that
+      # load from it, installed under the same switches as in `ci`.
+      - name: JS dependencies
+        uses: ./.civikitchen-siblings/ci/.github/actions/js-deps
+        with:
+          node_version: ${{ inputs.node_version }}
+          bun: ${{ inputs.bun }}
+          install: ${{ inputs.npm_ci || inputs.js_tests || inputs.bun }}
+          working_directory: ${{ inputs.working_directory }}
+
+      - name: Private dependencies
+        id: deps
+        if: ${{ inputs.composer_install || inputs.sibling_repo != '' }}
+        uses: ./.civikitchen-siblings/ci/.github/actions/private-deps
+        with:
+          node_version: ${{ inputs.node_version }}
+          sibling_repo: ${{ inputs.sibling_repo }}
+          composer_install: ${{ inputs.composer_install }}
+          composer_app_repositories: ${{ inputs.composer_app_repositories }}
+          app_id: ${{ secrets.composer_app_id }}
+          app_private_key: ${{ secrets.composer_app_private_key }}
+          ext_key: ${{ needs.key.outputs.key }}
+          working_directory: ${{ inputs.working_directory }}
+
+      # CiviCRM bakes CIVIKITCHEN_SITE_URL into asset and redirect URLs at install,
+      # so the site's port is chosen before the boot; a port probed free can be
+      # taken before the bind on a runner that runs several jobs. maildev's port is
+      # Docker's pick, found by lib.sh. Its tag follows the template's dev stack.
+      - name: Compose override — maildev, site on a free localhost port
+        run: |
+          set -euo pipefail
+          http=18080
+          while (exec 3<>"/dev/tcp/127.0.0.1/$http") 2>/dev/null; do http=$((http + 1)); done
+          override="$RUNNER_TEMP/civikitchen-e2e-override.yml"
+          cat > "$override" <<YAML
+          services:
+            app:
+              ports: !override ["127.0.0.1:$http:80"]
+              environment:
+                CIVIKITCHEN_SITE_URL: http://localhost:$http
+                CIVIKITCHEN_SMTP_HOST: maildev
+                CIVIKITCHEN_SMTP_PORT: "1025"
+            maildev:
+              image: maildev/maildev:2.2.1
+              ports: ["127.0.0.1::1080"]
+          YAML
+          {
+            echo "CK_E2E_OVERRIDE=$override"
+            echo "BASE_URL=http://localhost:$http"
+          } >> "$GITHUB_ENV"
+
+      - name: Start CiviCRM stack
+        id: stack
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-up
+        with:
+          working_directory: ${{ inputs.working_directory }}
+          overrides: |
+            ${{ env.CK_E2E_OVERRIDE }}
+            ${{ steps.suites.outputs.compose }}
+            ${{ steps.deps.outputs.sibling_override }}
+
+      # Every suite runs, so one red suite does not hide the next. lib.sh runs
+      # compose from .docker/, where it would read the dev stack's file.
+      - name: e2e suites
+        env:
+          COMPOSE_FILE: ${{ steps.stack.outputs.compose_file }}
+        run: |
+          rc=0
+          for suite in $CK_E2E; do
+            echo "::group::$suite"
+            bash "$suite" || { rc=1; echo "::error::$suite failed"; }
+            echo "::endgroup::"
+          done
+          exit "$rc"
+
+      # lib.sh keeps each suite's evidence in out/ next to the suite. It can hold
+      # credentials of this throwaway stack, hence the short retention.
+      - name: e2e evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-${{ needs.key.outputs.key }}
+          path: ${{ steps.suites.outputs.evidence }}
           if-no-files-found: ignore
           retention-days: 7
 
