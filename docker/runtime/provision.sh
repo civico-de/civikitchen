@@ -56,6 +56,8 @@ _ck_legacy CIVIKITCHEN_ENABLE_EXTENSIONS CIVICRM_ENABLE_EXTENSIONS
 # patch-test-db-boot.php). Empty or missing file = skip (buildkit flavors
 # boot through their CMS, not a stub).
 : "${CK_BOOT_STUB:=/var/www/html/civicrm.standalone.php}"
+# Standalone's settings file. Missing file = buildkit flavor, whose CMS owns it.
+: "${CK_SETTINGS_FILE:=/var/www/html/private/civicrm.settings.php}"
 # Where named profiles (docker/profiles/<name>/) ship inside the image.
 : "${CK_PROFILE_DIR:=/opt/civikitchen/docker/profiles}"
 # Optional civibuild-style settings.d dir (loaded into civicrm.settings.php).
@@ -737,12 +739,18 @@ ck_post_install_config() {
     touch "${CK_CONFIGURED_MARKER}"
 }
 
-# Keep core's status check from calling civicrm.org (version pingback,
-# extension feed): without egress it stalls the first admin page by 60 s.
-# Only a boolean FALSE disables the feed; `cv ext:download` sets its own.
+# Keep core's status check from calling civicrm.org: without egress it stalls the
+# first admin page by 60 s. Only a boolean FALSE disables the extension feed; newer
+# cores take it from civicrm.settings.php only (`cv ext:download` sets its own).
 ck_no_phone_home() {
+    local line="\$civicrm_setting['domain']['ext_repo_url'] = FALSE;"
     ck_as_web cv api4 Job.update +w api_action=version_check +v is_active=0 >/dev/null
-    echo '{"ext_repo_url":false}' | ck_as_web cv setting:set --in=json >/dev/null
+    if [[ -f "${CK_SETTINGS_FILE}" ]]; then
+        grep -qxF "${line}" "${CK_SETTINGS_FILE}" \
+            || printf '\n%s\n' "${line}" | ck_as_web tee -a "${CK_SETTINGS_FILE}" >/dev/null
+    else
+        echo '{"ext_repo_url":false}' | ck_as_web cv setting:set --in=json >/dev/null
+    fi
     echo "[civikitchen] civicrm.org calls off (version_check job inactive, ext_repo_url=false)."
 }
 

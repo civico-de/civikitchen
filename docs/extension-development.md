@@ -589,7 +589,8 @@ extension sends it.
   its DAO stub. A retry on the same database hits the tables that exist.
 - The status check still calls civicrm.org: the stack was provisioned before
   the setting existed. Recreate it with `docker compose down -v`. If you set
-  ext_repo_url yourself, it must be boolean false; an empty string still checks.
+  ext_repo_url yourself, set it to boolean false in `civicrm.settings.php`
+  (`$civicrm_setting['domain']['ext_repo_url'] = FALSE;`); an empty string still checks.
 - ckanalyze failed the run: findings never do, a crash of the tool does. A
   repository's own mago.toml loads the civikitchen plugins only when it
   extends the baseline, and its `[source]` lists add to ckanalyze's scope.
