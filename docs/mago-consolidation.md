@@ -96,8 +96,8 @@ mago.
 **Linter rules** gate in `cklint`. They cover all eight CiviKitchen sniffs and
 Slevomat's DeclareStrictTypes, which is mago's own strict-types rule. The
 sniffs, their PHPUnit test and Slevomat are gone from the phpcs standard. Over
-the 38 local extension repos, the mago rules and the old sniffs agree on 3017
-findings. Of the seven differences, six are false positives that the sniff
+the local extension repos, the mago rules and the old sniffs agree on all but
+seven findings. Of those, six are false positives that the sniff
 raised on booleans inside nested array literals. The seventh is one
 `phpcs:ignore` that needs to become `@mago-expect`.
 
@@ -111,7 +111,7 @@ is a plugin. Each plugin shares its contract logic with the phpstan rule
 through `toolbelt/phpstan/src`, so the two cannot drift during the shadow
 phase. The architecture plugin reproduces phpat's findings on the same
 fixtures. It also catches two cases phpat misses, a property's `@var` type and
-a static property fetch. A local shadow run over 49 extension repos found every
+a static property fetch. A local shadow run over the extension repos found every
 finding of both tools on the same line once phpstan's suppressions were
 lifted. The differences left are the divergences described below.
 

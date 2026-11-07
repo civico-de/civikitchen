@@ -31,7 +31,6 @@ nav = [
     { "Implementation architecture" = "implementation-architecture.md" },
     { "Consolidating on mago" = "mago-consolidation.md" },
     { "Typing core from outside" = "core-types.md" },
-    { "Moving to civico-de" = "move-to-civico-de.md" },
     { "Changelog" = "https://github.com/civico-de/civikitchen/blob/main/CHANGELOG.md" },
   ] },
   { "Architecture decisions" = [

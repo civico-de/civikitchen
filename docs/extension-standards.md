@@ -416,7 +416,9 @@ in the local stack.
 [Running the CI gates locally](extension-development.md#running-the-ci-gates-locally)
 names what runs on the runner instead. A stack whose image predates ck ci
 fails with an error saying so. The caller pins @v1 and the CI stack the
-matching :v1 image ([releases.md](releases.md)).
+matching :v1 image ([releases.md](releases.md)). The ckconform check
+moved-repository warns on the pre-civico-de names `jfilter/civikitchen` and
+`@jfilter/civicrm-profile-schema` in a repo's non-prose files.
 
 Releases go through the shared extension-release.yml ([Releasing an
 extension](extension-releases.md)); the check release-workflow fails when no

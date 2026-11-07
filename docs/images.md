@@ -326,6 +326,10 @@ are what extension repos pin. They move only when a release is cut; see
 version not published, see
 [Custom or older CiviCRM versions](#custom-or-older-civicrm-versions).
 
+The images under `ghcr.io/jfilter/civikitchen` are frozen at the last build
+before the repository moved to civico-de: no rebuilds, no security updates, and
+`cleanup-ghcr.yml` leaves them alone.
+
 ### Database compatibility
 
 Every run gives the standalone candidate a real install, extension
