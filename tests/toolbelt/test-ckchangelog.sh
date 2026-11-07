@@ -132,8 +132,7 @@ diff -u "$work/section.expected" "$work/section"
 expect_fail "no section for an unknown version" "$valid" \
   "no section for version 9.9.9" section 9.9.9
 
-# The repository's own changelog is the last fixture: the grammar has to hold
-# for the file it gates.
+# This repository's own changelog must pass the grammar too.
 (cd "$root" && "$check" lint >/dev/null)
 
 fresh="$work/fresh.md"

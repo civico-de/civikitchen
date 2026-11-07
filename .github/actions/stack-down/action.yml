@@ -27,9 +27,8 @@ runs:
         # A failing healthcheck's own output shows in no log.
         docker ps -aq --filter "$filter" | xargs -r docker inspect --format '{{.Name}}: {{json .State.Health}}'
 
-    # Job-scoped project names mean no later run's `down -v` ever finds this
-    # stack; leaked networks exhaust Docker's address pools on self-hosted runners.
-    # always(): a failed log step must not leave the stack behind.
+    # No later run finds a job-scoped project, so tear down even after a failed log
+    # step: leaked networks exhaust Docker's address pools on self-hosted runners.
     - name: Tear down the stack
       if: ${{ always() }}
       shell: bash

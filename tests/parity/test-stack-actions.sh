@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# The stack actions and the e2e job's network, run as written: stack-up merges
-# its files in order and boots through a fake docker; stack-down tears down by
-# project label; the e2e override publishes site and maildev on 127.0.0.1,
-# merged over the template CI compose. Needs jq and the docker CLI, not a daemon.
+# The stack actions and the e2e override, run as written against a fake docker.
+# Needs jq and the docker CLI, no daemon.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

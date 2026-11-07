@@ -420,12 +420,10 @@ final class ReleaseCommand implements Command
         return 1;
     }
 
-    /** CHANGELOG.md of the repository: one tag, one changelog, also for several extensions. */
     /**
-     * The changelog's name and content, from the working tree or from $ref; null content when
-     * there is none.
+     * The repository's one CHANGELOG.md, also for several extensions, from the working tree or $ref.
      *
-     * @return array{string, ?string}
+     * @return array{string, ?string} its name and content, null when absent
      */
     private function changelog(?string $ref): array
     {

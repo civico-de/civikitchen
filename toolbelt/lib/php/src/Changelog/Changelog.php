@@ -6,21 +6,7 @@ namespace CiviKitchen\Toolbelt\Changelog;
 
 use CiviKitchen\Toolbelt\Version\SemVer;
 
-/**
- * The one CHANGELOG.md grammar (Keep a Changelog 1.1.0), deliberately strict:
- * anything it does not spell out is an error, not a tolerated variant.
- *
- *   <prose>                     free text before the first "## " heading
- *   ## [Unreleased]             exactly once, and the first "## " heading
- *   ## [<semver>] - YYYY-MM-DD  one per released version, descending SemVer
- *   ### <Section>               only Added, Changed, Deprecated, Removed,
- *                               Fixed, Security; at least one per version
- *   - <bullet>                  at least one per "### " section; wrapped lines
- *                               continue with two spaces
- *   [<semver>]: <url>           one link reference per heading, Unreleased
- *                               included once a version exists; the references
- *                               close the file, nothing but them follows
- */
+/** The strict Keep a Changelog 1.1.0 grammar; `ckchangelog --help` spells it out. */
 final class Changelog
 {
     public const FILE = 'CHANGELOG.md';
@@ -66,12 +52,7 @@ final class Changelog
         return array_map('strval', array_keys($this->versions));
     }
 
-    /**
-     * Grammar violations plus what blocks releasing $version on $today
-     * (YYYY-MM-DD): no section for it, a future date, entries left in Unreleased.
-     *
-     * @return list<string>
-     */
+    /** @return list<string> grammar violations plus what blocks releasing $version on $today (YYYY-MM-DD) */
     public function releaseErrors(string $version, string $today): array
     {
         $version = self::version($version);

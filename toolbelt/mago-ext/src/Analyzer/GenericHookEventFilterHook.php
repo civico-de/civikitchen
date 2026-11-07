@@ -9,9 +9,8 @@ use Mago\Sdk\Analyzer\IssueFilterDecision;
 use Mago\Sdk\Analyzer\IssueFilterHook;
 
 /**
- * Core's GenericHookEvent exposes every hook parameter as a magic property, so
- * access on that class is its contract (phpstan: universalObjectCratesClasses).
- * A subclass documents its own fields with @property and keeps the finding.
+ * GenericHookEvent's magic properties are its contract (phpstan: universalObjectCratesClasses);
+ * a subclass documents its fields with @property.
  */
 final class GenericHookEventFilterHook implements IssueFilterHook
 {

@@ -8,11 +8,7 @@ use CiviKitchen\Ckconform\Check;
 use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
-/**
- * An extension under an open-source licence is meant for people outside the
- * team, so it ships a handbook/ — shown inside CiviCRM by the handbook
- * extension — and, on GitHub, publishes it through the shared docs workflow.
- */
+/** An open-source extension ships handbook/ and publishes it through the shared docs workflow. */
 final class HandbookCheck implements Check
 {
     public const INDEX = 'handbook/index.md';

@@ -580,7 +580,6 @@ done
 grep -q -- '- \.\./\.\.:/civikitchen-repo' "$mono/base/.docker/docker-compose.ci.yml"
 grep -q -- '- \.\./\.\.:/civikitchen-repo' "$mono/base/.docker/docker-compose.yml"
 "$root/scaffold/ckinit.php" --check "$mono" >/dev/null
-# The root changelog is seeded: once written, it is the repository's own.
 grep -q '^## \[Unreleased\]$' "$mono/CHANGELOG.md"
 printf '\n### Added\n\n- A feature.\n' >> "$mono/CHANGELOG.md"
 "$root/scaffold/ckinit.php" --check "$mono" >/dev/null

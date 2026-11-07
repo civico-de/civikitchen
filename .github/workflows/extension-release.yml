@@ -435,10 +435,8 @@ jobs:
           CK_DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
-          # dist runs the consistency check itself and refuses to build without
-          # it, so there is no way to publish an archive that skipped it.
-          # An empty version (dry run) builds whatever info.xml carries, and the
-          # changelog only has to be well-formed: nothing is released.
+          # dist refuses to build without its consistency check. A dry run builds
+          # the info.xml version and holds the changelog to the grammar only.
           args=()
           if [ "$CK_DRY_RUN" = true ]; then
             args+=(--dry-run)

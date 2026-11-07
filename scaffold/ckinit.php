@@ -79,7 +79,7 @@ const ROOT_ONLY_FILES = [
   'renovate.json',
 ];
 
-/** One changelog per repository: seeded at the root, then the repository's own. */
+/** Seeds CHANGELOG.md at the repository root once; afterwards the repository owns it. */
 const ROOT_CHANGELOG = 'CHANGELOG.md';
 
 /** The files only one CI host reads; policy.ci picks the set (absent: GitHub). */

@@ -715,12 +715,8 @@ jobs:
                "$CK_EXTRA_PHPUNIT_CONFIG" != ../* ) ]] \
             || { echo "invalid extra_phpunit_config: $CK_EXTRA_PHPUNIT_CONFIG" >&2; exit 1; }
 
-      # The shared steps of every stack-booting job live in this repository as
-      # composite actions, and a reusable workflow reaches its own repository
-      # only by checking it out at the SHA it was resolved from: `uses: ./…`
-      # alone would resolve against the CALLING repository. Under
-      # .civikitchen-siblings/, the one directory the extension scanner skips
-      # and cklint ignores.
+      # `uses: ./…` resolves in the caller's checkout, so the stack actions come from
+      # this workflow's SHA under .civikitchen-siblings/, which the scanner and cklint skip.
       - name: Check out civikitchen for the shared steps
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1620,7 +1616,6 @@ jobs:
       # skips through its marker-gated bundles.
       - name: Swap the core underneath the site
         env:
-          # The boot's files, with the swap and sibling overrides.
           COMPOSE_FILE: ${{ steps.stack.outputs.compose_file }}
         run: |
           set -euo pipefail
@@ -2092,13 +2087,8 @@ jobs:
           logs: ${{ job.status == 'failure' }}
 
   # --- Shell e2e suite (opt-in via e2e) -------------------------------------
-  #
-  # The suites under tests/e2e/ that run locally against the dev stack, here
-  # against the CI stack: the job adds maildev and publishes the site and
-  # maildev on free ports, bound to localhost only. The suite runs on the
-  # runner, where lib.sh reaches the stack through COMPOSE_FILE and BASE_URL.
-  # Its own job for the same reason as playwright: a red suite must not
-  # hide the PHPUnit result, and the published ports stay out of `ci`.
+  # tests/e2e/ suites run on the runner against the CI stack plus maildev, via
+  # COMPOSE_FILE and BASE_URL; their own job, so a red suite hides no PHPUnit result.
   e2e:
     # Cancelled only by this job in a newer run of the same caller workflow,
     # ref, directory and image. Literal name: github.job is the caller's job id.
@@ -2175,8 +2165,7 @@ jobs:
           node_version: ${{ inputs.node_version }}
           working_directory: ${{ inputs.working_directory }}
 
-      # Node for suites that call it on the runner; node_modules/ for pages that
-      # load from it, installed under the same switches as in `ci`.
+      # Node and node_modules/ for suites and the pages they load, as in `ci`.
       - name: JS dependencies
         uses: ./.civikitchen-siblings/ci/.github/actions/js-deps
         with:
@@ -2199,10 +2188,8 @@ jobs:
           ext_key: ${{ needs.key.outputs.key }}
           working_directory: ${{ inputs.working_directory }}
 
-      # CiviCRM bakes CIVIKITCHEN_SITE_URL into asset and redirect URLs at install,
-      # so the site's port is chosen before the boot; a port probed free can be
-      # taken before the bind on a runner that runs several jobs. maildev's port is
-      # Docker's pick, found by lib.sh. Its tag follows the template's dev stack.
+      # The install bakes the site URL in, so its port is probed before the boot (a
+      # parallel job can still take it); Docker picks maildev's, whose tag follows the dev stack.
       - name: Compose override — maildev, site on a free localhost port
         run: |
           set -euo pipefail

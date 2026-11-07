@@ -9,11 +9,7 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 use CiviKitchen\Toolbelt\Changelog\Changelog;
 
-/**
- * Every repository keeps one CHANGELOG.md at its root in the grammar ckchangelog
- * defines: its version section is the release notes, so a malformed file is a
- * red build here rather than a failed release later.
- */
+/** The root CHANGELOG.md follows ckchangelog's grammar; its version section is the release notes. */
 final class ChangelogCheck implements Check
 {
     public function name(): string

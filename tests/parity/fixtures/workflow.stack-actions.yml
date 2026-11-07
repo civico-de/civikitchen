@@ -1,7 +1,5 @@
-# Fixture for the stack actions: `wired` boots through stack-up with the
-# sibling override and tears down through stack-down under always(), and must
-# pass; `leak` never tears down, `unwired` passes no sibling override and
-# `late` tears down on success only.
+# `wired` must pass; `leak` never tears down, `unwired` lacks the sibling
+# override, `late` tears down on success only.
 name: fixture
 
 on: workflow_call

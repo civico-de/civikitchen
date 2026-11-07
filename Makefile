@@ -75,7 +75,6 @@ TRIPLE := $(ARCH)-unknown-linux-gnu
 # one hash per architecture there.
 MAGO_SHA256 := $(CK_MAGO_SHA256_$(PLATFORM))
 MAGO := $(CACHE)/mago-$(CK_MAGO_VERSION)
-# Versioned like the others, so a bump fetches the new release.
 ACTIONLINT := $(CACHE)/actionlint-$(CK_ACTIONLINT_VERSION)
 
 # Composer, uv and Node are fetched pinned too; composer is the images' release
@@ -430,9 +429,7 @@ lint-actions: $(ACTIONLINT) $(UVX) ## actionlint + zizmor over the workflows
 	$(call pyrun,zizmor,$(CK_ZIZMOR_VERSION)) --no-online-audits --config zizmor.yml \
 	  .github/workflows .github/actions scaffold/template/extension/.github/workflows
 
-# The release job runs the same tool with release, so a tag whose version
-# has no section fails before anything is pushed. Structure is checked here so
-# a malformed file is a red PR, not a red release.
+# The grammar on every PR; the release job adds the version-section gate.
 lint-changelog: ## CHANGELOG.md follows the Keep a Changelog grammar
 	toolbelt/bin/ckchangelog lint
 
