@@ -95,9 +95,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends patch \
 FROM php:${PHP_VERSION}-apache-bookworm
 
 # OS-level deps:
-# - libfreetype/libjpeg62-turbo/libpng/libwebp-dev: the PHP gd extension
-# - libicu-dev: intl; libzip-dev: zip
-# - imagemagick + libmagickwand-dev: the imagick extension (e.g. Mosaico)
 # - mariadb-client: cv, ckschemadiff and poking the DB from inside the container
 # - unzip/git: composer needs them for dist/source installs
 # - nodejs/npm: required by extensions with Angular/JS assets. 24.x is the
@@ -108,24 +105,36 @@ FROM php:${PHP_VERSION}-apache-bookworm
 # - zstd: compresses and loads seed snapshots (`ck seed`)
 # apt-get upgrade: security updates come from Debian at build time; the base
 # image ships none. The daily rebuild runs without cache, so they land.
-RUN apt-get update && apt-get upgrade -y --no-install-recommends \
-    && apt-get install -y --no-install-recommends \
-        ca-certificates curl git unzip zip jq \
-        libfreetype-dev libicu-dev libjpeg62-turbo-dev libpng-dev libwebp-dev \
-        libzip-dev imagemagick libmagickwand-dev mariadb-client zstd \
-    && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-# The extension set the official image shipped, plus soap and opcache to stay
-# in lockstep with the buildkit base. gd with webp: Mosaico.
+#
+# PHP extensions: the set the official image shipped, plus soap and opcache to stay
+# in lockstep with the buildkit base. gd with webp: Mosaico; imagick: Mosaico too.
 # pcov: fast code-coverage driver (PHPUnit's default coverage path).
 # xdebug: installed but NOT enabled — entrypoint activates it when XDEBUG_MODE is set.
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+# Their -dev headers are purged in the same layer, keeping the libraries the built
+# .so files link against (the official image's pattern); test-dev-tools.sh loads them.
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates curl git unzip zip jq mariadb-client zstd \
+    && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && savedAptMark="$(apt-mark showmanual)" \
+    && apt-get install -y --no-install-recommends \
+        libfreetype-dev libicu-dev libjpeg62-turbo-dev libpng-dev libwebp-dev \
+        libzip-dev libmagickwand-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && docker-php-ext-install -j"$(nproc)" gd bcmath intl mysqli pdo_mysql zip soap opcache \
     && pecl install imagick pcov xdebug \
-    && docker-php-ext-enable imagick pcov
+    && docker-php-ext-enable imagick pcov \
+    && rm -rf /tmp/pear \
+    && apt-mark auto '.*' > /dev/null \
+    && apt-mark manual $savedAptMark > /dev/null \
+    && find /usr/local/lib/php/extensions -type f -name '*.so' -exec ldd '{}' ';' \
+        | awk '/=>/ { so = $(NF-1); if (index(so, "/usr/local/") == 1) next; gsub("^/(usr/)?", "", so); print "*" so }' \
+        | sort -u | xargs -r dpkg-query --search | cut -d: -f1 | sort -u \
+        | xargs -r apt-mark manual > /dev/null \
+    && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # cv, pinned phar + checksum (the official image took a floating cv.phar).
 # Re-derive the hash on a bump from the release's SHA256SUMS file.

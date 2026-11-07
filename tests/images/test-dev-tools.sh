@@ -134,6 +134,12 @@ fi
 if [ "${CIVICRM_UF:-}" = "Standalone" ]; then
     echo "== standalone base parity =="
     PHP_MODULES="$(php -m)"
+    # A library the -dev purge took along shows as a startup warning on stderr.
+    if [ -z "$(php -m 2>&1 >/dev/null)" ]; then
+        ok "php starts without extension load warnings"
+    else
+        fail "php starts without extension load warnings"
+    fi
     for ext in imagick soap opcache gd intl mysqli pdo_mysql zip bcmath pcov; do
         name="${ext}"
         [ "${ext}" = opcache ] && name="Zend OPcache"

@@ -14,6 +14,12 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Changed
+
+- The standalone images purge the `-dev` headers and the ImageMagick CLI after compiling
+  the PHP extensions and keep only the libraries those link against (157 MB of packages
+  measured on arm64).
+
 ### Fixed
 
 - Standalone provisioning turns the extension feed off in `civicrm.settings.php`: CiviCRM
