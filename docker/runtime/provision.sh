@@ -741,9 +741,10 @@ ck_post_install_config() {
 
 # Keep core's status check from calling civicrm.org: without egress it stalls the
 # first admin page by 60 s. Only a boolean FALSE disables the extension feed; newer
-# cores take it from civicrm.settings.php only (`cv ext:download` sets its own).
+# cores take it from civicrm.settings.php only. `cv ext:*` sets its feed under the
+# same key before the file runs, so `??=` leaves it in place.
 ck_no_phone_home() {
-    local line="\$civicrm_setting['domain']['ext_repo_url'] = FALSE;"
+    local line="\$civicrm_setting['Extension Preferences']['ext_repo_url'] ??= FALSE;"
     ck_as_web cv api4 Job.update +w api_action=version_check +v is_active=0 >/dev/null
     if [[ -f "${CK_SETTINGS_FILE}" ]]; then
         grep -qxF "${line}" "${CK_SETTINGS_FILE}" \

@@ -34,8 +34,19 @@ ck_run_init_hooks() { :; }
 ck_post_install_provision >/dev/null
 grep -qx 'args: api4 Job.update +w api_action=version_check +v is_active=0' "$CV_LOG" \
     || fail "version_check job not deactivated: $(cat "$CV_LOG")"
-php -r 'eval(str_replace(["<?php", "require_once"], ["", "//"], file_get_contents($argv[1]))); exit(($civicrm_setting["domain"]["ext_repo_url"] ?? NULL) === FALSE ? 0 : 1);' "$CK_SETTINGS_FILE" \
+# ext_repo_url as core resolves it: the groups merged in order, the last one winning.
+# cv ext:list/ext:download put their own feed into the global before the file runs.
+effective_feed() { # effective_feed <feed preset by cv, or "">
+    php -r '$civicrm_setting = [];
+        if ($argv[2] !== "") { $civicrm_setting["Extension Preferences"]["ext_repo_url"] = $argv[2]; }
+        eval(str_replace(["<?php", "require_once"], ["", "//"], file_get_contents($argv[1])));
+        var_export(array_merge(...array_values($civicrm_setting))["ext_repo_url"] ?? NULL);' "$CK_SETTINGS_FILE" "$1"
+}
+[[ "$(effective_feed '')" == false ]] \
     || fail "civicrm.settings.php must set ext_repo_url to boolean false: $(cat "$CK_SETTINGS_FILE")"
+feed='https://civicrm.org/extdir/ver=6.20|status=stable|ready=ready'
+[[ "$(effective_feed "$feed")" == "'$feed'" ]] \
+    || fail "cv's own feed must survive civicrm.settings.php, got $(effective_feed "$feed")"
 ck_no_phone_home >/dev/null
 [[ "$(grep -c "ext_repo_url" "$CK_SETTINGS_FILE")" == 1 ]] || fail "a second run appends again: $(cat "$CK_SETTINGS_FILE")"
 [[ -f "$CK_PROVISIONED_MARKER" ]] || fail "provisioning did not complete"

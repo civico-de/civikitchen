@@ -18,6 +18,7 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 - Standalone provisioning turns the extension feed off in `civicrm.settings.php`: CiviCRM
   master accepts `ext_repo_url` only from there and failed the first boot on the API call.
+  `cv ext:download` keeps its own feed, so configured extra extensions still install.
 
 ## [1.57.1] - 2026-11-07
 
