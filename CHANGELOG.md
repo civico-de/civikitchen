@@ -14,6 +14,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.57.0] - 2026-11-07
+
 ### Added
 
 - **Breaking:** every extension repository keeps a CHANGELOG.md at its root in the
@@ -2634,7 +2636,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.56.1...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.57.0...HEAD
+[1.57.0]: https://github.com/civico-de/civikitchen/compare/v1.56.1...v1.57.0
 [1.56.1]: https://github.com/civico-de/civikitchen/compare/v1.56.0...v1.56.1
 [1.56.0]: https://github.com/civico-de/civikitchen/compare/v1.55.1...v1.56.0
 [1.55.1]: https://github.com/civico-de/civikitchen/compare/v1.55.0...v1.55.1
