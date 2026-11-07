@@ -84,6 +84,9 @@ ports() { jq -c --arg s "$1" '[.services[$s].ports[]? | {host_ip, published, tar
 [ "$(ports maildev)" = '[{"host_ip":"127.0.0.1","published":null,"target":1080}]' ] || fail "maildev publishes $(ports maildev)"
 [ "$(jq -r '.services.app.environment.CIVIKITCHEN_SITE_URL' <<<"$json")" = "$base_url" ] || fail "CIVIKITCHEN_SITE_URL is not BASE_URL"
 [ "$(jq -r '.services.app.environment.CIVIKITCHEN_SMTP_HOST' <<<"$json")" = maildev ] || fail "the site does not mail to maildev"
+# A runner that injects HTTP(S)_PROXY into containers must not turn maildev unhealthy.
+[ "$(jq -r '.services.maildev.healthcheck.test[1]' <<<"$json")" = 'http_proxy= HTTP_PROXY= wget -q -O /dev/null http://localhost:1080/healthz' ] \
+  || fail "maildev healthcheck: $(jq -c '.services.maildev.healthcheck' <<<"$json")"
 
 # --- the suite list: validated entries, evidence per suite directory, every suite run ---
 mkdir -p "$work/ext/tests/e2e/a" "$work/ext/tests/e2e/b"

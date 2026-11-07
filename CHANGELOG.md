@@ -14,6 +14,10 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Fixed
+
+- The extension e2e job's maildev turns healthy on runners that inject an HTTP proxy into containers: its healthcheck clears the proxy, which busybox `wget` uses even for `localhost`.
+
 ## [1.57.0] - 2026-11-07
 
 ### Added

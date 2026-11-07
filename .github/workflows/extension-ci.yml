@@ -2190,6 +2190,7 @@ jobs:
 
       # The install bakes the site URL in, so its port is probed before the boot (a
       # parallel job can still take it); Docker picks maildev's, whose tag follows the dev stack.
+      # maildev's busybox wget ignores no_proxy, so its healthcheck clears an injected proxy.
       - name: Compose override — maildev, site on a free localhost port
         run: |
           set -euo pipefail
@@ -2207,6 +2208,8 @@ jobs:
             maildev:
               image: maildev/maildev:2.2.1
               ports: ["127.0.0.1::1080"]
+              healthcheck:
+                test: ["CMD-SHELL", "http_proxy= HTTP_PROXY= wget -q -O /dev/null http://localhost:1080/healthz"]
           YAML
           {
             echo "CK_E2E_OVERRIDE=$override"
