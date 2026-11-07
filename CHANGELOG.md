@@ -33,6 +33,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 ### Fixed
 
 - A re-run of a release replaces the release notes along with the assets.
+- The verein profile installs on CiviCRM 6.20: its GDPRx pin carries the upstream fix for a
+  Memo custom field declared with a Text widget, which 6.20 rejects.
 - `ckanalyze` no longer reports non-documented-property for hook parameters read from
   `GenericHookEvent`, matching phpstan; a subclass still documents its fields.
 
