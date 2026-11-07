@@ -14,6 +14,11 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Changed
+
+- The image builds keep their layer cache in the GHCR package `civikitchen-buildcache` instead
+  of the Actions cache, whose size cap evicted it between pushes.
+
 ### Fixed
 
 - The extension e2e job's maildev turns healthy on runners that inject an HTTP proxy into containers: its healthcheck clears the proxy, which busybox `wget` uses even for `localhost`.

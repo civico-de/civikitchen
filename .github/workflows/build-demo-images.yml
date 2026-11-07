@@ -106,8 +106,8 @@ jobs:
             DEFAULT_SITE_TYPE=${{ matrix.variant.site_type }}
             CIVICRM_VERSION=${{ inputs.civicrm_version }}
             CIVICRM_BUILD_VERSION=${{ inputs.civicrm_build_version }}
-          cache-from: type=gha,scope=demo-${{ matrix.variant.name }}-${{ matrix.suffix }}
-          cache-to: type=gha,mode=max,scope=demo-${{ matrix.variant.name }}-${{ matrix.suffix }},ignore-error=true
+          cache-from: type=registry,ref=${{ env.IMAGE_PREFIX }}-buildcache:demo-${{ matrix.variant.name }}-${{ matrix.suffix }}
+          cache-to: type=registry,ref=${{ env.IMAGE_PREFIX }}-buildcache:demo-${{ matrix.variant.name }}-${{ matrix.suffix }},mode=max,ignore-error=true
           no-cache: ${{ github.event_name == 'schedule' }}
 
   merge:

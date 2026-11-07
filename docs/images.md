@@ -297,6 +297,11 @@ failed run's jobs after a later run rebuilt the same commit tests that newer
 build. Start a fresh run instead. The daily run
 skips the layer cache, so Debian security updates arrive within a day.
 
+The image builds keep their layer cache in the GHCR package
+`civikitchen-buildcache`, one tag per image and architecture, outside the
+Actions cache and its size cap. `cleanup-ghcr.yml` does not prune it; a tag of a
+retired line stays until it is deleted by hand.
+
 The moving tags track current CiviCRM, for local development and the canary
 repo:
 
