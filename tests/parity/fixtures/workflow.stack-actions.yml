@@ -1,0 +1,68 @@
+# Fixture for the stack actions: `wired` boots through stack-up with the
+# sibling override and tears down through stack-down under always(), and must
+# pass; `leak` never tears down, `unwired` passes no sibling override and
+# `late` tears down on success only.
+name: fixture
+
+on: workflow_call
+
+jobs:
+  wired:
+    runs-on: ${{ inputs.runs_on || 'ubuntu-latest' }}
+    env:
+      COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-wired
+    steps:
+      - id: deps
+        uses: ./.civikitchen-siblings/ci/.github/actions/private-deps
+        with:
+          node_version: '22'
+      - uses: ./.civikitchen-siblings/ci/.github/actions/stack-up
+        with:
+          overrides: |
+            ${{ env.CK_EXTRA_OVERRIDE }}
+            ${{ steps.deps.outputs.sibling_override }}
+      - if: ${{ always() }}
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-down
+
+  leak:
+    runs-on: ${{ inputs.runs_on || 'ubuntu-latest' }}
+    env:
+      COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-leak
+    steps:
+      - id: deps
+        uses: ./.civikitchen-siblings/ci/.github/actions/private-deps
+        with:
+          node_version: '22'
+      - uses: ./.civikitchen-siblings/ci/.github/actions/stack-up
+        with:
+          overrides: ${{ steps.deps.outputs.sibling_override }}
+
+  unwired:
+    runs-on: ${{ inputs.runs_on || 'ubuntu-latest' }}
+    env:
+      COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-unwired
+    steps:
+      - id: deps
+        uses: ./.civikitchen-siblings/ci/.github/actions/private-deps
+        with:
+          node_version: '22'
+      # steps.deps.outputs.sibling_override, named in a comment only
+      - uses: ./.civikitchen-siblings/ci/.github/actions/stack-up
+        with:
+          overrides: ${{ env.CK_EXTRA_OVERRIDE }}
+      - if: ${{ always() }}
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-down
+
+  late:
+    runs-on: ${{ inputs.runs_on || 'ubuntu-latest' }}
+    env:
+      COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-late
+    steps:
+      - id: deps
+        uses: ./.civikitchen-siblings/ci/.github/actions/private-deps
+        with:
+          node_version: '22'
+      - uses: ./.civikitchen-siblings/ci/.github/actions/stack-up
+        with:
+          overrides: ${{ steps.deps.outputs.sibling_override }}
+      - uses: ./.civikitchen-siblings/ci/.github/actions/stack-down

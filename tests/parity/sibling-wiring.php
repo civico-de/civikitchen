@@ -81,15 +81,22 @@ foreach ($files as $file) {
             $problems[] = "$file: job '$job' uses sibling_repo without the private-dependency steps";
         }
 
-        // Only a job that brings a stack UP installs the extension; one that
-        // only `exec`s reaches into a stack another job booted.
-        if (preg_match('/docker compose\b[^\n]*\bup\b/', $text) !== 1) {
+        // Only a job that brings a stack UP installs the extension.
+        if (!ck_job_boots($definition)) {
             continue;
         }
         if (!$usesPrivateDeps) {
             $problems[] = "$file: job '$job' boots a stack without the private-dependency steps";
         }
-        if (!str_contains($text, 'CK_SIBLING_OVERRIDE')) {
+        // A stack-up step takes the override among its `overrides`; a raw boot
+        // layers it itself. Later raw `up`s reuse the stack-up's file list.
+        $stackUps = ck_action_steps($definition, 'stack-up');
+        foreach ($stackUps as $step) {
+            if (!ck_expression_reads(ck_scalar_text($step['with']['overrides'] ?? null), 'steps.deps.outputs.sibling_override')) {
+                $problems[] = "$file: job '$job' runs stack-up without the sibling override";
+            }
+        }
+        if ($stackUps === [] && !str_contains($text, 'CK_SIBLING_OVERRIDE')) {
             $problems[] = "$file: job '$job' boots a stack without layering CK_SIBLING_OVERRIDE";
         }
     }

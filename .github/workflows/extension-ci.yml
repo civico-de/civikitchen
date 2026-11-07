@@ -698,6 +698,28 @@ jobs:
                "$CK_EXTRA_PHPUNIT_CONFIG" != ../* ) ]] \
             || { echo "invalid extra_phpunit_config: $CK_EXTRA_PHPUNIT_CONFIG" >&2; exit 1; }
 
+      # The shared steps of every stack-booting job live in this repository as
+      # composite actions, and a reusable workflow reaches its own repository
+      # only by checking it out at the SHA it was resolved from: `uses: ./…`
+      # alone would resolve against the CALLING repository. Under
+      # .civikitchen-siblings/, the one directory the extension scanner skips
+      # and cklint ignores.
+      - name: Check out civikitchen for the shared steps
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          repository: civico-de/civikitchen
+          ref: ${{ job.workflow_sha }}
+          # toolbelt/ and packages/ hold the reader of the siblings' policy.dist.build.
+          sparse-checkout: |
+            .github/actions
+            toolbelt/bin
+            toolbelt/lib
+            toolbelt/ckconform/bin
+            toolbelt/ckconform/src
+            packages
+          path: .civikitchen-siblings/ci
+
       # --- Frontend steps (opt-in via npm_ci / js_tests / bun) --------------
       #
       # js_tests implies npm_ci, and bun implies the install too: `npm test`
@@ -709,59 +731,13 @@ jobs:
       #     read during install has to find its files already there;
       #   * unit tests need no CiviCRM, so a red JS suite should cost a
       #     30-second install, not a stack boot first.
-      #
-      # Node is set up on BOTH paths. Bun replaces npm, not node: `bun run`
-      # starts the repo's scripts, and what those scripts call — tsc, vitest,
-      # playwright out of node_modules/.bin — is a `#!/usr/bin/env node`
-      # shebang away from needing a Node on PATH.
-      - name: Set up Node
+      - name: JS dependencies
         if: ${{ inputs.npm_ci || inputs.js_tests || inputs.bun }}
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: ./.civikitchen-siblings/ci/.github/actions/js-deps
         with:
-          node-version: ${{ inputs.node_version }}
-          # The npm cache keys on package-lock.json and setup-node FAILS the
-          # step when it finds none — which is exactly the Bun repo, where the
-          # committed lockfile is bun.lock. Written `!x && 'npm' || ''` and not
-          # the usual way round because a ternary whose first branch is the
-          # empty string collapses into its second.
-          cache: ${{ !inputs.bun && 'npm' || '' }}
-          # setup-node runs at the workspace root, so the lockfiles it keys on
-          # are named relative to that — the three names it searches itself.
-          cache-dependency-path: |
-            ${{ inputs.working_directory }}/package-lock.json
-            ${{ inputs.working_directory }}/npm-shrinkwrap.json
-            ${{ inputs.working_directory }}/yarn.lock
-
-      - name: Set up Bun
-        if: ${{ inputs.bun }}
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          # The repo pins its Bun in package.json ("packageManager": "bun@x.y.z"),
-          # next to its lockfile; an unpinned setup would test whatever Bun
-          # shipped this week.
-          bun-version-file: ${{ inputs.working_directory }}/package.json
-
-      # --ignore-scripts is deliberate and not configurable — see the input
-      # description. A package that genuinely needs a build step should run it
-      # as an explicit script from its `test`/`test:e2e` script, where it is
-      # visible, rather than through an install hook.
-      #
-      # One step for both managers: what decides whether the tree is installed
-      # at all is the same either way, and a second step is a second place for
-      # that condition to drift.
-      - name: Materialize JS dependencies (npm ci / bun install)
-        if: ${{ inputs.npm_ci || inputs.js_tests || inputs.bun }}
-        env:
-          CK_USE_BUN: ${{ inputs.bun }}
-        run: |
-          set -euo pipefail
-          if [ "$CK_USE_BUN" = true ]; then
-            # No --ignore-scripts counterpart to add: Bun runs no dependency
-            # lifecycle script at all unless it is a trustedDependency.
-            bun install --frozen-lockfile
-          else
-            npm ci --ignore-scripts
-          fi
+          node_version: ${{ inputs.node_version }}
+          bun: ${{ inputs.bun }}
+          working_directory: ${{ inputs.working_directory }}
 
       - name: JS unit tests (npm test / bun run test)
         if: ${{ inputs.js_tests }}
@@ -790,30 +766,6 @@ jobs:
       # entrypoint enables the extension *while booting*. Whatever enabling the
       # extension needs — its autoloader, a sibling it declares a requirement
       # on — has to be in the tree by then, not a step later.
-      #
-      # The private-dependency steps are shared with every other stack-booting
-      # job, so they live in this repository as a composite action — and a
-      # reusable workflow reaches its own repository only by checking it out at
-      # the SHA it was resolved from. `uses: ./…` alone would resolve against
-      # the CALLING repository. Under .civikitchen-siblings/, the one directory
-      # the extension scanner skips and cklint ignores.
-      - name: Check out civikitchen for the shared private-dependency steps
-        if: ${{ inputs.composer_install || inputs.sibling_repo != '' || (inputs.policy_defaults || vars.CK_POLICY_DEFAULTS) != '' }}
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          repository: civico-de/civikitchen
-          ref: ${{ job.workflow_sha }}
-          # toolbelt/ and packages/ hold the reader of the siblings' policy.dist.build.
-          sparse-checkout: |
-            .github/actions
-            toolbelt/bin
-            toolbelt/lib
-            toolbelt/ckconform/bin
-            toolbelt/ckconform/src
-            packages
-          path: .civikitchen-siblings/ci
-
       - name: Private dependencies
         id: deps
         if: ${{ inputs.composer_install || inputs.sibling_repo != '' || (inputs.policy_defaults || vars.CK_POLICY_DEFAULTS) != '' }}
@@ -842,32 +794,11 @@ jobs:
 
       - name: Start CiviCRM stack
         id: stack
-        env:
-          CK_SIBLING_OVERRIDE: ${{ steps.deps.outputs.sibling_override }}
-        run: |
-          set -euo pipefail
-          # Unchanged command when no sibling was checked out — the override
-          # output is empty then. It is needed for `up` alone: every later
-          # `docker compose exec` finds the stack through the project name in
-          # the base file, same as in the Playwright job.
-          compose=(-f "$CK_COMPOSE_FILE")
-          if [ -n "${CK_SIBLING_OVERRIDE:-}" ]; then
-            compose+=(-f "$CK_SIBLING_OVERRIDE")
-          fi
-          # The snapshot store, writable by the image's web user.
-          mkdir -p "$RUNNER_TEMP/ck-seed-store"
-          chmod 0777 "$RUNNER_TEMP/ck-seed-store"
-          seed_override="$RUNNER_TEMP/ck-seed-override.yml"
-          printf 'services:\n  app:\n    volumes:\n      - %s:/var/lib/civikitchen/snapshots\n' "$RUNNER_TEMP/ck-seed-store" > "$seed_override"
-          compose+=(-f "$seed_override")
-          # Self-hosted runners keep the previous run's stack; without -v the
-          # anonymous mariadb volume reattaches and the entrypoint skips install.
-          docker compose "${compose[@]}" down -v --remove-orphans
-          # vendor/ as the runner user, who owns the checkout; written by the stack
-          # it would belong to the image's web user.
-          docker compose "${compose[@]}" run --rm --no-deps -T -u "$(id -u):$(id -g)" -e HOME=/tmp \
-            --entrypoint sh app -c 'exec ck internal composer-install /var/www/html/ext/*/'
-          docker compose "${compose[@]}" up -d --wait --quiet-pull
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-up
+        with:
+          working_directory: ${{ inputs.working_directory }}
+          overrides: ${{ steps.deps.outputs.sibling_override }}
+          seed_store: true
 
       # Only a boot that generated a snapshot stores one: a restored set adds
       # nothing, and an expired one is replaced under the same key.
@@ -953,23 +884,12 @@ jobs:
         run: |
           sed -n '/^### Lifecycle gate/,$p' "$RUNNER_TEMP/cklifecycle.md" >> "$GITHUB_STEP_SUMMARY" || true
 
-      # A failed stack is a stack trace of nothing without its logs.
-      - name: Stack logs on failure
-        if: failure()
-        run: |
-          docker compose -f "$CK_COMPOSE_FILE" ps -a
-          docker compose -f "$CK_COMPOSE_FILE" logs --tail 200
-          # A failing healthcheck's own output shows in no log.
-          docker compose -f "$CK_COMPOSE_FILE" ps -aq | xargs -r docker inspect --format '{{.Name}}: {{json .State.Health}}'
-
-      # Job-scoped project names mean no later run's `down -v` ever finds this
-      # stack; leaked networks exhaust Docker's address pools on self-hosted runners.
-      - name: Tear down the stack
-        if: always()
-        run: |
-          docker ps -aq --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker rm -f -v
-          docker network ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker network rm
-          docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker volume rm
+      # The checkout holding the action is missing only when the job failed before any boot.
+      - name: Stack logs and teardown
+        if: ${{ always() && hashFiles('.civikitchen-siblings/ci/.github/actions/stack-down/action.yml') != '' }}
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-down
+        with:
+          logs: ${{ job.status == 'failure' }}
 
   # --- Upgrade from the last release (opt-in via upgrade_from_last_release) --
   #
@@ -1014,9 +934,8 @@ jobs:
           [[ "$CK_EXT_KEY" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]] \
             || { echo "invalid extension key: $CK_EXT_KEY" >&2; exit 1; }
 
-      # Private dependencies — see the note on the same pair of steps in `ci`.
+      # The shared steps — see the note on the same checkout in `ci`.
       - name: Check out civikitchen for the shared private-dependency steps
-        if: ${{ inputs.composer_install || inputs.sibling_repo != '' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -1085,23 +1004,10 @@ jobs:
       # and therefore the image that release was tested with, unless the
       # caller pins `image` or policy.civicrm.
       - name: Start CiviCRM stack on the previous release
-        env:
-          CK_SIBLING_OVERRIDE: ${{ steps.deps.outputs.sibling_override }}
-        run: |
-          set -euo pipefail
-          # The sibling override is empty without siblings, and is needed for
-          # `up` alone — every later `docker compose exec` finds the stack
-          # through the project name in the base file.
-          compose=(-f "$CK_COMPOSE_FILE")
-          if [ -n "${CK_SIBLING_OVERRIDE:-}" ]; then
-            compose+=(-f "$CK_SIBLING_OVERRIDE")
-          fi
-          docker compose "${compose[@]}" down -v --remove-orphans
-          # vendor/ as the runner user, who owns the checkout; written by the stack
-          # it would belong to the image's web user.
-          docker compose "${compose[@]}" run --rm --no-deps -T -u "$(id -u):$(id -g)" -e HOME=/tmp \
-            --entrypoint sh app -c 'exec ck internal composer-install /var/www/html/ext/*/'
-          docker compose "${compose[@]}" up -d --wait --quiet-pull
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-up
+        with:
+          working_directory: ${{ inputs.working_directory }}
+          overrides: ${{ steps.deps.outputs.sibling_override }}
 
       # The container sees the checkout through the bind mount, so this alone
       # puts the new code in front of the installed old schema.
@@ -1140,22 +1046,12 @@ jobs:
           [ "$status" = installed ] \
             || { echo "upgrade: extension ended up '$status', expected 'installed'" >&2; exit 1; }
 
-      - name: Stack logs on failure
-        if: failure()
-        run: |
-          docker compose -f "$CK_COMPOSE_FILE" ps -a
-          docker compose -f "$CK_COMPOSE_FILE" logs --tail 200
-          # A failing healthcheck's own output shows in no log.
-          docker compose -f "$CK_COMPOSE_FILE" ps -aq | xargs -r docker inspect --format '{{.Name}}: {{json .State.Health}}'
-
-      # Job-scoped project names mean no later run's `down -v` ever finds this
-      # stack; leaked networks exhaust Docker's address pools on self-hosted runners.
-      - name: Tear down the stack
-        if: always()
-        run: |
-          docker ps -aq --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker rm -f -v
-          docker network ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker network rm
-          docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker volume rm
+      # The checkout holding the action is missing only when the job failed before any boot.
+      - name: Stack logs and teardown
+        if: ${{ always() && hashFiles('.civikitchen-siblings/ci/.github/actions/stack-down/action.yml') != '' }}
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-down
+        with:
+          logs: ${{ job.status == 'failure' }}
 
   # --- Schema parity (opt-in via schema_parity) -----------------------------
   #
@@ -1214,9 +1110,8 @@ jobs:
           [[ "$CK_EXT_KEY" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]] \
             || { echo "invalid extension key: $CK_EXT_KEY" >&2; exit 1; }
 
-      # Private dependencies — see the note on the same pair of steps in `ci`.
+      # The shared steps — see the note on the same checkout in `ci`.
       - name: Check out civikitchen for the shared private-dependency steps
-        if: ${{ inputs.composer_install || inputs.sibling_repo != '' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -1309,22 +1204,10 @@ jobs:
 
       - name: Start CiviCRM stack on the previous release
         if: ${{ steps.gate.outputs.run == 'true' }}
-        env:
-          CK_SIBLING_OVERRIDE: ${{ steps.deps.outputs.sibling_override }}
-        run: |
-          set -euo pipefail
-          # The sibling override is needed for `up` alone — every later
-          # `docker compose exec` finds the stack through the project name.
-          compose=(-f "$CK_COMPOSE_FILE")
-          if [ -n "${CK_SIBLING_OVERRIDE:-}" ]; then
-            compose+=(-f "$CK_SIBLING_OVERRIDE")
-          fi
-          docker compose "${compose[@]}" down -v --remove-orphans
-          # vendor/ as the runner user, who owns the checkout; written by the stack
-          # it would belong to the image's web user.
-          docker compose "${compose[@]}" run --rm --no-deps -T -u "$(id -u):$(id -g)" -e HOME=/tmp \
-            --entrypoint sh app -c 'exec ck internal composer-install /var/www/html/ext/*/'
-          docker compose "${compose[@]}" up -d --wait --quiet-pull
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-up
+        with:
+          working_directory: ${{ inputs.working_directory }}
+          overrides: ${{ steps.deps.outputs.sibling_override }}
 
       - name: Move the mount to this commit
         if: ${{ steps.gate.outputs.run == 'true' }}
@@ -1374,20 +1257,10 @@ jobs:
       # The working tree is already at HEAD, so the boot installs this commit.
       - name: Reinstall from scratch on this commit
         if: ${{ steps.gate.outputs.run == 'true' }}
-        env:
-          CK_SIBLING_OVERRIDE: ${{ steps.deps.outputs.sibling_override }}
-        run: |
-          set -euo pipefail
-          compose=(-f "$CK_COMPOSE_FILE")
-          if [ -n "${CK_SIBLING_OVERRIDE:-}" ]; then
-            compose+=(-f "$CK_SIBLING_OVERRIDE")
-          fi
-          docker compose "${compose[@]}" down -v
-          # vendor/ as the runner user, who owns the checkout; written by the stack
-          # it would belong to the image's web user.
-          docker compose "${compose[@]}" run --rm --no-deps -T -u "$(id -u):$(id -g)" -e HOME=/tmp \
-            --entrypoint sh app -c 'exec ck internal composer-install /var/www/html/ext/*/'
-          docker compose "${compose[@]}" up -d --wait --quiet-pull
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-up
+        with:
+          working_directory: ${{ inputs.working_directory }}
+          overrides: ${{ steps.deps.outputs.sibling_override }}
 
       # The upgraded dump goes back INTO the new container rather than the diff
       # being run on the runner: `ckschemadiff diff` is where the explanation of
@@ -1405,22 +1278,12 @@ jobs:
              ckschemadiff dump \"\${CIVICRM_DB_NAME:-civicrm}\" /tmp/ck-schema-fresh.sql
              ckschemadiff diff /tmp/ck-schema-fresh.sql /tmp/ck-schema-upgraded.sql"
 
-      - name: Stack logs on failure
-        if: failure()
-        run: |
-          docker compose -f "$CK_COMPOSE_FILE" ps -a
-          docker compose -f "$CK_COMPOSE_FILE" logs --tail 200
-          # A failing healthcheck's own output shows in no log.
-          docker compose -f "$CK_COMPOSE_FILE" ps -aq | xargs -r docker inspect --format '{{.Name}}: {{json .State.Health}}'
-
-      # Job-scoped project names mean no later run's `down -v` ever finds this
-      # stack; leaked networks exhaust Docker's address pools on self-hosted runners.
-      - name: Tear down the stack
-        if: always()
-        run: |
-          docker ps -aq --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker rm -f -v
-          docker network ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker network rm
-          docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker volume rm
+      # The checkout holding the action is missing only when the job failed before any boot.
+      - name: Stack logs and teardown
+        if: ${{ always() && hashFiles('.civikitchen-siblings/ci/.github/actions/stack-down/action.yml') != '' }}
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-down
+        with:
+          logs: ${{ job.status == 'failure' }}
 
   # --- Mutation testing (opt-in via mutation) -------------------------------
   #
@@ -1474,9 +1337,8 @@ jobs:
           [[ "$CK_EXT_KEY" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]] \
             || { echo "invalid extension key: $CK_EXT_KEY" >&2; exit 1; }
 
-      # Private dependencies — see the note on the same pair of steps in `ci`.
+      # The shared steps — see the note on the same checkout in `ci`.
       - name: Check out civikitchen for the shared steps
-        if: ${{ inputs.composer_install || inputs.sibling_repo != '' || needs.key.outputs.dist_build_tool != '' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -1516,20 +1378,10 @@ jobs:
 
       - name: Start CiviCRM stack
         id: stack
-        env:
-          CK_SIBLING_OVERRIDE: ${{ steps.deps.outputs.sibling_override }}
-        run: |
-          set -euo pipefail
-          compose=(-f "$CK_COMPOSE_FILE")
-          if [ -n "${CK_SIBLING_OVERRIDE:-}" ]; then
-            compose+=(-f "$CK_SIBLING_OVERRIDE")
-          fi
-          docker compose "${compose[@]}" down -v --remove-orphans
-          # vendor/ as the runner user, who owns the checkout; written by the stack
-          # it would belong to the image's web user.
-          docker compose "${compose[@]}" run --rm --no-deps -T -u "$(id -u):$(id -g)" -e HOME=/tmp \
-            --entrypoint sh app -c 'exec ck internal composer-install /var/www/html/ext/*/'
-          docker compose "${compose[@]}" up -d --wait --quiet-pull
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-up
+        with:
+          working_directory: ${{ inputs.working_directory }}
+          overrides: ${{ steps.deps.outputs.sibling_override }}
 
       # safe.directory first: the mount belongs to the runner user, and the
       # changed-lines mode (no policy.mutation.paths) shells out to git as www-data.
@@ -1543,22 +1395,12 @@ jobs:
             "git config --global --add safe.directory $CK_REPO_PATH
              cd \"$CK_EXT_PATH\" && ckmutate"
 
-      - name: Stack logs on failure
-        if: failure()
-        run: |
-          docker compose -f "$CK_COMPOSE_FILE" ps -a
-          docker compose -f "$CK_COMPOSE_FILE" logs --tail 200
-          # A failing healthcheck's own output shows in no log.
-          docker compose -f "$CK_COMPOSE_FILE" ps -aq | xargs -r docker inspect --format '{{.Name}}: {{json .State.Health}}'
-
-      # Job-scoped project names mean no later run's `down -v` ever finds this
-      # stack; leaked networks exhaust Docker's address pools on self-hosted runners.
-      - name: Tear down the stack
-        if: always()
-        run: |
-          docker ps -aq --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker rm -f -v
-          docker network ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker network rm
-          docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker volume rm
+      # The checkout holding the action is missing only when the job failed before any boot.
+      - name: Stack logs and teardown
+        if: ${{ always() && hashFiles('.civikitchen-siblings/ci/.github/actions/stack-down/action.yml') != '' }}
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-down
+        with:
+          logs: ${{ job.status == 'failure' }}
 
   # --- Core upgrade persistence (opt-in via core_upgrade_from) --------------
   #
@@ -1617,9 +1459,8 @@ jobs:
           [[ "$CK_CORE_FROM" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*(:[A-Za-z0-9._-]+)?(@sha256:[a-f0-9]{64})?$ ]] \
             || { echo "core_upgrade_from is not an image reference: $CK_CORE_FROM" >&2; exit 1; }
 
-      # Private dependencies — see the note on the same pair of steps in `ci`.
+      # The shared steps — see the note on the same checkout in `ci`.
       - name: Check out civikitchen for the shared private-dependency steps
-        if: ${{ inputs.composer_install || inputs.sibling_repo != '' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -1703,27 +1544,18 @@ jobs:
       # and enables the mounted extension, on the version the site is meant to
       # have been living on.
       - name: Start the CiviCRM stack on the old core
+        id: stack
         env:
           CIVIKITCHEN_IMAGE: ${{ inputs.core_upgrade_from }}
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-up
+        with:
+          working_directory: ${{ inputs.working_directory }}
+          overrides: |
+            ${{ env.CK_UPGRADE_OVERRIDE }}
+            ${{ steps.deps.outputs.sibling_override }}
           # The old core's image may predate `ck internal composer-install`, and
           # the site ends on the run's image, whose PHP vendor/ has to fit.
-          CK_VENDOR_IMAGE: ${{ needs.key.outputs.image }}
-          CK_SIBLING_OVERRIDE: ${{ steps.deps.outputs.sibling_override }}
-        run: |
-          set -euo pipefail
-          # The swap override carrying the site and the database, and — when
-          # there are siblings — the one that mounts and enables them. Compose
-          # merges any number of -f files; the two touch different keys.
-          compose=(-f "$CK_COMPOSE_FILE" -f "$CK_UPGRADE_OVERRIDE")
-          if [ -n "${CK_SIBLING_OVERRIDE:-}" ]; then
-            compose+=(-f "$CK_SIBLING_OVERRIDE")
-          fi
-          docker compose "${compose[@]}" down -v --remove-orphans
-          # vendor/ as the runner user, who owns the checkout; written by the stack
-          # it would belong to the image's web user.
-          CIVIKITCHEN_IMAGE="$CK_VENDOR_IMAGE" docker compose "${compose[@]}" run --rm --no-deps -T -u "$(id -u):$(id -g)" -e HOME=/tmp \
-            --entrypoint sh app -c 'exec ck internal composer-install /var/www/html/ext/*/'
-          docker compose "${compose[@]}" up -d --wait --quiet-pull
+          vendor_image: ${{ needs.key.outputs.image }}
 
       # `cv scr`, not a PHPUnit class, and deliberately so: these assertions have
       # to run against the LIVE site database, while the headless harness points
@@ -1771,18 +1603,12 @@ jobs:
       # skips through its marker-gated bundles.
       - name: Swap the core underneath the site
         env:
-          CK_SIBLING_OVERRIDE: ${{ steps.deps.outputs.sibling_override }}
+          # The boot's files, with the swap and sibling overrides.
+          COMPOSE_FILE: ${{ steps.stack.outputs.compose_file }}
         run: |
           set -euo pipefail
-          # The swap override carrying the site and the database, and — when
-          # there are siblings — the one that mounts and enables them. Compose
-          # merges any number of -f files; the two touch different keys.
-          compose=(-f "$CK_COMPOSE_FILE" -f "$CK_UPGRADE_OVERRIDE")
-          if [ -n "${CK_SIBLING_OVERRIDE:-}" ]; then
-            compose+=(-f "$CK_SIBLING_OVERRIDE")
-          fi
-          docker compose "${compose[@]}" down
-          docker compose "${compose[@]}" up -d --wait --quiet-pull
+          docker compose down
+          docker compose up -d --wait --quiet-pull
 
       # `cv upgrade:db` straight away, with no `cv flush` in front of it: a
       # normal cv bootstrap against a database the code has not upgraded yet is
@@ -1848,22 +1674,12 @@ jobs:
             echo "no tests/upgrade/assert.php: the upgrade itself passed, but nothing checked what became of the extension's own records."
           fi
 
-      - name: Stack logs on failure
-        if: failure()
-        run: |
-          docker compose -f "$CK_COMPOSE_FILE" ps -a
-          docker compose -f "$CK_COMPOSE_FILE" logs --tail 200
-          # A failing healthcheck's own output shows in no log.
-          docker compose -f "$CK_COMPOSE_FILE" ps -aq | xargs -r docker inspect --format '{{.Name}}: {{json .State.Health}}'
-
-      # Job-scoped project names mean no later run's `down -v` ever finds this
-      # stack; leaked networks exhaust Docker's address pools on self-hosted runners.
-      - name: Tear down the stack
-        if: always()
-        run: |
-          docker ps -aq --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker rm -f -v
-          docker network ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker network rm
-          docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker volume rm
+      # The checkout holding the action is missing only when the job failed before any boot.
+      - name: Stack logs and teardown
+        if: ${{ always() && hashFiles('.civikitchen-siblings/ci/.github/actions/stack-down/action.yml') != '' }}
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-down
+        with:
+          logs: ${{ job.status == 'failure' }}
 
   # --- Compatibility matrix (opt-in via matrix_images) ----------------------
   #
@@ -1964,9 +1780,8 @@ jobs:
         with:
           persist-credentials: false
 
-      # Private dependencies — see the note on the same pair of steps in `ci`.
+      # The shared steps — see the note on the same checkout in `ci`.
       - name: Check out civikitchen for the shared steps
-        if: ${{ inputs.composer_install || inputs.sibling_repo != '' || needs.key.outputs.dist_build_tool != '' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -2013,20 +1828,10 @@ jobs:
       # CiviCRM and enables the mounted extension, so an installer that fails
       # on this version never gets to the suite.
       - name: Start CiviCRM stack
-        env:
-          CK_SIBLING_OVERRIDE: ${{ steps.deps.outputs.sibling_override }}
-        run: |
-          set -euo pipefail
-          compose=(-f "$CK_COMPOSE_FILE")
-          if [ -n "${CK_SIBLING_OVERRIDE:-}" ]; then
-            compose+=(-f "$CK_SIBLING_OVERRIDE")
-          fi
-          docker compose "${compose[@]}" down -v --remove-orphans
-          # vendor/ as the runner user, who owns the checkout; written by the stack
-          # it would belong to the image's web user.
-          docker compose "${compose[@]}" run --rm --no-deps -T -u "$(id -u):$(id -g)" -e HOME=/tmp \
-            --entrypoint sh app -c 'exec ck internal composer-install /var/www/html/ext/*/'
-          docker compose "${compose[@]}" up -d --wait --quiet-pull
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-up
+        with:
+          working_directory: ${{ inputs.working_directory }}
+          overrides: ${{ steps.deps.outputs.sibling_override }}
 
       - name: PHPUnit
         run: |
@@ -2049,22 +1854,12 @@ jobs:
         run: |
           sed -n '/^### Lifecycle gate/,$p' "$RUNNER_TEMP/cklifecycle.md" >> "$GITHUB_STEP_SUMMARY" || true
 
-      - name: Stack logs on failure
-        if: failure()
-        run: |
-          docker compose -f "$CK_COMPOSE_FILE" ps -a
-          docker compose -f "$CK_COMPOSE_FILE" logs --tail 200
-          # A failing healthcheck's own output shows in no log.
-          docker compose -f "$CK_COMPOSE_FILE" ps -aq | xargs -r docker inspect --format '{{.Name}}: {{json .State.Health}}'
-
-      # Job-scoped project names mean no later run's `down -v` ever finds this
-      # stack; leaked networks exhaust Docker's address pools on self-hosted runners.
-      - name: Tear down the stack
-        if: always()
-        run: |
-          docker ps -aq --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker rm -f -v
-          docker network ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker network rm
-          docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker volume rm
+      # The checkout holding the action is missing only when the job failed before any boot.
+      - name: Stack logs and teardown
+        if: ${{ always() && hashFiles('.civikitchen-siblings/ci/.github/actions/stack-down/action.yml') != '' }}
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-down
+        with:
+          logs: ${{ job.status == 'failure' }}
 
   # --- Browser tests (opt-in via playwright) --------------------------------
   #
@@ -2117,7 +1912,7 @@ jobs:
           [[ "$CK_EXT_KEY" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]] \
             || { echo "invalid extension key: $CK_EXT_KEY" >&2; exit 1; }
 
-      # Private dependencies — see the note on the same pair of steps in `ci`.
+      # The shared steps — see the note on the same checkout in `ci`.
       # The checkout also carries `ck playwright` and its Dockerfile.
       - name: Check out civikitchen for ck playwright and the private-dependency steps
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -2189,28 +1984,13 @@ jobs:
           restore-keys: ck-seed-playwright-${{ inputs.working_directory }}-${{ matrix.image }}-
 
       - name: Start CiviCRM stack
-        env:
-          CK_SIBLING_OVERRIDE: ${{ steps.deps.outputs.sibling_override }}
-        run: |
-          set -euo pipefail
-          # The demo-user override and the sibling one touch different
-          # keys; compose merges any number of -f files.
-          compose=(-f "$CK_COMPOSE_FILE" -f "$CK_PW_OVERRIDE")
-          if [ -n "${CK_SIBLING_OVERRIDE:-}" ]; then
-            compose+=(-f "$CK_SIBLING_OVERRIDE")
-          fi
-          # The snapshot store, writable by the image's web user.
-          mkdir -p "$RUNNER_TEMP/ck-seed-store"
-          chmod 0777 "$RUNNER_TEMP/ck-seed-store"
-          seed_override="$RUNNER_TEMP/ck-seed-override.yml"
-          printf 'services:\n  app:\n    volumes:\n      - %s:/var/lib/civikitchen/snapshots\n' "$RUNNER_TEMP/ck-seed-store" > "$seed_override"
-          compose+=(-f "$seed_override")
-          docker compose "${compose[@]}" down -v --remove-orphans
-          # vendor/ as the runner user, who owns the checkout; written by the stack
-          # it would belong to the image's web user.
-          docker compose "${compose[@]}" run --rm --no-deps -T -u "$(id -u):$(id -g)" -e HOME=/tmp \
-            --entrypoint sh app -c 'exec ck internal composer-install /var/www/html/ext/*/'
-          docker compose "${compose[@]}" up -d --wait --quiet-pull
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-up
+        with:
+          working_directory: ${{ inputs.working_directory }}
+          overrides: |
+            ${{ env.CK_PW_OVERRIDE }}
+            ${{ steps.deps.outputs.sibling_override }}
+          seed_store: true
 
       # Only a boot that generated a snapshot stores one: a restored set adds
       # nothing, and an expired one is replaced under the same key.
@@ -2287,22 +2067,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      # No override needed to find the stack: the project name comes from the
-      # compose file, and this way the step still works when the failure was
-      # the override step itself.
-      - name: Stack logs on failure
-        if: failure()
-        run: |
-          docker compose -f "$CK_COMPOSE_FILE" ps -a
-          docker compose -f "$CK_COMPOSE_FILE" logs --tail 200
-          # A failing healthcheck's own output shows in no log.
-          docker compose -f "$CK_COMPOSE_FILE" ps -aq | xargs -r docker inspect --format '{{.Name}}: {{json .State.Health}}'
-
-      # Job-scoped project names mean no later run's `down -v` ever finds this
-      # stack; leaked networks exhaust Docker's address pools on self-hosted runners.
-      - name: Tear down the stack
-        if: always()
-        run: |
-          docker ps -aq --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker rm -f -v
-          docker network ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker network rm
-          docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker volume rm
+      # The checkout holding the action is missing only when the job failed before any boot.
+      - name: Stack logs and teardown
+        if: ${{ always() && hashFiles('.civikitchen-siblings/ci/.github/actions/stack-down/action.yml') != '' }}
+        uses: ./.civikitchen-siblings/ci/.github/actions/stack-down
+        with:
+          logs: ${{ job.status == 'failure' }}

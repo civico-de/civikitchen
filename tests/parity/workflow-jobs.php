@@ -143,3 +143,30 @@ function ck_job_uses(array $job): array
 
     return $uses;
 }
+
+/**
+ * The job's steps that run the given civikitchen composite action.
+ *
+ * @return list<array<mixed>>
+ */
+function ck_action_steps(array $job, string $action): array
+{
+    $steps = [];
+    foreach ($job['steps'] ?? [] as $step) {
+        if (is_array($step) && str_ends_with((string) ($step['uses'] ?? ''), "/.github/actions/$action")) {
+            $steps[] = $step;
+        }
+    }
+
+    return $steps;
+}
+
+/**
+ * Whether the job brings a compose stack up: a raw `docker compose … up` or
+ * the stack-up action. `exec` alone reaches into a stack another job booted.
+ */
+function ck_job_boots(array $job): bool
+{
+    return ck_action_steps($job, 'stack-up') !== []
+        || preg_match('/docker compose\\b[^\\n]*\\bup\\b/', ck_job_text($job)) === 1;
+}

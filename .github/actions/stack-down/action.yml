@@ -1,0 +1,39 @@
+name: CiviKitchen stack down
+description: >-
+  Prints the stack's state and logs when asked, then removes every container,
+  network and volume of the job's compose project (COMPOSE_PROJECT_NAME).
+  Run it under always().
+
+inputs:
+  logs:
+    description: Print container states, the last 200 log lines and health results first.
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    # By project label, like the teardown: no compose file, no Compose version quirks.
+    - name: Stack logs
+      if: ${{ inputs.logs == 'true' }}
+      shell: bash
+      run: |
+        filter="label=com.docker.compose.project=$COMPOSE_PROJECT_NAME"
+        docker ps -a --filter "$filter"
+        for id in $(docker ps -aq --filter "$filter"); do
+          echo "::group::$(docker inspect --format '{{.Name}}' "$id")"
+          docker logs --tail 200 "$id" 2>&1
+          echo "::endgroup::"
+        done
+        # A failing healthcheck's own output shows in no log.
+        docker ps -aq --filter "$filter" | xargs -r docker inspect --format '{{.Name}}: {{json .State.Health}}'
+
+    # Job-scoped project names mean no later run's `down -v` ever finds this
+    # stack; leaked networks exhaust Docker's address pools on self-hosted runners.
+    # always(): a failed log step must not leave the stack behind.
+    - name: Tear down the stack
+      if: ${{ always() }}
+      shell: bash
+      run: |
+        docker ps -aq --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker rm -f -v
+        docker network ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker network rm
+        docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker volume rm

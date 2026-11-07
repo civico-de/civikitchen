@@ -32,9 +32,8 @@ foreach ($files as $file) {
     foreach (ck_jobs_parsed($file) as $job => $definition) {
         $text = ck_job_text($definition);
 
-        // Only jobs that actually bring a stack up can collide. `exec` alone
-        // reaches into whatever the booting job created and is not a boot.
-        if (preg_match('/docker compose\\b[^\\n]*\\bup\\b/', $text) !== 1) {
+        // Only jobs that actually bring a stack up can collide.
+        if (!ck_job_boots($definition)) {
             continue;
         }
         // A hardcoded GitHub-hosted label means one VM per job — no shared
@@ -44,7 +43,9 @@ foreach ($files as $file) {
         if ($runsOn !== '' && !str_contains($runsOn, '${{')) {
             continue;
         }
-        if (!str_contains($text, 'COMPOSE_PROJECT_NAME')) {
+        // The job env names it, or a step writes it to GITHUB_ENV.
+        $named = is_array($definition['env'] ?? null) && array_key_exists('COMPOSE_PROJECT_NAME', $definition['env']);
+        if (!$named && !str_contains($text, 'COMPOSE_PROJECT_NAME')) {
             $problems[] = "$file: job '$job' boots a compose stack without COMPOSE_PROJECT_NAME";
         } elseif (!ck_tears_down($definition)) {
             $problems[] = "$file: job '$job' leaves its compose project behind (no always() step removes its networks)";
@@ -56,9 +57,11 @@ foreach ($files as $file) {
 function ck_tears_down(array $job): bool
 {
     foreach (is_array($job['steps'] ?? null) ? $job['steps'] : [] as $step) {
-        $run = is_array($step) ? ck_scalar_text($step['run'] ?? null) : '';
-        if (is_array($step) && str_contains(ck_scalar_text($step['if'] ?? null), 'always()')
-            && preg_match('/docker network rm|docker compose\\b[^\\n]*\\bdown\\b/', $run) === 1) {
+        if (!is_array($step) || !str_contains(ck_scalar_text($step['if'] ?? null), 'always()')) {
+            continue;
+        }
+        if (str_ends_with((string) ($step['uses'] ?? ''), '/.github/actions/stack-down')
+            || preg_match('/docker network rm|docker compose\\b[^\\n]*\\bdown\\b/', ck_scalar_text($step['run'] ?? null)) === 1) {
             return true;
         }
     }

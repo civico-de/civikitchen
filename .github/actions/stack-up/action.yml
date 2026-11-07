@@ -1,0 +1,72 @@
+name: CiviKitchen stack up
+description: >-
+  Boots the job's CiviCRM stack: the CI compose file in CK_COMPOSE_FILE plus
+  the given overrides, a clean `down -v` first, vendor/ installed as the
+  runner user, then `up --wait`. Output `compose_file` is the file list in
+  COMPOSE_FILE form, for later steps that need the overrides again.
+
+inputs:
+  working_directory:
+    description: >-
+      The extension's directory inside the repository. Composite steps do not
+      inherit the calling job's defaults.run.working-directory.
+    default: '.'
+  overrides:
+    description: >-
+      Compose files merged over CK_COMPOSE_FILE, one per line, in order.
+      Empty lines are skipped, so an unset step output can be passed as is.
+    default: ''
+  seed_store:
+    description: >-
+      Mount a writable seed snapshot store from $RUNNER_TEMP/ck-seed-store
+      (docs/seed-snapshots.md).
+    default: 'false'
+  vendor_image:
+    description: >-
+      Image the vendor/ install runs on, when it differs from the one the
+      stack boots; empty uses CIVIKITCHEN_IMAGE.
+    default: ''
+
+outputs:
+  compose_file:
+    description: The merged compose files, colon-separated, as COMPOSE_FILE takes them.
+    value: ${{ steps.up.outputs.compose_file }}
+
+runs:
+  using: composite
+  steps:
+    - name: Start CiviCRM stack
+      id: up
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      env:
+        CK_OVERRIDES: ${{ inputs.overrides }}
+        CK_SEED_STORE: ${{ inputs.seed_store }}
+        CK_VENDOR_IMAGE: ${{ inputs.vendor_image }}
+      run: |
+        set -euo pipefail
+        files="$PWD/$CK_COMPOSE_FILE"
+        while IFS= read -r file; do
+          [ -n "$file" ] || continue
+          [[ "$file" == /* ]] || file="$PWD/$file"
+          files="$files:$file"
+        done <<< "$CK_OVERRIDES"
+        if [ "$CK_SEED_STORE" = true ]; then
+          # Writable by the image's web user.
+          mkdir -p "$RUNNER_TEMP/ck-seed-store"
+          chmod 0777 "$RUNNER_TEMP/ck-seed-store"
+          seed_override="$RUNNER_TEMP/ck-seed-override.yml"
+          printf 'services:\n  app:\n    volumes:\n      - %s:/var/lib/civikitchen/snapshots\n' "$RUNNER_TEMP/ck-seed-store" > "$seed_override"
+          files="$files:$seed_override"
+        fi
+        export COMPOSE_FILE="$files"
+        echo "compose_file=$files" >> "$GITHUB_OUTPUT"
+        # Self-hosted runners keep the previous run's stack; without -v the
+        # anonymous mariadb volume reattaches and the entrypoint skips install.
+        docker compose down -v --remove-orphans
+        # vendor/ as the runner user, who owns the checkout; written by the stack
+        # it would belong to the image's web user.
+        env ${CK_VENDOR_IMAGE:+"CIVIKITCHEN_IMAGE=$CK_VENDOR_IMAGE"} \
+          docker compose run --rm --no-deps -T -u "$(id -u):$(id -g)" -e HOME=/tmp \
+          --entrypoint sh app -c 'exec ck internal composer-install /var/www/html/ext/*/'
+        docker compose up -d --wait --quiet-pull

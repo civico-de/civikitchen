@@ -39,4 +39,13 @@ grep -q "'narrow' checks civikitchen out without toolbelt/bin" <<<"$out" \
 grep -q "'narrow' runs the private-dependency steps without node_version" <<<"$out" \
   || fail "checker did not name the missing node_version (got: $out)"
 
+# stack-up takes the override among its `overrides`; a comment naming it is not wiring.
+out=$(php "$CHECK" tests/parity/fixtures/workflow.stack-actions.yml 2>&1) \
+  && fail "checker passed a stack-up without the sibling override"
+grep -q "'unwired' runs stack-up without the sibling override" <<<"$out" \
+  || fail "checker did not name job 'unwired' (got: $out)"
+for job in wired leak late; do
+  grep -q "'$job'" <<<"$out" && fail "checker flagged job '$job', whose stack-up layers the override"
+done
+
 echo "sibling wiring suite OK"

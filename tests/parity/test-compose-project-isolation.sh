@@ -42,4 +42,16 @@ out=$(php "$CHECK" tests/parity/fixtures/workflow.compose-project-leak.yml 2>&1)
 grep -q "'leak'" <<<"$out" || fail "checker failed but did not name job 'leak' (got: $out)"
 grep -q "'smoke'" <<<"$out" && fail "checker flagged a job whose teardown runs under always() && …"
 
+# The same rules through the stack actions: stack-up is a boot, stack-down
+# under always() is the teardown.
+out=$(php "$CHECK" tests/parity/fixtures/workflow.stack-actions.yml 2>&1) \
+  && fail "checker passed stack-up jobs that never tear down"
+for job in leak late; do
+  grep -q "'$job' leaves its compose project behind" <<<"$out" \
+    || fail "checker did not name job '$job' (got: $out)"
+done
+for job in wired unwired; do
+  grep -q "'$job'" <<<"$out" && fail "checker flagged job '$job', which tears down under always()"
+done
+
 echo "compose project isolation suite OK"

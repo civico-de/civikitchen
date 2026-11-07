@@ -37,6 +37,9 @@ except that a break the consumers are adjusted for ships as a minor, marked
   `require_changelog` input and `ckrelease check --require-changelog` are gone; drop them
   from callers.
 - The GitHub release notes are the version's changelog section instead of generated notes.
+- The stack jobs of extension-ci.yml boot, print logs and tear down through the shared
+  `stack-up` and `stack-down` actions, and check civikitchen out on every run. Failure logs
+  cover every container of the job's compose project, override services included.
 
 ## [1.56.1] - 2026-11-04
 
