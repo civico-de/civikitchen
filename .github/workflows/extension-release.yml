@@ -432,13 +432,19 @@ jobs:
           # not land in the tree the archive is built from.
           CK_DIST: ${{ runner.temp }}/ckrelease
           CK_RELEASE_VERSION: ${{ steps.key.outputs.version }}
+          CK_DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
           # dist runs the consistency check itself and refuses to build without
           # it, so there is no way to publish an archive that skipped it.
-          # An empty version (dry run) builds whatever info.xml carries.
+          # An empty version (dry run) builds whatever info.xml carries, and the
+          # changelog only has to be well-formed: nothing is released.
+          args=()
+          if [ "$CK_DRY_RUN" = true ]; then
+            args+=(--dry-run)
+          fi
           php "$GITHUB_WORKSPACE"/.civikitchen-ci/toolbelt/bin/ckrelease dist \
-            --version "$CK_RELEASE_VERSION" --ref "$CK_RELEASE_REF" --output "$CK_DIST"
+            --version "$CK_RELEASE_VERSION" --ref "$CK_RELEASE_REF" --output "$CK_DIST" "${args[@]}"
 
       # Merged: an artifact is extracted flat or into a subdirectory depending
       # on how many match, so each sibling is picked by its exact archive name.
@@ -702,12 +708,12 @@ jobs:
           flags=$(.civikitchen-ci/.github/scripts/release-publish-flags.sh "$tag" \
             < "$RUNNER_TEMP/release-tags.txt")
           echo "$flags"
-          php .civikitchen-ci/toolbelt/bin/ckchangelog section "$tag" > "$RUNNER_TEMP/release-notes.md"
           if [ "$CK_DRY_RUN" = true ]; then
             echo "dry run: release $tag would carry"
             ls -1 "$CK_DIST"
             exit 0
           fi
+          php .civikitchen-ci/toolbelt/bin/ckchangelog section "$tag" > "$RUNNER_TEMP/release-notes.md"
           prerelease=$(sed -n 's/^prerelease=//p' <<< "$flags")
           latest=$(sed -n 's/^latest=//p' <<< "$flags")
           # A draft cannot be Latest; publishing it later decides that in the UI.

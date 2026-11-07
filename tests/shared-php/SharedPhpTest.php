@@ -950,6 +950,31 @@ final class SharedPhpTest extends TestCase
         self::assertStringContainsString('## [Unreleased]', $help);
     }
 
+    public function testReleaseDryRunHoldsTheChangelogToTheGrammarOnly(): void
+    {
+        $repository = $this->temporary . '/pending';
+        $this->write($repository, 'info.xml', '<extension key="org.example.pending"><file>pending</file><version>1.0.0</version></extension>');
+        $this->write($repository, 'pending.php', '<?php');
+        $this->write($repository, 'CHANGELOG.md', "# Changelog\n\n## [Unreleased]\n\n### Added\n\n- Not released yet.\n");
+        $this->git($repository, 'init', '-q');
+        $this->git($repository, 'add', '-A');
+        $this->git($repository, '-c', 'user.name=ck', '-c', 'user.email=ck@example.org', 'commit', '-q', '-m', 'fixture');
+        $dist = function (array $flags) use ($repository): int {
+            $output = $this->temporary . '/dist-pending';
+            return $this->inRepository($repository, static fn (): int => (new ReleaseCommand(dirname(__DIR__, 2)))
+                ->run(['dist', '--output', $output, ...$flags]));
+        };
+
+        self::assertSame(1, $dist([]));
+        self::assertSame(0, $dist(['--dry-run']));
+        self::assertFileExists($this->temporary . '/dist-pending/org.example.pending-1.0.0.zip');
+
+        $this->write($repository, 'CHANGELOG.md', "# Changelog\n\n## [1.0] - 2026-01-01\n");
+        $this->git($repository, '-c', 'user.name=ck', '-c', 'user.email=ck@example.org', 'commit', '-q', '-am', 'broken');
+        self::assertSame(1, $dist(['--dry-run']));
+        self::assertSame(1, (new ReleaseCommand(dirname(__DIR__, 2), new RecordingRunner()))->run(['check', '--dry-run']));
+    }
+
     public function testReleaseAcceptsDashPrefixedArchiveAfterOptionTerminator(): void
     {
         file_put_contents($this->temporary . '/info.xml', '<extension key="org.example.safe"><file>safe</file><version>1.2.3</version></extension>');

@@ -292,6 +292,13 @@ publish refs/heads/main true
 [ "$rc" -eq 0 ] || fail "dry-run publish failed: $out"
 case "$out" in *'latest=true'*'dry run: release v1.0.0 would carry'*) ;; *) fail "dry-run publish: $out" ;; esac
 case "$calls" in *release*) fail "a dry run called gh release: $calls" ;; esac
+# A dry run needs no changelog section for the version: it writes no notes.
+mv "$dist" "$work/dist-1.0.0" && mkdir "$dist"
+archive org.example.base 3.0.0
+publish refs/heads/main true
+[ "$rc" -eq 0 ] || fail "a dry run asked for the changelog section of a version it does not release: $out"
+[ ! -e "$notes" ] || fail "a dry run wrote release notes"
+rm -rf "$dist" && mv "$work/dist-1.0.0" "$dist"
 
 publish refs/tags/v1.0.1 false
 [ "$rc" -ne 0 ] || fail "archives of 1.0.0 were published under v1.0.1"

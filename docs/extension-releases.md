@@ -102,7 +102,7 @@ extensions releases them together from one caller at its root; see
 |-------|---------|----------------|
 | `working_directory` | `.` | The extension's directory in a repository of several extensions. |
 | `stage` | `release` | release builds and publishes. build builds, verifies, smoke-tests and uploads the archive as an artifact. publish builds nothing and publishes one release with every archive of the run. |
-| `dry_run` | `false` | Builds the current info.xml version without a tag; the publish job lists the archives instead of publishing. |
+| `dry_run` | `false` | Builds the current info.xml version without a tag and holds CHANGELOG.md to the grammar only; the publish job lists the archives instead of publishing. |
 | `image` | empty | The smoke-test image. When empty: the standalone image of the minor in policy.civicrm, otherwise the v1 image. Setting both is an error. |
 | `smoke_test` | `true` | Disable only for an extension whose install cannot be reached this way, and say why in the caller. |
 | `draft` | `false` | Publishes the GitHub release as a draft. |
@@ -138,7 +138,8 @@ else. ckinit seeds it; `ckchangelog --help` prints the grammar:
   the info.xml version exists without a section.
 - `ckrelease check` (and therefore every tag) fails unless the version has a
   section dated today or earlier and Unreleased is empty. `ckrelease dist`
-  reads the changelog from the ref it archives, not from the working tree.
+  reads the changelog from the ref it archives, not from the working tree;
+  with `--dry-run`, which the `dry_run` input passes, it checks only the grammar.
 - The publish job uses that section as the GitHub release notes.
 
 `ckchangelog lint`, `ckchangelog release <v>` and `ckchangelog section <v>`
@@ -346,7 +347,7 @@ off visibly in the caller with smoke_test: false.
 
 ```
 ckrelease check  [--version <v>]
-ckrelease dist   [--version <v>] [--ref <ref>] [--output <dir>]
+ckrelease dist   [--version <v>] [--ref <ref>] [--output <dir>] [--dry-run]
 ckrelease verify <zip> [--version <v>]
 ckrelease info   key|file|version|dist-name
 ```

@@ -33,6 +33,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 ### Fixed
 
 - A re-run of a release replaces the release notes along with the assets.
+- A `dry_run` of extension-release.yml holds CHANGELOG.md to the grammar only, so it passes
+  while `[Unreleased]` has entries; `ckrelease dist --dry-run` does the same locally.
 - The verein profile installs on CiviCRM 6.20: its GDPRx pin carries the upstream fix for a
   Memo custom field declared with a Text widget, which 6.20 rejects.
 - `ckanalyze` no longer reports non-documented-property for hook parameters read from

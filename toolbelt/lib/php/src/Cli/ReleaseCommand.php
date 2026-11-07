@@ -48,6 +48,7 @@ final class ReleaseCommand implements Command
             return 2;
         }
         $options = ['version' => '', 'ref' => 'HEAD', 'output' => '.ckrelease'];
+        $dryRun = false;
         $positionals = [];
         $literal = false;
         while ($arguments !== []) {
@@ -59,6 +60,10 @@ final class ReleaseCommand implements Command
             if (!$literal && in_array($argument, ['-h', '--help'], true)) {
                 echo $this->usage();
                 return 0;
+            }
+            if (!$literal && $command === 'dist' && $argument === '--dry-run') {
+                $dryRun = true;
+                continue;
             }
             $names = ['--version' => 'version', '--ref' => 'ref', '--output' => 'output'];
             if (!$literal && isset($names[$argument])) {
@@ -82,7 +87,7 @@ final class ReleaseCommand implements Command
         return match ($command) {
             'info' => $this->info($positionals),
             'check' => $this->check((string) $options['version']),
-            'dist' => $this->dist((string) $options['version'], (string) $options['ref'], (string) $options['output']),
+            'dist' => $this->dist((string) $options['version'], (string) $options['ref'], (string) $options['output'], $dryRun),
             'verify' => $this->verifyCommand($positionals, (string) $options['version']),
         };
     }
@@ -158,8 +163,11 @@ final class ReleaseCommand implements Command
         return 0;
     }
 
-    /** With a $ref the changelog is read from it: the archive's notes must come from what it archives. */
-    private function check(string $wantedVersion, ?string $ref = null): int
+    /**
+     * With a $ref the changelog is read from it: the archive's notes must come from what it archives.
+     * A dry run releases nothing, so it holds the changelog to the grammar only.
+     */
+    private function check(string $wantedVersion, ?string $ref = null, bool $dryRun = false): int
     {
         $failed = false;
         if ($wantedVersion !== '' && $wantedVersion !== $this->metadata['version']) {
@@ -183,11 +191,13 @@ final class ReleaseCommand implements Command
             fwrite(STDERR, "ckrelease: FAIL - no {$changelog}; its section for the version is the release notes.\n");
             $failed = true;
         } else {
-            $errors = (new Changelog($changelog, $content))->releaseErrors($version, gmdate('Y-m-d'));
+            $parsed = new Changelog($changelog, $content);
+            $errors = $dryRun ? $parsed->errors() : $parsed->releaseErrors($version, gmdate('Y-m-d'));
             if ($errors === []) {
-                echo "ckrelease: {$changelog} documents {$version}.\n";
+                echo $dryRun ? "ckrelease: {$changelog} is well-formed (dry run).\n" : "ckrelease: {$changelog} documents {$version}.\n";
             } else {
-                fwrite(STDERR, "ckrelease: FAIL - {$changelog} is not ready for {$version}:\n  " . implode("\n  ", $errors) . "\n");
+                $problem = $dryRun ? 'is not well-formed' : "is not ready for {$version}";
+                fwrite(STDERR, "ckrelease: FAIL - {$changelog} {$problem}:\n  " . implode("\n  ", $errors) . "\n");
                 $failed = true;
             }
         }
@@ -198,7 +208,7 @@ final class ReleaseCommand implements Command
         return 0;
     }
 
-    private function dist(string $version, string $ref, string $outputDirectory): int
+    private function dist(string $version, string $ref, string $outputDirectory, bool $dryRun): int
     {
         $repository = new Files($this->checkoutRoot, $this->runner);
         if ($repository->git(['rev-parse', '--is-inside-work-tree'])['status'] !== 0) {
@@ -207,7 +217,7 @@ final class ReleaseCommand implements Command
         if ($repository->git(['rev-parse', '-q', '--verify', "{$ref}^{tree}"])['status'] !== 0) {
             return $this->error("cannot resolve ref: {$ref}");
         }
-        $status = $this->check($version, $ref);
+        $status = $this->check($version, $ref, $dryRun);
         if ($status !== 0) {
             return $status;
         }
@@ -445,7 +455,7 @@ final class ReleaseCommand implements Command
 ckrelease - release helper for CiviCRM extensions (version check, dist zip).
 
   ckrelease check  [--version <v>]
-  ckrelease dist   [--version <v>] [--ref <ref>] [--output <dir>]
+  ckrelease dist   [--version <v>] [--ref <ref>] [--output <dir>] [--dry-run]
   ckrelease verify <zip> [--version <v>]
   ckrelease info   key|file|version|dist-name
 TXT;
