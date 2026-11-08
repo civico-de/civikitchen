@@ -26,6 +26,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Fixed
 
+- `cksmarty` no longer fails a `.tpl` under `managed/` that holds Civi tokens.
+  Core replaces them before Smarty when a `.mgd.php` loads the file as a body.
 - Buildkit images turn the civicrm.org extension feed off through a
   `civicrm.settings.d` file. The API path they took failed on current cores,
   and a missing settings target now stops provisioning instead.

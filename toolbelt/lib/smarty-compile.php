@@ -23,7 +23,8 @@
  * every user, on the first request that touches it.
  *
  * Three sources, because a repo ships Smarty in three shapes:
- *   * .tpl FILES in the checkout;
+ *   * .tpl FILES in the checkout, where those under managed/ are MessageTemplate
+ *     bodies that carry Civi tokens;
  *   * installed managed MessageTemplate BODIES, which are Smarty strings in
  *     the database and never a file anywhere;
  *   * column and tally REWRITES of installed managed SearchDisplays, which
@@ -86,6 +87,7 @@ $failures = [];
 // Both token layers run before Smarty. A token is assumed populated here: whether
 // a template survives an empty one depends on the record, not on the source.
 $populatedToken = '1';
+$tokens = new \Civi\Token\TokenProcessor(\Civi::dispatcher(), ['controller' => 'cksmarty']);
 
 // Read through Managed: it records what this extension owns and what really installed.
 $managedRecords = static function (string $key, string $entityType) {
@@ -130,8 +132,12 @@ else {
   echo "cksmarty: compiling " . count($tpls) . " .tpl file(s) with " . get_class($smarty)
     . " (Smarty " . $smarty->getVersion() . ") ...\n";
   foreach ($tpls as $tpl) {
-    $error = $compile($smarty, 'file:' . $tpl);
     $relative = substr($tpl, strlen($root) + 1);
+    // A .mgd.php reads these into a MessageTemplate, so core replaces their tokens before Smarty.
+    $resource = str_contains("/$relative", '/managed/')
+      ? 'string:' . $tokens->visitTokens(file_get_contents($tpl), static fn (): string => $populatedToken)
+      : 'file:' . $tpl;
+    $error = $compile($smarty, $resource);
     if ($error !== NULL) {
       $failures[] = "$relative: $error";
       echo "  FAIL $relative\n";
@@ -174,7 +180,6 @@ else {
   }
   else {
     echo "cksmarty: compiling " . count($managed) . " managed MessageTemplate body/bodies ...\n";
-    $tokens = new \Civi\Token\TokenProcessor(\Civi::dispatcher(), ['controller' => 'cksmarty']);
     foreach ($managed as $record) {
       if (in_array($record['name'], $skip, TRUE)) {
         continue;
