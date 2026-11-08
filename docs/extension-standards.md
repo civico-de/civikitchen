@@ -362,10 +362,12 @@ has to restate those patterns.
 ### cksmarty
 
 cksmarty compiles every .tpl in the repo with the real CRM_Core_Smarty in the
-booted CI stack, plus the bodies of the managed MessageTemplates the extension
-installed, as a step in the normal ci job. Whether a template compiles
-depends on core's Smarty version and plugins, which no static check knows. A
-repo with no .tpl passes with a log line.
+booted CI stack, plus the bodies of the managed MessageTemplates and the column
+and tally rewrites of the managed SearchDisplays the extension installed, as a step in
+the normal ci job. Whether a template compiles depends on core's Smarty version
+and plugins, which no static check knows. Tokens count as populated, so a
+template that only breaks on an empty token passes. A repo with no .tpl passes
+with a log line.
 
 A managed MessageTemplate the extension renders itself, without Smarty, is
 declared by its managed name with a reason:

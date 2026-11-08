@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<extension key="cksearchgood" type="module">
+  <file>cksearchgood</file>
+  <name>cksearchgood</name>
+  <description>Copied in by tests/images/boot-test-standalone.sh for cksmarty's managed SearchDisplay rewrites.</description>
+  <version>1.0.0</version>
+  <releaseDate>2026-01-01</releaseDate>
+  <compatibility><ver>6.0</ver></compatibility>
+  <requires><ext>org.civicrm.search_kit</ext></requires>
+  <mixins><mixin>mgd-php@1.0.0</mixin></mixins>
+</extension>

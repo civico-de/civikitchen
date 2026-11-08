@@ -73,7 +73,8 @@ final class SmartyCommand implements Command
         return <<<'TXT'
 cksmarty - compile the extension's Smarty templates in a booted CiviCRM.
 
-  cksmarty              compile .tpl files + installed managed MessageTemplates
+  cksmarty              compile .tpl files, installed managed MessageTemplates
+                        and the column and tally rewrites of managed SearchDisplays
   cksmarty --key KEY    override the extension key (default: from info.xml)
 
 Compiles, never renders. Run from the extension root, inside a container where

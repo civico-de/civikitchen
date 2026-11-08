@@ -22,11 +22,12 @@
  * applicable: a template that does not compile is broken on every site, for
  * every user, on the first request that touches it.
  *
- * Two sources, because a repo ships Smarty in two shapes:
+ * Three sources, because a repo ships Smarty in three shapes:
  *   * .tpl FILES in the checkout;
  *   * installed managed MessageTemplate BODIES, which are Smarty strings in
- *     the database and never a file anywhere. Those are the ones nothing else
- *     in the toolchain can see at all.
+ *     the database and never a file anywhere;
+ *   * column and tally REWRITES of installed managed SearchDisplays, which
+ *     SearchKit renders through Smarty.
  *
  * Env in: CK_SMARTY_ROOT (extension checkout), CK_SMARTY_KEY (extension key),
  * CK_SMARTY_DONE (file written on success, so the wrapper can tell a run from a failed boot).
@@ -82,6 +83,20 @@ $compile = function ($smarty, string $resource): ?string {
 
 $failures = [];
 
+// Both token layers run before Smarty. A token is assumed populated here: whether
+// a template survives an empty one depends on the record, not on the source.
+$populatedToken = '1';
+
+// Read through Managed: it records what this extension owns and what really installed.
+$managedRecords = static function (string $key, string $entityType) {
+  return \Civi\Api4\Managed::get(FALSE)
+    ->addSelect('entity_id', 'name')
+    ->addWhere('module', '=', $key)
+    ->addWhere('entity_type', '=', $entityType)
+    ->addWhere('entity_id', 'IS NOT EMPTY')
+    ->execute();
+};
+
 // --- .tpl files ------------------------------------------------------------
 //
 // Absolute `file:` paths rather than names relative to a template dir: the
@@ -133,15 +148,13 @@ else {
 // file-based check in this toolchain and every unit test that does not send
 // that exact mail.
 //
-// Read through Managed rather than by guessing at names: that table is the
-// authoritative record of which templates THIS extension owns, and it only
-// lists what actually installed. `is_reserved` copies are core's business.
+// `is_reserved` copies are core's business.
 //
 // Skipped rather than failed when the extension key is unknown: the .tpl half
 // above is still a real gate, and an unreadable info.xml is a different tool's
 // complaint.
 if ($key === '') {
-  echo "cksmarty: no extension key — skipping the managed MessageTemplate bodies.\n";
+  echo "cksmarty: no extension key — skipping the managed MessageTemplate bodies and SearchDisplay rewrites.\n";
 }
 else {
   // A repo may render some of its own MessageTemplates itself — token
@@ -154,12 +167,7 @@ else {
     echo 'cksmarty: skipping ' . count($skip) . " MessageTemplate(s) the repo renders without Smarty.\n";
   }
 
-  $managed = \Civi\Api4\Managed::get(FALSE)
-    ->addSelect('entity_id', 'name')
-    ->addWhere('module', '=', $key)
-    ->addWhere('entity_type', '=', 'MessageTemplate')
-    ->addWhere('entity_id', 'IS NOT EMPTY')
-    ->execute();
+  $managed = $managedRecords($key, 'MessageTemplate');
 
   if (!count($managed)) {
     echo "cksmarty: extension '$key' installs no managed MessageTemplates.\n";
@@ -190,11 +198,54 @@ else {
         // is not written at all.
         // Civi tokens ({contact.first_name}) are substituted before Smarty
         // sees the body, so strip them with core's own token parser first.
-        $body = $tokens->visitTokens($body, static fn (): string => '', $field === 'msg_html' ? 'text/html' : 'text/plain');
+        $body = $tokens->visitTokens($body, static fn (): string => $populatedToken, $field === 'msg_html' ? 'text/html' : 'text/plain');
         $error = $compile($smarty, 'string:' . $body);
         if ($error !== NULL) {
           $failures[] = "MessageTemplate {$record['name']} ($field): $error";
           echo "  FAIL {$record['name']} ($field)\n";
+        }
+      }
+    }
+  }
+
+  // --- installed managed SearchDisplay rewrites ------------------------------
+  //
+  // SearchKit replaces [field] tokens, resolves conditional punctuation, then
+  // renders any rewrite containing braces through Smarty.
+  $displays = $managedRecords($key, 'SearchDisplay');
+  if (!count($displays)) {
+    echo "cksmarty: extension '$key' installs no managed SearchDisplays.\n";
+  }
+  else {
+    echo "cksmarty: compiling the rewrites of " . count($displays) . " managed SearchDisplay(s) ...\n";
+    foreach ($displays as $record) {
+      $display = \Civi\Api4\SearchDisplay::get(FALSE)
+        ->addSelect('settings')
+        ->addWhere('id', '=', $record['entity_id'])
+        ->execute()
+        ->first();
+      foreach ($display['settings']['columns'] ?? [] as $index => $column) {
+        $columnName = 'column ' . ($column['key'] ?? $index);
+        $rewrites = [
+          $columnName => (string) ($column['rewrite'] ?? ''),
+          "$columnName tally" => (string) ($column['tally']['rewrite'] ?? ''),
+        ];
+        foreach ($rewrites as $label => $rewrite) {
+          if (!str_contains($rewrite, '{') || !str_contains($rewrite, '}')) {
+            continue;
+          }
+          foreach (\CRM_Utils_String::getSquareTokens($rewrite) as $token) {
+            $rewrite = str_replace($token['token'], $populatedToken, $rewrite);
+          }
+          // Absent from older cores, whose SearchKit does not call it either.
+          if (method_exists(\Civi\Token\TokenCompatSubscriber::class, 'renderConditionalPunctuation')) {
+            $rewrite = \Civi\Token\TokenCompatSubscriber::renderConditionalPunctuation($rewrite);
+          }
+          $error = $compile($smarty, 'string:' . $rewrite);
+          if ($error !== NULL) {
+            $failures[] = "SearchDisplay {$record['name']} ($label): $error";
+            echo "  FAIL {$record['name']} ($label)\n";
+          }
         }
       }
     }

@@ -20,8 +20,8 @@
 #   * cklifecycle's settings-metadata check names every malformed
 #     pseudoconstant and passes valid ones, on a site that loads options;
 #   * cklifecycle accepts managed records core keeps by cleanup policy;
-#   * cksmarty compiles managed MessageTemplate bodies that mix Civi tokens
-#     with Smarty, and still fails a broken one;
+#   * cksmarty compiles managed MessageTemplate bodies and SearchDisplay
+#     rewrites that mix tokens with Smarty, and still fails a broken one;
 #   * the phpstan field check accepts every live get and create field on the
 #     catalog's minor release.
 #   * execute() and civicrm_api4() without an index return array rows, the
@@ -234,7 +234,7 @@ check "core patch log lists the patch" \
 # in, not bind-mounted, so the malformed fixture is not enabled while the steps
 # above run.
 docker exec "${APP}" bash -c 'cp -R /civikitchen-lifecycle-fixtures/. /var/www/html/ext/ && chown -R www-data: /var/www/html/ext/cksettings* /var/www/html/ext/ckmanagedkept /var/www/html/ext/ckmsgtpl*'
-cv ext:enable cksettingsgood cksettingsbad ckmanagedkept ckmsgtplgood ckmsgtplbad >/dev/null || true
+cv ext:enable cksettingsgood cksettingsbad ckmanagedkept ckmsgtplgood ckmsgtplbad cksearchgood cksearchbad cksearchpunct >/dev/null || true
 lifecycle() { docker exec -u www-data -w "/var/www/html/ext/$1" "${APP}" cklifecycle > "${FIXTURE}/lifecycle-$1.log" 2>&1; }
 check "cklifecycle passes valid pseudoconstants" "lifecycle cksettingsgood"
 check "cklifecycle fails malformed pseudoconstants" "! lifecycle cksettingsbad"
@@ -244,13 +244,21 @@ for name in cksettingsbad_snake cksettingsbad_table cksettingsbad_callback; do
 done
 [ "${fail}" = 0 ] || tail -20 "${FIXTURE}"/lifecycle-*.log
 
-# 11) cksmarty on managed MessageTemplate bodies: core strips Civi tokens
-# before Smarty compiles, so a token is no Smarty error, an unclosed {if} is.
+# 11) cksmarty on managed bodies and rewrites: core replaces tokens before
+# Smarty compiles, so a token is no Smarty error, an unclosed {if} is.
 smarty() { docker exec -u www-data -w "/var/www/html/ext/$1" "${APP}" cksmarty > "${FIXTURE}/smarty-$1.log" 2>&1; }
 check "cksmarty passes a body with Civi tokens" "smarty ckmsgtplgood"
 check "cksmarty fails an unclosed {if}" "! smarty ckmsgtplbad"
 check "cksmarty names the broken body" "grep -q 'MessageTemplate MessageTemplate_ckmsgtplbad (msg_html)' '${FIXTURE}/smarty-ckmsgtplbad.log'"
 check "cksmarty passes the token-only subject" "! grep -q 'ckmsgtplbad (msg_subject)' '${FIXTURE}/smarty-ckmsgtplbad.log'"
+check "cksmarty passes rewrites with square tokens" "smarty cksearchgood"
+check "cksmarty fails a rewrite with an unclosed {if}" "! smarty cksearchbad"
+check "cksmarty names the broken rewrite" "grep -q 'SearchDisplay SearchDisplay_cksearchbad (column id)' '${FIXTURE}/smarty-cksearchbad.log'"
+check "cksmarty names the broken tally" "grep -q 'SearchDisplay SearchDisplay_cksearchbad (column display_name tally)' '${FIXTURE}/smarty-cksearchbad.log'"
+# Conditional punctuation arrived in core after the oldest catalog releases.
+if [ "$(cv ev 'echo (int) method_exists("Civi\\Token\\TokenCompatSubscriber", "renderConditionalPunctuation");' | tr -d '"')" = 1 ]; then
+    check "cksmarty passes a rewrite with conditional punctuation" "smarty cksearchpunct"
+fi
 [ "${fail}" = 0 ] || tail -20 "${FIXTURE}"/smarty-*.log
 
 # 12) A profile set with neither API users nor an AuthX policy, like the empty

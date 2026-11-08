@@ -16,6 +16,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Added
 
+- `cksmarty` also compiles the column and tally rewrites of the SearchDisplays an
+  extension installs through managed records.
 - `ckchangelog published` fails when a tagged version's section no longer
   reads as in its tag, and `scripts/release.sh` runs it before tagging: the
   release notes are cut from that text, so a late entry there never ships.
@@ -29,6 +31,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
   and a missing settings target now stops provisioning instead.
 - Buildkit images purge the `-dev` headers their PHP extensions were built
   with, as the standalone image does.
+- `cksmarty` no longer fails a MessageTemplate body with a bare token in an
+  `{if}`. A token now counts as populated while the body compiles.
 - Two entries missing from their release notes, written into a released
   section after its tag: since 1.36.0 a recreated app container no longer
   re-runs the `init.d` hooks against the kept database volume (setting
