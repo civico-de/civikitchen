@@ -26,6 +26,14 @@ jobs:
       run:
         working-directory: ${{ inputs.working_directory }}
     steps:
+      # Fork PRs run their own code in these jobs. A public caller resolving
+      # runs_on or CK_RUNS_ON to a self-hosted runner stops here, before checkout.
+      - name: Refuse a self-hosted runner for a public repository
+        if: runner.environment == 'self-hosted' && github.event.repository.visibility == 'public'
+        working-directory: .
+        run: |
+          echo "::error::public repository on a self-hosted runner: set runs_on and CK_RUNS_ON to a GitHub-hosted label" >&2
+          exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false

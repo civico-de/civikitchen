@@ -19,6 +19,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - `ckchangelog published` fails when a section of the last release no longer
   reads as in its tag, and `scripts/release.sh` runs it before tagging: the
   release notes are cut from that text, so a late entry there never ships.
+- `extension-ci.yml`, `frontend-ci.yml` and `command-check.yml` fail in their
+  first step when a public repository's job lands on a self-hosted runner.
 
 ### Fixed
 

@@ -72,7 +72,10 @@ runner needs these on the host; Node and Bun come from their setup actions:
 | `frontend-ci.yml`, `command-check.yml` | whatever the caller's commands run |
 
 Never attach a self-hosted runner to a public repository: a pull request from
-a fork runs its own code on it.
+a fork runs its own code on it. The workflows refuse it in their first step
+(`runner.environment` is `self-hosted` and the repository is public). This
+catches a misconfigured `runs_on` or `CK_RUNS_ON`, not a fork that rewrites
+the calling workflow, so the runner must still not be attached.
 
 ## Frontend CI
 
