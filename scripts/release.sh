@@ -32,6 +32,8 @@ ok "${tag} is free locally and on origin"
 
 toolbelt/bin/ckchangelog release "$version" >/dev/null || die "changelog gate failed"
 ok "changelog has a [${version}] section and an empty [Unreleased]"
+toolbelt/bin/ckchangelog published >/dev/null || die "a released changelog section changed after its tag"
+ok "every released changelog section reads as in its tag"
 scaffold/ck make test-ckinit >/dev/null || die "ckinit suite failed"
 ok "ckinit suite passed"
 

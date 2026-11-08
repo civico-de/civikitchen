@@ -166,4 +166,26 @@ sed -e 's/^## \[1\.1\.0\] - 2026-01-01$/## [1.2.0] - 2026-01-01/' \
     -e 's/^\[1\.2\.0\]:/[1.2.0-rc.1]:/' -e 's/^\[1\.1\.0\]:/[1.2.0]:/' "$valid" > "$rc"
 expect_fail "a pre-release does not sort above its release" "$rc" "out of descending order" lint
 
+# published: a tagged version keeps the section text its release notes were cut from.
+repo="$work/repo"
+mkdir "$repo"
+git -C "$repo" init -q
+git -C "$repo" config user.email test@example.org
+git -C "$repo" config user.name Test
+cp "$valid" "$repo/CHANGELOG.md"
+git -C "$repo" add CHANGELOG.md
+git -C "$repo" commit -q -m one
+git -C "$repo" tag v1.2.0
+published() { (cd "$repo" && "$check" published) >"$work/out" 2>&1; }
+published || { echo "expected pass: unchanged tagged sections" >&2; cat "$work/out" >&2; exit 1; }
+awk '{ print } /^- A thing\.$/ { print "- Slipped in after the release." }' "$valid" > "$repo/CHANGELOG.md"
+if published; then echo "expected failure: an entry added to a tagged section" >&2; exit 1; fi
+grep -q '\[1.2.0\] differs from its text in v1.2.0' "$work/out" || { echo "wrong message for: tagged section" >&2; cat "$work/out" >&2; exit 1; }
+git -C "$repo" checkout -q CHANGELOG.md
+git -C "$repo" tag v1.1.0 "$(git -C "$repo" commit-tree -m backfill "$(printf '100644 blob %s\tREADME\n' "$(echo x | git -C "$repo" hash-object -w --stdin)" | git -C "$repo" mktree)")"
+published || { echo "expected pass: a tag without a changelog leaves its section unchecked" >&2; cat "$work/out" >&2; exit 1; }
+if (cd "$work" && "$check" --file valid.md published) >"$work/out" 2>&1; then echo "expected failure: published outside a checkout" >&2; exit 1; fi
+grep -q 'needs a git checkout' "$work/out" || { echo "wrong message for: outside a checkout" >&2; cat "$work/out" >&2; exit 1; }
+expect_fail "published refuses an absolute --file" "$valid" "must be relative" published
+
 echo "ckchangelog: ok"

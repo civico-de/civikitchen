@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CiviKitchen\Toolbelt\Cli;
 
 use CiviKitchen\Toolbelt\Changelog\Changelog;
+use CiviKitchen\Toolbelt\Repository\Files;
 
 /** ckchangelog: the CHANGELOG.md grammar as a lint, a release gate and the release notes. */
 final class ChangelogCommand implements Command
@@ -22,8 +23,8 @@ final class ChangelogCommand implements Command
             echo $this->usage();
             return 0;
         }
-        if ($file === '' || !in_array($operation, ['lint', 'release', 'section'], true)
-            || count($arguments) !== ($operation === 'lint' ? 0 : 1)) {
+        if ($file === '' || !in_array($operation, ['lint', 'release', 'section', 'published'], true)
+            || count($arguments) !== (in_array($operation, ['lint', 'published'], true) ? 0 : 1)) {
             fwrite(STDERR, $this->usage());
             return 2;
         }
@@ -37,6 +38,9 @@ final class ChangelogCommand implements Command
             }
             echo $body, "\n";
             return 0;
+        }
+        if ($operation === 'published') {
+            return $this->published($changelog, $file);
         }
 
         $errors = $operation === 'release'
@@ -52,17 +56,53 @@ final class ChangelogCommand implements Command
         return 0;
     }
 
+    /** Each tagged version's section must read as it did in the tag: its release notes were cut from it. */
+    private function published(Changelog $changelog, string $file): int
+    {
+        if (str_starts_with($file, '/')) {
+            fwrite(STDERR, "ckchangelog: published reads the file from the tags, so --file must be relative\n");
+            return 2;
+        }
+        $git = new Files((string) getcwd());
+        if (!$git->isGitCheckout()) {
+            fwrite(STDERR, "ckchangelog: published needs a git checkout with its tags\n");
+            return 2;
+        }
+        $changed = [];
+        foreach ($changelog->versions() as $version) {
+            $tag = "v{$version}";
+            if ($git->git(['rev-parse', '-q', '--verify', "refs/tags/{$tag}"])['status'] !== 0) {
+                continue;
+            }
+            $shown = $git->git(['show', "{$tag}:./{$file}"]);
+            // A changelog written after the tag never carried this section into a release.
+            $then = $shown['status'] === 0 ? (new Changelog("{$tag}:{$file}", $shown['output']))->section($version) : null;
+            if ($then !== null && $then !== $changelog->section($version)) {
+                $changed[] = "{$file}: [{$version}] differs from its text in {$tag}; new entries belong under [Unreleased]";
+            }
+        }
+        if ($changed !== []) {
+            fwrite(STDERR, implode("\n", $changed) . "\n");
+            return 1;
+        }
+        echo "ckchangelog: every tagged section in {$file} is unchanged\n";
+        return 0;
+    }
+
     private function usage(): string
     {
         return <<<'TXT'
 usage: ckchangelog [--file <path>] lint
        ckchangelog [--file <path>] release <version>
        ckchangelog [--file <path>] section <version>
+       ckchangelog [--file <path>] published
 
   lint      CHANGELOG.md follows the grammar below
   release   lint, plus <version> has a section dated today or earlier and
             [Unreleased] is empty
   section   print <version>'s section body, the release notes
+  published every version with a v<version> tag has the section text it had
+            in that tag; a section the tag's changelog lacks is not checked
 
 Grammar (Keep a Changelog 1.1.0, nothing else is tolerated):
   <prose>                     free text before the first "## " heading

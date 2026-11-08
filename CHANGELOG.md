@@ -14,6 +14,20 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- `ckchangelog published` fails when a section of the last release no longer
+  reads as in its tag, and `scripts/release.sh` runs it before tagging: the
+  release notes are cut from that text, so a late entry there never ships.
+
+### Fixed
+
+- Two entries missing from their release notes, written into a released
+  section after its tag: since 1.36.0 a recreated app container no longer
+  re-runs the `init.d` hooks against the kept database volume (setting
+  `civikitchen_provisioned`), and since 1.30.0 the standalone image's first
+  boot has the buildkit healthcheck budget (`start-period=600s`, 18 retries).
+
 ## [1.57.2] - 2026-11-07
 
 ### Changed
@@ -1119,11 +1133,6 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Fixed
 
-- A recreated app container (image update, `docker compose up` after a compose
-  change) no longer re-runs the `init.d` hooks against the kept database
-  volume, which seeded it a second time. Their run is marked in the database
-  (setting `civikitchen_provisioned`); profile, locales and extensions are
-  still re-applied, and `docker compose down -v` still provisions afresh.
 - A job in `extension-ci.yml` is cancelled only by its own copy in a newer run
   of the same caller workflow on the same ref and image: the concurrency
   groups carry the caller's workflow name and the image, a matrix leg's
@@ -1656,11 +1665,6 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - A profile's registry extensions download under a 120 s `http_timeout`.
   Core bounds the whole archive transfer by that setting, 5 s by default, so a
   multi-MB release from a slow mirror failed the profile.
-
-- The standalone image's first boot gets the healthcheck budget the buildkit
-  images have (`start-period=600s`, 18 retries). A cold install plus enabling
-  extensions that seed demo data takes minutes and was reported unhealthy
-  after about five.
 
 ## [1.29.0] - 2026-09-29
 

@@ -144,6 +144,8 @@ else. ckinit seeds it; `ckchangelog --help` prints the grammar:
 
 `ckchangelog lint`, `ckchangelog release <v>` and `ckchangelog section <v>`
 run the same parser outside CI.
+`ckchangelog published` checks that every tagged version's section still
+reads as in its tag; a late entry belongs under `[Unreleased]`.
 
 ## Cutting one
 
