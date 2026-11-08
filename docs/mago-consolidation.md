@@ -148,11 +148,6 @@ The five compatibility gaps and the compile errors that only analyze reports
 go upstream as reports. A gap fixed there retires its part of the
 `civikitchen/php-compatibility` or `civikitchen/php-deprecation` rule.
 
-The 1.45 to 1.55 bump changes formatter output in two places. Wrapped boolean
-conditions now open and close on their own lines, and wrapped concatenations
-on the right of an assignment change too. Repos with such code fail
-`ckfmt --check` until one `ckfmt` run. The new output is phpcs-clean.
-
 ### 2. Replace phpcs with mago linter rules (done)
 
 `cklint` runs `php -l` and `mago lint` only. civicrm/coder and the CiviKitchen
