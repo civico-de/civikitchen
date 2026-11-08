@@ -741,16 +741,21 @@ ck_post_install_config() {
 
 # Keep core's status check from calling civicrm.org: without egress it stalls the
 # first admin page by 60 s. Only a boolean FALSE disables the extension feed; newer
-# cores take it from civicrm.settings.php only. `cv ext:*` sets its feed under the
-# same key before the file runs, so `??=` leaves it in place.
+# cores take it from settings files only. `cv ext:*` sets its feed under the same
+# key before the file runs, so `??=` leaves it in place.
 ck_no_phone_home() {
     local line="\$civicrm_setting['Extension Preferences']['ext_repo_url'] ??= FALSE;"
     ck_as_web cv api4 Job.update +w api_action=version_check +v is_active=0 >/dev/null
-    if [[ -f "${CK_SETTINGS_FILE}" ]]; then
+    if [[ -n "${CK_SETTINGS_D}" ]]; then
+        # civibuild requires these files inside a function, hence the global.
+        printf '<?php\nglobal $civicrm_setting;\n%s\n' "${line}" \
+            | ck_as_web tee "${CK_SETTINGS_D}/150-civikitchen-no-phone-home.php" >/dev/null
+    elif [[ -f "${CK_SETTINGS_FILE}" ]]; then
         grep -qxF "${line}" "${CK_SETTINGS_FILE}" \
             || printf '\n%s\n' "${line}" | ck_as_web tee -a "${CK_SETTINGS_FILE}" >/dev/null
     else
-        echo '{"ext_repo_url":false}' | ck_as_web cv setting:set --in=json >/dev/null
+        echo "[civikitchen] ERROR: no ${CK_SETTINGS_FILE} and no CK_SETTINGS_D to turn the extension feed off in" >&2
+        return 1
     fi
     echo "[civikitchen] civicrm.org calls off (version_check job inactive, ext_repo_url=false)."
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # First-boot provisioning turns off core's calls to civicrm.org: the
-# version_check job goes inactive and civicrm.settings.php sets ext_repo_url to
+# version_check job goes inactive and a settings file sets ext_repo_url to
 # boolean false (a string "false" or "" leaves the feed on). Fake cv records args.
 set -euo pipefail
 
@@ -51,12 +51,22 @@ ck_no_phone_home >/dev/null
 [[ "$(grep -c "ext_repo_url" "$CK_SETTINGS_FILE")" == 1 ]] || fail "a second run appends again: $(cat "$CK_SETTINGS_FILE")"
 [[ -f "$CK_PROVISIONED_MARKER" ]] || fail "provisioning did not complete"
 
-# Buildkit flavors have no Standalone settings file; their cores still take the API.
-/bin/rm "$CK_SETTINGS_FILE"
+# Buildkit: civibuild loads app/civicrm.settings.d/*.php, sorted by name, from
+# inside a function. Ours sorts before buildkit's own 210-ext-repo.php.
+export CK_SETTINGS_D="$work/settings.d"
+mkdir "$CK_SETTINGS_D"
 : > "$CV_LOG"
 ck_no_phone_home >/dev/null
-stdin="$(sed -n 's/^stdin: //p' "$CV_LOG")"
-php -r 'exit(json_decode($argv[1], true) === ["ext_repo_url" => false] ? 0 : 1);' "$stdin" \
-    || fail "without a settings file, ext_repo_url must go through the API as boolean false, got: ${stdin:-nothing}"
+CK_SETTINGS_FILE="$CK_SETTINGS_D/150-civikitchen-no-phone-home.php"
+grep -q 'setting:set' "$CV_LOG" && fail "buildkit must not set the feed through the API: $(cat "$CV_LOG")"
+[[ "$(php -r 'function load($f) { require $f; } $GLOBALS["civicrm_setting"] = []; load($argv[1]);
+        var_export($GLOBALS["civicrm_setting"]["Extension Preferences"]["ext_repo_url"] ?? NULL);' "$CK_SETTINGS_FILE")" == false ]] \
+    || fail "the settings.d file must set the global ext_repo_url to boolean false: $(cat "$CK_SETTINGS_FILE")"
+[[ "$(effective_feed "$feed")" == "'$feed'" ]] \
+    || fail "cv's own feed must survive the settings.d file, got $(effective_feed "$feed")"
+
+CK_SETTINGS_D="" CK_SETTINGS_FILE="$work/missing.php"
+if ck_no_phone_home 2>"$work/err"; then fail "no settings file and no settings.d must fail"; fi
+grep -q 'ERROR: no' "$work/err" || fail "wrong message: $(cat "$work/err")"
 
 echo "provision phone-home: ok"

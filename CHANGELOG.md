@@ -16,7 +16,7 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Added
 
-- `ckchangelog published` fails when a section of the last release no longer
+- `ckchangelog published` fails when a tagged version's section no longer
   reads as in its tag, and `scripts/release.sh` runs it before tagging: the
   release notes are cut from that text, so a late entry there never ships.
 - `extension-ci.yml`, `frontend-ci.yml` and `command-check.yml` fail in their
@@ -24,6 +24,11 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Fixed
 
+- Buildkit images turn the civicrm.org extension feed off through a
+  `civicrm.settings.d` file. The API path they took failed on current cores,
+  and a missing settings target now stops provisioning instead.
+- Buildkit images purge the `-dev` headers their PHP extensions were built
+  with, as the standalone image does.
 - Two entries missing from their release notes, written into a released
   section after its tag: since 1.36.0 a recreated app container no longer
   re-runs the `init.d` hooks against the kept database volume (setting

@@ -46,31 +46,41 @@ ARG DEBIAN_FRONTEND=noninteractive
 # - git/unzip/zip: composer source/dist installs
 # - rsync/patch/acl/bzip2/jq: civibuild and its site templates use these
 # - default-mysql-client: civibuild + entrypoint DB probe
-# - lib*-dev: headers needed by docker-php-ext-install for gd/intl/zip/soap
 # - nodejs: extensions with Angular/JS assets, and civicrm-buildkit's own
 #   civi-download-tools. 24.x is the current LTS line; npm is upgraded past
 #   what the distro package ships in install-dev-tools.sh (NPM_VERSION).
 # apt-get upgrade: security updates come from Debian at build time; the base
 # image ships none. The daily rebuild runs without cache, so they land.
+# PHP extensions, plus pcov (always on) and xdebug (installed, enabled by the
+# entrypoint when XDEBUG_MODE is set). Their -dev headers are purged in the
+# same layer, keeping the libraries the built .so files link against, as in
+# the standalone image; test-dev-tools.sh loads them.
 RUN apt-get update && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends \
         ca-certificates curl git unzip zip rsync patch acl bzip2 jq \
         default-mysql-client \
-        libpng-dev libjpeg-dev libfreetype6-dev \
-        libicu-dev libxml2-dev libzip-dev libonig-dev \
     && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
+    && savedAptMark="$(apt-mark showmanual)" \
+    && apt-get install -y --no-install-recommends \
+        libpng-dev libjpeg-dev libfreetype6-dev \
+        libicu-dev libxml2-dev libzip-dev \
     && docker-php-ext-configure gd --with-jpeg --with-freetype \
     && docker-php-ext-install -j"$(nproc)" \
         pdo_mysql mysqli gd intl zip bcmath soap opcache \
+    && pecl install pcov xdebug \
+    && docker-php-ext-enable pcov \
+    && rm -rf /tmp/pear \
+    && apt-mark auto '.*' > /dev/null \
+    && apt-mark manual $savedAptMark > /dev/null \
+    && find /usr/local/lib/php/extensions -type f -name '*.so' -exec ldd '{}' ';' \
+        | awk '/=>/ { so = $(NF-1); if (index(so, "/usr/local/") == 1) next; gsub("^/(usr/)?", "", so); print "*" so }' \
+        | sort -u | xargs -r dpkg-query --search | cut -d: -f1 | sort -u \
+        | xargs -r apt-mark manual > /dev/null \
+    && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
     && a2enmod rewrite ssl headers \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-
-# pcov: fast code-coverage driver (always on). xdebug: installed but disabled
-# — entrypoint enables it when XDEBUG_MODE is set. Same approach as standalone.
-RUN pecl install pcov xdebug \
-    && docker-php-ext-enable pcov
 
 # Shared dev-tools install (composer, civix, phpunit, phpstan, mago,
 # rector/ckmodernize, the ckdeps analyser).
