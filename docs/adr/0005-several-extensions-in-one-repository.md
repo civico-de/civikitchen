@@ -54,8 +54,8 @@ would hide each extension's inputs from them.
 
 Every push runs every extension's jobs. Path filters would save runner time,
 but they would let a change in the base extension skip the extensions that
-depend on it. On self-hosted runners we accept that cost. We measured about
-50 s to a healthy stack, with jobs running in parallel.
+depend on it. We accept that cost. We measured about 50 s to a healthy stack,
+with jobs running in parallel.
 
 A compose line is the one mechanism that works for a local
 `docker compose up` and in CI alike. The check turns a forgotten line from a

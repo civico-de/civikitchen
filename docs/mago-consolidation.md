@@ -7,7 +7,7 @@ and on real extension code. Where mago has no equivalent, the tool stays.
 
 The decision is recorded in
 [ADR-0017](adr/0017-php-quality-tools-consolidate-on-mago.md). The mago pin
-lives in `toolbelt/install-dev-tools.sh` and follows the newest mago release.
+is `CK_MAGO_VERSION` in `toolbelt/versions.env` and follows the newest mago release.
 
 ## Target state
 

@@ -410,8 +410,8 @@ A count afterwards found no orphans.
   - All 9,643 `receive_date` values moved by exactly 10 days with the time of
     day kept.
   - Every `modified_date` and `birth_date` moved by exactly 10 days as well.
-- `zstd` is in the MariaDB image but **not in the app image**. The app image
-  needs it for the store.
+- `zstd` was in the MariaDB image but not in the app image. The standalone
+  app image installs it since, for the store.
 
 ### Date shift: what the spike changed in the design
 

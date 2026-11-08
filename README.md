@@ -153,6 +153,7 @@ after their tests pass. Extensions pin the v1 release tags.
 | [Extension standards](docs/extension-standards.md) | What the gates enforce and why |
 | [Declarative scenarios](docs/scenarios.md) | civikitchen.yaml: policy and stack scenarios |
 | [Reusable workflows](docs/reusable-workflows.md) | Frontend CI, Playwright e2e, command checks |
+| [Seed snapshots](docs/seed-snapshots.md) | Seeding once, restoring the dump on every fresh boot, the date shift |
 | [Releasing an extension](docs/extension-releases.md) | ckrelease and the release workflow |
 | [Releases](docs/releases.md) | How civikitchen itself is versioned |
 | [Building locally](docs/building.md) | The test and lint loop, build arguments, tool pins, image tests |
