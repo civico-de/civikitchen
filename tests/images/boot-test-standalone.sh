@@ -253,6 +253,7 @@ check "cksmarty names the broken body" "grep -q 'MessageTemplate MessageTemplate
 check "cksmarty passes the token-only subject" "! grep -q 'ckmsgtplbad (msg_subject)' '${FIXTURE}/smarty-ckmsgtplbad.log'"
 check "cksmarty names a broken body file under managed/" "grep -q 'managed/Receipt.tpl:' '${FIXTURE}/smarty-ckmsgtplbad.log'"
 check "cksmarty rejects a token outside managed/" "grep -q 'templates/Page.tpl:' '${FIXTURE}/smarty-ckmsgtplbad.log'"
+check "cksmarty names a missing include target" "grep -q 'templates/Missing.tpl: include target does not exist: CRM/Ck/Missing.tpl' '${FIXTURE}/smarty-ckmsgtplbad.log'"
 check "cksmarty passes rewrites with square tokens" "smarty cksearchgood"
 check "cksmarty fails a rewrite with an unclosed {if}" "! smarty cksearchbad"
 check "cksmarty names the broken rewrite" "grep -q 'SearchDisplay SearchDisplay_cksearchbad (column id)' '${FIXTURE}/smarty-cksearchbad.log'"

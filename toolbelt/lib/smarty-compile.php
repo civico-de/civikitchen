@@ -82,6 +82,13 @@ $compile = function ($smarty, string $resource): ?string {
   }
 };
 
+// The compiler leaves a literal {include} unresolved until render, so a missing target compiles.
+$missingIncludes = static function ($smarty, string $source): array {
+  $source = preg_replace('/\{\*.*?\*\}|\{literal\}.*?\{\/literal\}/s', '', $source);
+  preg_match_all('/\{include\s[^}]*?\bfile=(["\'])([^"\'$`:]+)\1(?=[\s}])/', $source, $matches);
+  return array_values(array_filter(array_unique($matches[2]), static fn (string $target): bool => !$smarty->templateExists($target)));
+};
+
 $failures = [];
 
 // Both token layers run before Smarty. A token is assumed populated here: whether
@@ -141,6 +148,10 @@ else {
     if ($error !== NULL) {
       $failures[] = "$relative: $error";
       echo "  FAIL $relative\n";
+    }
+    foreach ($missingIncludes($smarty, file_get_contents($tpl)) as $target) {
+      $failures[] = "$relative: include target does not exist: $target";
+      echo "  FAIL $relative (include $target)\n";
     }
   }
 }

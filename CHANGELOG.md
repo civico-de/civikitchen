@@ -16,6 +16,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Added
 
+- `cksmarty` fails a `.tpl` whose literal `{include file="..."}` names a template
+  that does not exist, which compiling alone does not notice.
 - `cksmarty` also compiles the column and tally rewrites of the SearchDisplays an
   extension installs through managed records.
 - `ckchangelog published` fails when a tagged version's section no longer

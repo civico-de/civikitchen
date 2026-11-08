@@ -368,8 +368,10 @@ the normal ci job. Whether a template compiles depends on core's Smarty version
 and plugins, which no static check knows. Tokens count as populated, so a
 template that only breaks on an empty token passes. A .tpl under `managed/` is
 compiled after its tokens are replaced, since a .mgd.php reads it into a
-MessageTemplate; anywhere else a token is a syntax error. A repo with no .tpl
-passes with a log line.
+MessageTemplate; anywhere else a token is a syntax error. A literal
+`{include file="..."}` must name a template that exists in the booted stack, so
+an include from another extension needs that extension enabled there. A repo
+with no .tpl passes with a log line.
 
 A managed MessageTemplate the extension renders itself, without Smarty, is
 declared by its managed name with a reason:
