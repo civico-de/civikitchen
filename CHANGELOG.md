@@ -52,8 +52,9 @@ except that a break the consumers are adjusted for ships as a minor, marked
   `phpunit.xml.dist`, such as `tests/extensions/router-test/tests/phpunit`,
   from that directory with its config, headless and with `--e2e`. Before,
   core's root config left those suites without a database connection
-  ("No database name / dsn found anywhere"). The test path must come last and
-  exist; a missing one stops the run with a message.
+  ("No database name / dsn found anywhere"). The test path must come last; a
+  missing one (a word with `/` or ending in `.php`) stops the run with a
+  message, while options and their values (`--filter testX`) pass through.
 - `ckcoretest` on a core version without a git tag (an alpha) whose `tests/`
   is missing stops with a message that only git-source images carry such
   versions and that they ship `tests/`, instead of git's "Remote branch not

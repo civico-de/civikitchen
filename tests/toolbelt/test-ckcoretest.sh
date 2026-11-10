@@ -19,6 +19,11 @@ touch "$core/phpunit.xml.dist" "$router/phpunit.xml.dist" "$router/tests/phpunit
 echo '<?xml version="1.0"?><version><version_no>6.20.alpha1</version_no></version>' > "$core/xml/version.xml"
 cat > "$work/bin/phpunit" <<'FAKE'
 #!/usr/bin/env bash
+if [[ "${1:-}" == --help ]]; then
+  printf '  %s\n' '--filter <pattern>          Filter' '--log-junit <file>          Log' \
+    '-c|--configuration <file>   Read' '-d <key[=value]>            Sets' '--stop-on-failure           Stop'
+  exit 0
+fi
 printf 'dir=%s uf=%s args=%s\n' "$PWD" "${CIVICRM_UF:-}" "$*" > "$PHPUNIT_LOG"
 FAKE
 chmod +x "$work/bin/phpunit"
@@ -81,6 +86,27 @@ bash "$root/toolbelt/bin/ckcoretest" --filter testX tests/phpunit/CRM >/dev/null
 bash "$root/toolbelt/bin/ckcoretest" --filter testX tests/extensions/router-test/tests/phpunit/CRM/PageTest.php >/dev/null
 [[ "$(cat "$work/php.log" 2>/dev/null)" == "dir=$router uf=UnitTests args=-d sendmail_path=/bin/true -d variables_order=EGPCS $work/bin/phpunit --filter testX tests/phpunit/CRM/PageTest.php" ]] \
   || fail "a headless test file below its own phpunit.xml.dist must run from that directory: $(cat "$work/php.log" 2>/dev/null)"
+
+# PHPUnit options without a test path run core's default suite: the last word is no path.
+bash "$root/toolbelt/bin/ckcoretest" --filter testX >/dev/null
+[[ "$(cat "$work/php.log" 2>/dev/null)" == "dir=$core uf=UnitTests args=-d sendmail_path=/bin/true -d variables_order=EGPCS $work/bin/phpunit --filter testX" ]] \
+  || fail "an option value as the last word must reach phpunit unchanged: $(cat "$work/php.log" 2>/dev/null)"
+CIVICRM_UF=Standalone bash "$root/toolbelt/bin/ckcoretest" --e2e --stop-on-failure >/dev/null
+[[ "$(cat "$work/phpunit.log")" == "dir=$core uf=Standalone args=--group e2e --stop-on-failure" ]] \
+  || fail "an option as the last word must reach phpunit unchanged: $(cat "$work/phpunit.log")"
+# A value of an option that takes one is no test path, even when it looks like one or exists.
+CIVICRM_UF=Standalone bash "$root/toolbelt/bin/ckcoretest" --e2e --log-junit /nonexistent/junit.xml >/dev/null
+[[ "$(cat "$work/phpunit.log")" == "dir=$core uf=Standalone args=--group e2e --log-junit /nonexistent/junit.xml" ]] \
+  || fail "an option value that looks like a path must reach phpunit unchanged: $(cat "$work/phpunit.log")"
+CIVICRM_UF=Standalone bash "$root/toolbelt/bin/ckcoretest" --e2e --filter '/testFoo/' >/dev/null
+[[ "$(cat "$work/phpunit.log")" == "dir=$core uf=Standalone args=--group e2e --filter /testFoo/" ]] \
+  || fail "a --filter regex must reach phpunit unchanged: $(cat "$work/phpunit.log")"
+CIVICRM_UF=Standalone bash "$root/toolbelt/bin/ckcoretest" --e2e -c tests/extensions/router-test/phpunit.xml.dist >/dev/null
+[[ "$(cat "$work/phpunit.log")" == "dir=$core uf=Standalone args=--group e2e -c tests/extensions/router-test/phpunit.xml.dist" ]] \
+  || fail "an existing option value below a nested suite must not move the run: $(cat "$work/phpunit.log")"
+CIVICRM_UF=Standalone bash "$root/toolbelt/bin/ckcoretest" --e2e --stop-on-failure tests/extensions/router-test/tests/phpunit >/dev/null
+[[ "$(cat "$work/phpunit.log")" == "dir=$router uf=Standalone args=--group e2e --stop-on-failure tests/phpunit" ]] \
+  || fail "a test path after a flag without value must still run from its suite: $(cat "$work/phpunit.log")"
 
 /bin/rm -f "$work/php.log"
 if bash "$root/toolbelt/bin/ckcoretest" tests/phpunit/Nope >/dev/null 2>"$work/err"; then

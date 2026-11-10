@@ -146,9 +146,20 @@ fi
 cd "${run_dir}"
 # A suite with its own phpunit.xml.dist below core (tests/extensions/<name>) runs from
 # there: core's config boots only to settings level, so the test listener skips the boot.
+# The last word is the test path unless it is an option or the value of one; phpunit's
+# own help names the options that take a value (--filter <pattern>, -c|--configuration <file>).
+path=""
 if [ "${run_dir}" = "${CK_CORE_DIR}" ] && [ $# -gt 0 ]; then
-  path="${!#}"
-  [ -e "${path}" ] || ck_die "no test file or directory '${path}' in ${CK_CORE_DIR} (the test path goes last)"
+  last="${!#}"
+  prev=""
+  [ $# -gt 1 ] && prev="${*:$#-1:1}"
+  value_opts=" $(phpunit --help | sed -nE 's/^ +(-[a-zA-Z])?\|?(--[a-z0-9-]+)? <[^>]+>.*/\1 \2/p' | tr '\n' ' ') "
+  if [[ "${last}" != -* ]] && { [ -z "${prev}" ] || [[ "${value_opts}" != *" ${prev} "* ]]; }; then
+    path="${last}"
+    [ -e "${path}" ] || ck_die "no test file or directory '${path}' in ${CK_CORE_DIR} (the test path goes last)"
+  fi
+fi
+if [ -n "${path}" ]; then
   if [ -d "${path}" ]; then
     full=$(cd "${path}" && pwd -P)
     dir="${full}"
