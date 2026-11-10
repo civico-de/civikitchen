@@ -22,8 +22,11 @@ jobs:
     permissions:
       packages: write
     steps:
-      - uses: civico-de/ghcr-prune@389e65f1469e782b0a083644f871fbeae88a6701 # v1.0.0
+      - uses: civico-de/ghcr-prune@7274f640dc305f1a53b4bed712edcc98ff8fb063 # v2.0.0
         with:
+          packages: |
+            civikitchen
+            civikitchen-buildcache
           keep-newest: 1
           min-age-days: 2
           keep-tags: ^(?!.*-[0-9a-f]{40}(-(amd64|arm64))?$)
