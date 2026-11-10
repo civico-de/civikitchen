@@ -26,6 +26,12 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - `extension-ci.yml`, `frontend-ci.yml` and `command-check.yml` fail in their
   first step when a public repository's job lands on a self-hosted runner.
 
+### Changed
+
+- The weekly GHCR cleanup also deletes image versions no tag points at any
+  more, such as the build a moving tag like `:standalone-6.19` replaced. Pin a
+  tag, not a digest, or the digest disappears once no tag carries it.
+
 ### Fixed
 
 - `cksmarty` no longer fails a `.tpl` under `managed/` that holds Civi tokens.

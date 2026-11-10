@@ -1,18 +1,6 @@
-# Prune the sha-candidate tags the test-then-promote pipeline leaves behind.
-#
-# Every push creates per-sha candidate tags (…-<40-hex-sha> multi-arch index +
-# …-<sha>-amd64/-arm64 children) that the smoke tests run against; promote then
-# attaches the stable tags to the SAME digests. The candidates are dead weight
-# once a newer push has been promoted — but the most recent generation still
-# shares digests with the stable tags, so deletion must be reference-aware:
-#
-#   protected = every sha that appears on a version which ALSO carries a
-#               non-sha tag (i.e. the digests the stable tags point at)
-#   deleted   = versions whose tags are ALL sha-candidate tags of
-#               non-protected shas, older than 2 days (in-flight-run guard)
-#
-# Untagged versions are never touched (attestations / children referenced by
-# kept indexes). Runs weekly + on demand (dry_run input previews).
+# Weekly GHCR cleanup. Kept: every version with a stable (non-sha) tag, the newest build, and
+# everything younger than 2 days; the platform and attestation manifests of a kept index stay
+# with it. Pruned: superseded sha-candidate tags and the manifests nothing lists any more.
 name: Cleanup GHCR
 
 on:
@@ -25,26 +13,19 @@ on:
         type: boolean
         default: false
 
-# The prune job widens this to packages: write; nothing else needs a token.
 permissions:
   contents: read
 
 jobs:
-  prune-candidates:
+  prune:
     runs-on: ubuntu-24.04
     permissions:
       packages: write
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      PKG: civikitchen
-      DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
     steps:
-      - name: Checkout (for the prune script)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: civico-de/ghcr-prune@389e65f1469e782b0a083644f871fbeae88a6701 # v1.0.0
         with:
-          persist-credentials: false
-
-      - name: Prune stale sha-candidate versions
-        env:
-          OWNER: ${{ github.repository_owner }}
-        run: .github/scripts/prune-ghcr-candidates.sh
+          keep-newest: 1
+          min-age-days: 2
+          keep-tags: ^(?!.*-[0-9a-f]{40}(-(amd64|arm64))?$)
+          apply: ${{ !inputs.dry_run }}
+          max-delete: 500
