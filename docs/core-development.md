@@ -13,6 +13,17 @@ matching tag and caches the result in the container. Then it runs
 `CIVICRM_UF=UnitTests phpunit <args>` from the core directory. With
 `--ext <name>` it runs from that core extension's directory instead.
 
+The test path goes last. When it lies in a directory with its own
+`phpunit.xml.dist`, such as core's test extensions under
+`tests/extensions/<name>`, phpunit runs from that directory with its config
+and the path made relative to it. Core's root config boots CiviCRM only to
+the settings level, which leaves those suites without a database connection:
+`ckcoretest --e2e tests/extensions/router-test/tests/phpunit`.
+
+A core version without a git tag, such as an alpha from `master`, comes from
+a git-source image, which keeps its tests. `ckcoretest` has nothing to fetch
+for it and stops with a message if `tests/` is missing.
+
 It covers the headless PHP suites: api, CRM, Civi and the extensions. It
 refuses to run until `TEST_DB_DSN` is provisioned.
 

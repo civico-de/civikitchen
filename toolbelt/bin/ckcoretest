@@ -24,6 +24,11 @@
 #   ckcoretest --ext search_kit [phpunit args...]   # a core extension's suite
 #   ckcoretest --fetch-only            # just materialize tests/, run nothing
 #   ckcoretest --e2e --ext afform/mock tests/phpunit/E2E   # browser/e2e tests, see below
+#   ckcoretest --e2e tests/extensions/router-test/tests/phpunit
+#
+# Without --ext the test path goes last. A path inside a directory below core with its
+# own phpunit.xml.dist (tests/extensions/<name>, ext/<name>) runs from that directory,
+# so its config boots the system the way that suite expects.
 #
 # --e2e runs @group e2e tests against the dev site instead (CIVICRM_UF from the
 # image, no test DB): they install extensions into it and log in as ADMIN_USER.
@@ -44,6 +49,8 @@ ckcoretest - run CiviCRM core's PHPUnit suites against the installed core.
   ckcoretest --e2e [--ext <name>] [args]      @group e2e tests against the dev site
   ckcoretest --fetch-only                     fetch tests/ for the installed version
 
+The test path goes last. A path inside a directory with its own phpunit.xml.dist
+(tests/extensions/<name>, ext/<name>) runs from that directory with its config.
 Headless runs need the scratch test database (CIVIKITCHEN_TEST_DB=1).
 USAGE
   exit 0
@@ -67,6 +74,17 @@ marker="${CK_CORE_DIR}/tests/.ckcoretest-version"
 if [ -d "${CK_CORE_DIR}/tests/phpunit" ] && [ ! -f "${marker}" ]; then
   echo "[ckcoretest] ${CK_CORE_DIR}/tests already present (git checkout?) — not touching it"
 elif [ ! -f "${marker}" ] || [ "$(cat "${marker}")" != "${version}" ]; then
+  # Tarball images carry release versions only, and each has a tag; a version without
+  # one (an alpha) comes from a git-source image, which ships tests/ itself.
+  rc=0
+  git ls-remote --quiet --exit-code "${CK_CORE_REPO}" "refs/tags/${version}" >/dev/null || rc=$?
+  if [ "${rc}" = 2 ]; then
+    ck_die "core ${version} has no tag in ${CK_CORE_REPO}, so there are no tests to fetch for it." \
+      "Only release tarballs lack tests/; a git-source image (CIVICRM_SOURCE=git) ships them," \
+      "so restore ${CK_CORE_DIR}/tests from that build."
+  elif [ "${rc}" != 0 ]; then
+    ck_die "git ls-remote ${CK_CORE_REPO} failed (exit ${rc})"
+  fi
   echo "[ckcoretest] Fetching tests, phpunit config and seed SQL for core ${version}..."
   src=$(mktemp -d)
   trap 'rm -rf "${src}"' EXIT
@@ -126,6 +144,30 @@ if [ "${1:-}" = "--ext" ]; then
 fi
 
 cd "${run_dir}"
+# A suite with its own phpunit.xml.dist below core (tests/extensions/<name>) runs from
+# there: core's config boots only to settings level, so the test listener skips the boot.
+if [ "${run_dir}" = "${CK_CORE_DIR}" ] && [ $# -gt 0 ]; then
+  path="${!#}"
+  [ -e "${path}" ] || ck_die "no test file or directory '${path}' in ${CK_CORE_DIR} (the test path goes last)"
+  if [ -d "${path}" ]; then
+    full=$(cd "${path}" && pwd -P)
+    dir="${full}"
+  else
+    dir=$(cd "$(dirname "${path}")" && pwd -P)
+    full="${dir}/$(basename "${path}")"
+  fi
+  core_real=$(pwd -P)
+  while [ "${dir}" != "${core_real}" ] && [ "${dir}" != / ]; do
+    if [ -f "${dir}/phpunit.xml.dist" ]; then
+      rel="${full#"${dir}"}"
+      rel="${rel#/}"
+      set -- "${@:1:$#-1}" "${rel:-.}"
+      cd "${dir}"
+      break
+    fi
+    dir=$(dirname "${dir}")
+  done
+fi
 if [ "${e2e}" = 1 ]; then
   # As the web user: files the tests make the site write (afform's ang/ cache) must stay writable for it.
   if [ "$(id -u)" = 0 ]; then

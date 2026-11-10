@@ -251,7 +251,7 @@ test-provision: ## provision.sh: extension provisioning wiring, mounted extensio
 	bash tests/toolbelt/test-provision-site-port.sh
 	bash tests/toolbelt/test-test-db-boot.sh
 
-test-ckcoretest: ## ckcoretest --e2e runs only e2e tests against the dev site, as www-data; headless runs keep the test-DB gate and get core's startup ini
+test-ckcoretest: ## ckcoretest --e2e runs only e2e tests against the dev site, as www-data; headless runs keep the test-DB gate and get core's startup ini; a path below a nested phpunit.xml.dist runs from there; an untagged version stops the fetch
 	bash tests/toolbelt/test-ckcoretest.sh
 
 test-core-patches: ## Standalone core patches: applied once, contained ones skipped, stale or unlinked ones fail
