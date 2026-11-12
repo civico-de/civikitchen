@@ -16,6 +16,9 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Added
 
+- `ck ab <image A> <image B> -- <command>` runs one check on two CiviCRM
+  versions, each in a fresh Standalone stack, and lists the tests that pass on
+  A and fail on B ([Comparing two versions](docs/core-development.md#comparing-two-versions-ck-ab)).
 - `cksmarty` fails a `.tpl` whose literal `{include file="..."}` names a template
   that does not exist, which compiling alone does not notice.
 - `cksmarty` also compiles the column and tally rewrites of the SearchDisplays an

@@ -100,6 +100,36 @@ Run `cv flush` after each toggle, or the Angular and asset caches keep the old
 files. A change to composer dependencies, or to anything outside the mounted
 directory, needs a rebuilt image.
 
+## Comparing two versions: `ck ab`
+
+`ck ab` answers whether a check that passes on one CiviCRM version fails on
+another. It boots two Standalone stacks, runs the same command in both and
+compares the results. It runs on the host through `scaffold/ck`.
+
+```bash
+ck ab standalone standalone-beta -- ckcoretest --log-junit /tmp/ck-ab.xml tests/phpunit/api/v4/Query
+ck ab standalone-6.16 standalone-master --mount "$PWD:/var/www/html/ext/myext" -- cv api4 Contact.get
+```
+
+Each side is an image reference or a civikitchen tag
+([Tags and versions](images.md#tags-and-versions)). The command runs in each
+app container as `www-data`, from `/var/www/html`. `--mount <src>:<dst>` puts
+a host path into both containers; Docker must share it, so keep it under
+`$HOME` on colima and Docker Desktop.
+
+When the command writes a JUnit report to `/tmp/ck-ab.xml`, `ck ab` compares
+per test and lists four groups: pass on A and fail on B, fail on A and pass on
+B, fail on both, and ran on A but skipped or missing on B. The exit status is
+1 when the first group is not empty. Without a report it compares the two exit
+statuses, and 1 means the command passes on A and fails on B. A report on one
+side only, or one without test cases, is an error.
+
+The output names the CiviCRM version of each side, and for a git-built image
+the commits it holds. The daily tags move, so note those commits with a
+result. The compose files and both reports stay in the output directory
+(`--out`, default `./ck-ab-<A>-vs-<B>`); the stacks and their volumes are
+removed at the end unless `--keep` is given.
+
 ## Recording a change before and after: `ck demo`
 
 `ck demo` shows what a civicrm-core change does on screen. It boots a fresh
