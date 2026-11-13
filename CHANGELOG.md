@@ -14,6 +14,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.58.0] - 2026-11-13
+
 ### Added
 
 - `ck ab <image A> <image B> -- <command>` runs one check on two CiviCRM
@@ -2713,7 +2715,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.57.2...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.58.0...HEAD
+[1.58.0]: https://github.com/civico-de/civikitchen/compare/v1.57.2...v1.58.0
 [1.57.2]: https://github.com/civico-de/civikitchen/compare/v1.57.1...v1.57.2
 [1.57.1]: https://github.com/civico-de/civikitchen/compare/v1.57.0...v1.57.1
 [1.57.0]: https://github.com/civico-de/civikitchen/compare/v1.56.1...v1.57.0
