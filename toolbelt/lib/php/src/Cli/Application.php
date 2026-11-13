@@ -136,6 +136,9 @@ final class Application
         if ($command === 'ab') {
             return (new AbCommand($this->runner))->run($arguments);
         }
+        if ($command === 'run') {
+            return (new RunCommand($this->runner))->run($arguments);
+        }
         if ($command === 'demo') {
             return (new DemoCommand($this->checkoutRoot, $this->runner))->run($arguments);
         }
@@ -191,6 +194,7 @@ ck — CiviKitchen extension-development toolbelt
   ck test-reset [args]    reset the standalone scratch DB
   ck demo [args]          record a core change before and after (on the host: scaffold/ck)
   ck ab [args]            run one check on two CiviCRM versions and compare (on the host: scaffold/ck)
+  ck run [args]           run a command in a fresh Standalone stack of one version (on the host: scaffold/ck)
   ck playwright [args]    run a command with the project's Playwright in Docker (on the host: scaffold/ck)
 
 Use `ck <command> --help` for command-specific help.

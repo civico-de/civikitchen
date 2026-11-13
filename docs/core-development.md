@@ -100,6 +100,29 @@ Run `cv flush` after each toggle, or the Angular and asset caches keep the old
 files. A change to composer dependencies, or to anything outside the mounted
 directory, needs a rebuilt image.
 
+## One command on one version: `ck run`
+
+`ck run` boots a fresh Standalone stack from an image, runs one command in it
+and removes the stack with its volumes. It runs on the host through
+`scaffold/ck` and needs no compose file.
+
+```bash
+ck run standalone-master -- ckcoretest tests/phpunit/api/v4/Query
+ck run standalone-master --mount "$PWD/tests:/var/www/html/core/tests" -- ckcoretest tests/phpunit/CRM/Utils
+ck run standalone-6.16 --name bug-1234 --keep -- cv api4 Contact.get
+```
+
+The image is a civikitchen tag or a full image name. `--mount` puts a host
+path into the app container, such as a directory of a civicrm-core checkout
+over the image's copy; the path must lie under `$HOME`, the civikitchen
+checkout or the current git work tree. The command runs as www-data from
+`/var/www/html`, and its exit status is the status of `ck run`.
+
+The compose project is `ck-run-<tag>`, or the name given with `--name`; a
+second run on the same tag at the same time needs its own name. With `--keep`
+the stack stays up: `ck run` writes its compose file to the current directory
+and prints the commands to enter and to remove it.
+
 ## Comparing two versions: `ck ab`
 
 `ck ab` answers whether a check that passes on one CiviCRM version fails on

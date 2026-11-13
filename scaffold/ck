@@ -5,6 +5,7 @@
 #
 #   ck playwright npm run test:e2e     ck demo 12345 --page civicrm/admin/search
 #   ck ab standalone standalone-beta -- ckcoretest tests/phpunit/api/v4/Query
+#   ck run standalone-master -- ckcoretest tests/phpunit/api/v4/Query
 #   ck make test lint                  this checkout's make targets
 #
 # Every other ck command runs in the dev stack: ckx ck <command>.
@@ -13,10 +14,10 @@ set -euo pipefail
 die() { echo "ck: $*" >&2; exit 2; }
 
 case "${1:-}" in
-  playwright|demo|ab|make) ;;
-  -h|--help) sed -n '3,10s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"; exit 0 ;;
-  "") die "which command? ck playwright <command>, ck demo <change>, ck ab <A> <B> or ck make <target> (ck --help)" ;;
-  *) die "$1 runs in the dev stack: ckx ck $1 (here only playwright, demo, ab and make)" ;;
+  playwright|demo|ab|run|make) ;;
+  -h|--help) sed -n '3,11s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"; exit 0 ;;
+  "") die "which command? ck playwright <command>, ck demo <change>, ck ab <A> <B>, ck run <image> or ck make <target> (ck --help)" ;;
+  *) die "$1 runs in the dev stack: ckx ck $1 (here only playwright, demo, ab, run and make)" ;;
 esac
 command -v docker >/dev/null 2>&1 || die "docker is required"
 

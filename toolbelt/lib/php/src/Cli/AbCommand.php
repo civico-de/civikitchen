@@ -13,11 +13,6 @@ final class AbCommand implements Command
 {
     public const JUNIT = '/tmp/ck-ab.xml';
 
-    private const IMAGE = 'ghcr.io/civico-de/civikitchen:';
-    private const SOURCE_LOG = '/usr/local/share/civikitchen/civicrm-source.log';
-    // The images' start period plus every retry of their healthcheck.
-    private const BOOT_SECONDS = 900;
-
     private const USAGE = <<<'TXT'
 ck ab — run the same check on two CiviCRM versions and compare the results
 
@@ -39,8 +34,11 @@ Exit status 1: a test passes on A and fails on B, or without reports, the
 command passes on A and fails on B. Runs on the host through scaffold/ck.
 TXT;
 
+    private readonly StandaloneStack $stack;
+
     public function __construct(private readonly Runner $runner = new Runner())
     {
+        $this->stack = new StandaloneStack($runner);
     }
 
     public function run(array $arguments): int
@@ -53,7 +51,7 @@ TXT;
         if ($this->runner->which('docker') === null) {
             throw new RuntimeException('ab runs on the host and needs docker on PATH');
         }
-        $label = self::label($options['images']['A']) . '-vs-' . self::label($options['images']['B']);
+        $label = StandaloneStack::label($options['images']['A']) . '-vs-' . StandaloneStack::label($options['images']['B']);
         $out = $options['out'] ?? getcwd() . "/ck-ab-{$label}";
         if (!is_dir($out) && !mkdir($out, 0777, true) && !is_dir($out)) {
             throw new RuntimeException("cannot create {$out}");
@@ -64,18 +62,18 @@ TXT;
         $results = [];
         try {
             foreach ($options['images'] as $side => $image) {
-                $files[$side] = $this->prepare("ck-ab-{$label}-" . strtolower($side), $image, $options['mounts'], "{$out}/{$side}.compose.json");
+                $files[$side] = $this->stack->prepare("ck-ab-{$label}-" . strtolower($side), $image, $options['mounts'], "{$out}/{$side}.compose.json");
             }
             foreach ($files as $file) {
-                $this->up($file, false);
+                $this->stack->up($file, false);
             }
             foreach ($files as $side => $file) {
-                $this->up($file, true);
-                $results[$side] = ['image' => $options['images'][$side], 'core' => $this->core($file)];
+                $this->stack->up($file, true);
+                $results[$side] = ['image' => $options['images'][$side], 'core' => $this->stack->core($file)];
             }
             foreach ($files as $side => $file) {
                 echo "ck ab: {$side} ({$results[$side]['core']}): " . implode(' ', $options['command']) . "\n";
-                $results[$side]['status'] = $this->runner->passthrough([...self::exec($file), ...$options['command']]);
+                $results[$side]['status'] = $this->runner->passthrough([...StandaloneStack::exec($file), ...$options['command']]);
                 $results[$side]['junit'] = $this->fetchReport($file, "{$out}/{$side}.junit.xml");
             }
         } finally {
@@ -84,7 +82,7 @@ TXT;
                     echo "ck ab: kept {$side}: docker compose -f {$file} exec -u www-data app bash\n";
                     continue;
                 }
-                if ($this->runner->passthrough(['docker', 'compose', '-f', $file, 'down', '-v', '--remove-orphans']) !== 0) {
+                if (!$this->stack->down($file)) {
                     fwrite(STDERR, "ck ab: could not remove the stack of {$file}\n");
                     continue;
                 }
@@ -150,87 +148,6 @@ TXT;
         return $groups['regression'] === [] ? 0 : 1;
     }
 
-    /**
-     * Writes the compose file of one side; a project of that name must not exist yet.
-     *
-     * @param list<string> $mounts
-     */
-    private function prepare(string $project, string $image, array $mounts, string $file): string
-    {
-        $containers = $this->runner->capture(['docker', 'ps', '-a', '-q', '--filter', "label=com.docker.compose.project={$project}"]);
-        if ($containers['status'] !== 0) {
-            throw new RuntimeException("docker ps failed:\n" . $containers['output']);
-        }
-        if (trim($containers['output']) !== '') {
-            throw new RuntimeException("a stack named {$project} exists; remove it: docker compose -p {$project} down -v");
-        }
-        $config = [
-            'name' => $project,
-            'services' => [
-                'app' => [
-                    'image' => $image,
-                    'pull_policy' => 'missing',
-                    'depends_on' => ['db' => ['condition' => 'service_healthy']],
-                    'environment' => [
-                        'CIVICRM_AUTO_INSTALL' => '1',
-                        'CIVICRM_DB_HOST' => 'db',
-                        'CIVICRM_DB_NAME' => 'civicrm',
-                        'CIVICRM_DB_USER' => 'civicrm',
-                        'CIVICRM_DB_PASSWORD' => 'civicrm',
-                        // The headless test database is created as database root.
-                        'CIVICRM_DB_ROOT_PASSWORD' => 'root',
-                    ],
-                    'volumes' => $mounts,
-                ],
-                'db' => [
-                    'image' => 'mariadb:11.4',
-                    'environment' => [
-                        'MARIADB_ROOT_PASSWORD' => 'root',
-                        'MARIADB_DATABASE' => 'civicrm',
-                        'MARIADB_USER' => 'civicrm',
-                        'MARIADB_PASSWORD' => 'civicrm',
-                    ],
-                    'healthcheck' => [
-                        'test' => ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized'],
-                        'interval' => '5s',
-                        'timeout' => '5s',
-                        'retries' => 30,
-                    ],
-                ],
-            ],
-        ];
-        file_put_contents($file, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
-        return $file;
-    }
-
-    private function up(string $file, bool $wait): void
-    {
-        $command = ['docker', 'compose', '-f', $file, 'up', '-d'];
-        if ($wait) {
-            array_push($command, '--wait', '--wait-timeout', (string) self::BOOT_SECONDS);
-        }
-        if ($this->runner->passthrough($command) !== 0) {
-            // The run removes the stack on its way out, so its log goes into the error.
-            $log = $this->runner->capture(['docker', 'compose', '-f', $file, 'logs', '--no-color', '--tail', '40', 'app']);
-            throw new RuntimeException("the stack of {$file} did not boot. The end of its log:\n" . $log['output']);
-        }
-    }
-
-    /** The CiviCRM version, plus the commits a git-built image names. */
-    private function core(string $file): string
-    {
-        $version = $this->runner->captureSeparate([...self::exec($file), 'cv', 'ev', 'echo CRM_Utils_System::version();']);
-        if ($version['status'] !== 0) {
-            throw new RuntimeException("cv ev failed in the stack of {$file}:\n" . $version['stdout'] . $version['stderr']);
-        }
-        $core = 'CiviCRM ' . trim($version['stdout']);
-        $source = $this->runner->captureSeparate([...self::exec($file), 'cat', self::SOURCE_LOG]);
-        if ($source['status'] === 0 && trim($source['stdout']) !== '') {
-            $core .= ', ' . implode(', ', array_map('trim', explode("\n", trim($source['stdout']))));
-        }
-        return $core;
-    }
-
     /** Copies the side's JUnit report out of its container; null when the command wrote none. */
     private function fetchReport(string $file, string $target): ?string
     {
@@ -239,18 +156,6 @@ TXT;
         }
         $copy = $this->runner->capture(['docker', 'compose', '-f', $file, 'cp', 'app:' . self::JUNIT, $target]);
         return $copy['status'] === 0 && is_file($target) ? $target : null;
-    }
-
-    /** @return non-empty-list<string> */
-    private static function exec(string $file): array
-    {
-        return ['docker', 'compose', '-f', $file, 'exec', '-T', '-u', 'www-data', '-w', '/var/www/html', 'app'];
-    }
-
-    private static function label(string $image): string
-    {
-        $tag = substr($image, (int) strrpos($image, ':') + 1);
-        return trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower($tag)), '-');
     }
 
     /**
@@ -276,7 +181,7 @@ TXT;
                 continue;
             }
             if (!str_starts_with($argument, '--')) {
-                $images[] = preg_match('#[:/]#', $argument) === 1 ? $argument : self::IMAGE . $argument;
+                $images[] = StandaloneStack::image($argument);
                 continue;
             }
             $value = array_shift($arguments);
@@ -284,10 +189,7 @@ TXT;
                 throw new RuntimeException("{$argument} needs a value");
             }
             if ($argument === '--mount') {
-                if (preg_match('#^/[^:]*:/[^:]+$#', $value) !== 1) {
-                    throw new RuntimeException("--mount takes <absolute host path>:<container path>, not {$value}");
-                }
-                $mounts[] = $value;
+                $mounts[] = StandaloneStack::mount($value);
             } elseif ($argument === '--out') {
                 $out = $value;
             } else {
