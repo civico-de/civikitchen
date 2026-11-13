@@ -21,6 +21,7 @@ final class RunTest extends TestCase
         self::assertSame('ck-run-standalone-master', $runner->config['name']);
         self::assertSame(self::IMAGE . 'standalone-master', $runner->config['services']['app']['image']);
         self::assertSame(['/src/core/tests:/var/www/html/core/tests'], $runner->config['services']['app']['volumes']);
+        self::assertArrayNotHasKey('CIVIKITCHEN_LOCALES', $runner->config['services']['app']['environment']);
         self::assertSame(['exec', '-T', '-u', 'www-data', '-w', '/var/www/html', 'app', 'ckcoretest', 'tests/phpunit/api/v4/Query'], $runner->ran);
         self::assertStringContainsString('standalone-master (CiviCRM 6.18.alpha1, civicrm-core master abc1234): ckcoretest', $output);
         self::assertTrue($runner->removed);
@@ -42,6 +43,15 @@ final class RunTest extends TestCase
         unlink($file);
         self::assertStringContainsString("docker compose -f {$file} exec -u www-data app bash", $output);
         self::assertStringContainsString("docker compose -f {$file} down -v", $output);
+    }
+
+    public function testLocalesReachTheAppContainer(): void
+    {
+        $runner = new RunRunner();
+
+        $this->runCommand($runner, ['standalone-master', '--locales', 'it_IT,fr_CA', '--', 'true']);
+
+        self::assertSame('it_IT,fr_CA', $runner->config['services']['app']['environment']['CIVIKITCHEN_LOCALES']);
     }
 
     public function testAStackThatCannotBeRemovedIsNamedByProject(): void
@@ -89,6 +99,8 @@ final class RunTest extends TestCase
             '--mount takes' => ['standalone', '--mount', 'relative:/x', '--', 'true'],
             '--name takes' => ['standalone', '--name', 'Bug 1', '--', 'true'],
             '--name needs a value' => ['standalone', '--name', '--', 'true'],
+            '--locales takes' => ['standalone', '--locales', 'it_IT, fr_FR', '--', 'true'],
+            '--locales needs a value' => ['standalone', '--locales', '--', 'true'],
             'unknown option --out' => ['standalone', '--out', '/x', '--', 'true'],
         ];
         foreach ($cases as $message => $arguments) {

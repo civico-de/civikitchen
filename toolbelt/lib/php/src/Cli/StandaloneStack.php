@@ -40,12 +40,21 @@ final class StandaloneStack
         return $value;
     }
 
+    /** A comma-separated list of CiviCRM locales, as CIVIKITCHEN_LOCALES takes it. */
+    public static function locales(string $value): string
+    {
+        if (preg_match('/^[a-z]{2,3}_[A-Z]{2}(,[a-z]{2,3}_[A-Z]{2})*$/', $value) !== 1) {
+            throw new RuntimeException("--locales takes CiviCRM locales separated by commas, e.g. it_IT,fr_FR, not {$value}");
+        }
+        return $value;
+    }
+
     /**
      * Writes the compose file; a project of that name must not exist yet.
      *
      * @param list<string> $mounts
      */
-    public function prepare(string $project, string $image, array $mounts, string $file): string
+    public function prepare(string $project, string $image, array $mounts, ?string $locales, string $file): string
     {
         $containers = $this->runner->capture(['docker', 'ps', '-a', '-q', '--filter', "label=com.docker.compose.project={$project}"]);
         if ($containers['status'] !== 0) {
@@ -89,6 +98,9 @@ final class StandaloneStack
                 ],
             ],
         ];
+        if ($locales !== null) {
+            $config['services']['app']['environment']['CIVIKITCHEN_LOCALES'] = $locales;
+        }
         file_put_contents($file, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
         return $file;
     }

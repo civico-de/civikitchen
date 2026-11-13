@@ -36,7 +36,7 @@ final class AbTest extends TestCase
         ];
         $runner->status = ['a' => 1, 'b' => 1];
 
-        [$status, $output] = $this->ab($runner, ['standalone-6.16', 'standalone-beta', '--mount', '/src/myext:/var/www/html/ext/myext', '--out', $this->out, ...self::CHECK]);
+        [$status, $output] = $this->ab($runner, ['standalone-6.16', 'standalone-beta', '--mount', '/src/myext:/var/www/html/ext/myext', '--locales', 'it_IT', '--out', $this->out, ...self::CHECK]);
 
         self::assertSame(1, $status);
         self::assertStringContainsString("pass on A, fail on B: 1\n  QueryTest::testJoin\n", $output);
@@ -51,6 +51,7 @@ final class AbTest extends TestCase
         $b = $runner->configs['ck-ab-standalone-6-16-vs-standalone-beta-b']['services']['app'];
         self::assertSame(self::IMAGE . 'standalone-beta', $b['image']);
         self::assertSame(['/src/myext:/var/www/html/ext/myext'], $b['volumes']);
+        self::assertSame('it_IT', $b['environment']['CIVIKITCHEN_LOCALES']);
         self::assertSame($runner->configs['ck-ab-standalone-6-16-vs-standalone-beta-a']['services']['db'], $runner->configs['ck-ab-standalone-6-16-vs-standalone-beta-b']['services']['db']);
         // Both stacks are gone, the reports stay.
         self::assertSame(['a', 'b'], $runner->removed);
@@ -148,6 +149,7 @@ final class AbTest extends TestCase
             [['standalone', '--', 'true'], 'two images, got 1'],
             [['standalone', 'standalone', '--', 'true'], 'nothing to compare'],
             [['standalone', 'standalone-beta', '--mount', 'ext:/var/www', '--', 'true'], '--mount takes'],
+            [['standalone', 'standalone-beta', '--locales', 'it', '--', 'true'], '--locales takes'],
             [['standalone', 'standalone-beta', '--cms', 'all', '--', 'true'], 'unknown option --cms'],
             [['standalone', 'standalone-beta', '--out', '--', 'true'], '--out needs a value'],
         ];

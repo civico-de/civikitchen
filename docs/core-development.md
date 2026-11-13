@@ -127,6 +127,12 @@ over the image's copy; the path must lie under `$HOME`, the civikitchen
 checkout or the current git work tree. The command runs as www-data from
 `/var/www/html`, and its exit status is the status of `ck run`.
 
+The images carry no core language files, so CiviCRM offers only en_US.
+`--locales de_DE,es_MX,fr_CA,fr_FR,it_IT,nl_NL` installs those at boot, as
+`CIVIKITCHEN_LOCALES` does ([Configuration](configuration.md)); core's
+`@group locale` tests use these. The image has only the C and POSIX system
+locales, so `CRM_Core_I18n_LocaleTest::testInsertTurkish` (`tr_TR.utf8`) fails.
+
 The compose project is `ck-run-<tag>`, or the name given with `--name`; a
 second run on the same tag at the same time needs its own name. With `--keep`
 the stack stays up: `ck run` writes its compose file to the current directory
@@ -147,7 +153,8 @@ Each side is an image reference or a civikitchen tag
 ([Tags and versions](images.md#tags-and-versions)). The command runs in each
 app container as `www-data`, from `/var/www/html`. `--mount <src>:<dst>` puts
 a host path into both containers; Docker must share it, so keep it under
-`$HOME` on colima and Docker Desktop.
+`$HOME` on colima and Docker Desktop. `--locales` installs core language files
+in both, as with `ck run`.
 
 When the command writes a JUnit report to `/tmp/ck-ab.xml`, `ck ab` compares
 per test and lists four groups: pass on A and fail on B, fail on A and pass on

@@ -22,6 +22,8 @@ ck ab — run the same check on two CiviCRM versions and compare the results
                        standalone, standalone-beta or standalone-master
   --mount <src>:<dst>  mount a host path into both app containers (repeatable),
                        e.g. an extension: --mount "$PWD:/var/www/html/ext/myext"
+  --locales <list>     install these core language files in both, e.g. it_IT,fr_FR
+                       (sets CIVIKITCHEN_LOCALES; default: en_US only)
   --out <dir>          for the compose files and JUnit reports (default: ./ck-ab-<A>-vs-<B>)
   --keep               leave both stacks running
 
@@ -62,7 +64,7 @@ TXT;
         $results = [];
         try {
             foreach ($options['images'] as $side => $image) {
-                $files[$side] = $this->stack->prepare("ck-ab-{$label}-" . strtolower($side), $image, $options['mounts'], "{$out}/{$side}.compose.json");
+                $files[$side] = $this->stack->prepare("ck-ab-{$label}-" . strtolower($side), $image, $options['mounts'], $options['locales'], "{$out}/{$side}.compose.json");
             }
             foreach ($files as $file) {
                 $this->stack->up($file, false);
@@ -160,7 +162,7 @@ TXT;
 
     /**
      * @param list<string> $arguments
-     * @return array{images: array{A: string, B: string}, mounts: list<string>, out: ?string, keep: bool, command: non-empty-list<string>}
+     * @return array{images: array{A: string, B: string}, mounts: list<string>, locales: ?string, out: ?string, keep: bool, command: non-empty-list<string>}
      */
     private function parse(array $arguments): array
     {
@@ -172,6 +174,7 @@ TXT;
         $arguments = array_slice($arguments, 0, (int) $separator);
         $images = [];
         $mounts = [];
+        $locales = null;
         $out = null;
         $keep = false;
         while ($arguments !== []) {
@@ -190,6 +193,8 @@ TXT;
             }
             if ($argument === '--mount') {
                 $mounts[] = StandaloneStack::mount($value);
+            } elseif ($argument === '--locales') {
+                $locales = StandaloneStack::locales($value);
             } elseif ($argument === '--out') {
                 $out = $value;
             } else {
@@ -202,6 +207,6 @@ TXT;
         if ($images[0] === $images[1]) {
             throw new RuntimeException("both sides are {$images[0]}; nothing to compare");
         }
-        return ['images' => ['A' => $images[0], 'B' => $images[1]], 'mounts' => $mounts, 'out' => $out, 'keep' => $keep, 'command' => $command];
+        return ['images' => ['A' => $images[0], 'B' => $images[1]], 'mounts' => $mounts, 'locales' => $locales, 'out' => $out, 'keep' => $keep, 'command' => $command];
     }
 }

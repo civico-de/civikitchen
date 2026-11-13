@@ -14,6 +14,11 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- `ck run` and `ck ab` take `--locales <list>`, which sets `CIVIKITCHEN_LOCALES` in
+  the stacks they boot, so core tests in `@group locale` can run.
+
 ## [1.58.0] - 2026-11-13
 
 ### Added

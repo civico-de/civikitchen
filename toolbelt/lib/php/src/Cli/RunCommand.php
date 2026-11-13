@@ -19,6 +19,8 @@ ck run — run a command in a fresh Standalone stack of one CiviCRM version
                        standalone, standalone-beta or standalone-master
   --mount <src>:<dst>  mount a host path into the app container (repeatable), e.g. a
                        directory of a civicrm-core checkout over /var/www/html/core/<dir>
+  --locales <list>     install these core language files, e.g. it_IT,fr_FR
+                       (sets CIVIKITCHEN_LOCALES; default: en_US only)
   --name <project>     compose project name (default: ck-run-<tag>)
   --keep               leave the stack running; its compose file is written to the
                        current directory
@@ -51,7 +53,7 @@ TXT;
         $project = $options['name'] ?? 'ck-run-' . StandaloneStack::label($options['image']);
         // A kept stack is entered and removed through its compose file, so that one stays with the caller.
         $directory = $options['keep'] ? (string) getcwd() : sys_get_temp_dir();
-        $file = $this->stack->prepare($project, $options['image'], $options['mounts'], "{$directory}/{$project}.compose.json");
+        $file = $this->stack->prepare($project, $options['image'], $options['mounts'], $options['locales'], "{$directory}/{$project}.compose.json");
         try {
             $this->stack->up($file, true);
             echo "ck run: {$options['image']} ({$this->stack->core($file)}): " . implode(' ', $options['command']) . "\n";
@@ -72,7 +74,7 @@ TXT;
 
     /**
      * @param list<string> $arguments
-     * @return array{image: string, mounts: list<string>, name: ?string, keep: bool, command: non-empty-list<string>}
+     * @return array{image: string, mounts: list<string>, locales: ?string, name: ?string, keep: bool, command: non-empty-list<string>}
      */
     private function parse(array $arguments): array
     {
@@ -84,6 +86,7 @@ TXT;
         $arguments = array_slice($arguments, 0, (int) $separator);
         $images = [];
         $mounts = [];
+        $locales = null;
         $name = null;
         $keep = false;
         while ($arguments !== []) {
@@ -102,6 +105,8 @@ TXT;
             }
             if ($argument === '--mount') {
                 $mounts[] = StandaloneStack::mount($value);
+            } elseif ($argument === '--locales') {
+                $locales = StandaloneStack::locales($value);
             } elseif ($argument === '--name') {
                 if (preg_match('/^[a-z0-9][a-z0-9_-]*$/', $value) !== 1) {
                     throw new RuntimeException("--name takes lowercase letters, digits, - and _, not {$value}");
@@ -114,6 +119,6 @@ TXT;
         if (count($images) !== 1) {
             throw new RuntimeException('run takes one image, got ' . count($images) . "\n" . self::USAGE);
         }
-        return ['image' => $images[0], 'mounts' => $mounts, 'name' => $name, 'keep' => $keep, 'command' => $command];
+        return ['image' => $images[0], 'mounts' => $mounts, 'locales' => $locales, 'name' => $name, 'keep' => $keep, 'command' => $command];
     }
 }
