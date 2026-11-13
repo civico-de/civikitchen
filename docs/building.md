@@ -1,7 +1,7 @@
 # Building locally
 
 Every step on this page is a make target, and make runs in the toolchain
-container that `scaffold/ck` builds from `scaffold/ck.Dockerfile`, with PHP,
+container that `scaffold/ck` builds from `docker/cli/Dockerfile` (target `toolchain`), with PHP,
 GNU Make, bash, git, jq and the docker CLI. `scaffold/ck make help` lists the
 targets. The fast loop:
 
@@ -35,7 +35,24 @@ gates need into `.cache/`. `scaffold/ck make clean` removes it.
 
 The host needs bash and Docker. `scaffold/ck` mounts `$HOME`, the checkout and
 the Docker socket at their own paths, so on macOS the checkout has to live
-under `$HOME`, which colima and Docker Desktop share with their VM.
+under `$HOME`, which colima and Docker Desktop share with their VM. The
+container starts as root with `CK_USER=<uid>:<gid>`; its entrypoint drops to
+that user plus the Docker socket's group, so files it writes belong to you.
+
+## ck without a checkout
+
+`ghcr.io/civico-de/civikitchen-cli` (target `cli` of the same Dockerfile)
+carries ck's host commands — `playwright`, `demo`, `ab` and `run` — and needs
+no civikitchen checkout. Run it from a directory below `$HOME`:
+
+```bash
+docker run --rm -it --init --network host -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME:$HOME" -w "$PWD" -e HOME=/tmp -e CK_USER="$(id -u):$(id -g)" ghcr.io/civico-de/civikitchen-cli:v1 run standalone-master -- php -v
+```
+
+Everything after the image name is a ck command line. `:latest` follows main,
+`:v1` and `:vX.Y.Z` follow the releases. Without `CK_USER` the command runs as
+the user the container was started as; a missing socket or a malformed
+`CK_USER` stops it.
 
 The slow loop builds and boots images: `build` builds the standalone image as
 `civikitchen:standalone`, and `test-images`, `e2e`, `docs-a11y` and

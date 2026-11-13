@@ -16,6 +16,7 @@ printf '%s\n' "$*" >> "$FAKE_DOCKER_LOG"
 case "$1 $2" in
   "image inspect") [[ -z "${FAKE_IMAGE_MISSING:-}" || "$3" != civikitchen-ck:* ]] ;;
   "run --rm")
+    # ck playwright's probe of the socket's group.
     if [[ " $* " == *" --entrypoint stat "* ]]; then echo 991; exit 0; fi
     # The wrapper's container: run its command here, where every mount sits at its own path.
     for ((i = 1; i <= $#; i++)); do
@@ -38,16 +39,17 @@ test ! -e "$FAKE_DOCKER_LOG" || fail "a refused command reached Docker"
 mkdir -p "$work/home" "$work/tree/.git" "$work/tree/e2e"
 printf '{}\n' > "$work/tree/e2e/package.json"
 printf '{}\n' > "$work/tree/e2e/package-lock.json"
-(cd "$work/tree/e2e" && HOME="$work/home" FAKE_IMAGE_MISSING=1 CK_PROBE=1 DOCKER_HOST=tcp://elsewhere:2375 \
+(cd "$work/tree/e2e" && HOME="$work/home" FAKE_IMAGE_MISSING=1 CK_USER=0:0 CK_PROBE=1 DOCKER_HOST=tcp://elsewhere:2375 \
   LANG=C.UTF-8 LC_ALL=C.UTF-8 "$root/scaffold/ck" playwright npm run test:e2e) > /dev/null
 log="$(cat "$FAKE_DOCKER_LOG")"
-[[ "$log" == *"build -t civikitchen-ck:"* ]] || fail "a missing image is not built"
+[[ "$log" == *"build --target toolchain -f $root/docker/cli/Dockerfile -t civikitchen-ck:"*" $root"* ]] \
+  || fail "a missing image is not built: $log"
 wrapper="$(grep -E '^run .* civikitchen-ck:' "$FAKE_DOCKER_LOG" | grep -vF -- '--entrypoint stat')"
 for expected in "-v $work/home:$work/home" "-v $root:$root" "-v $work/tree:$work/tree" "-w $work/tree/e2e" \
-    "--group-add 991" "-e HOME=/tmp" "-e CK_PROBE" "php $root/toolbelt/bin/ck playwright npm run test:e2e"; do
+    "-e CK_USER=$(id -u):$(id -g)" "-e HOME=/tmp" "-e CK_PROBE" "php $root/toolbelt/bin/ck playwright npm run test:e2e"; do
   [[ "$wrapper" == *" $expected"* ]] || fail "the container lacks '$expected': $wrapper"
 done
-for unexpected in "-e PATH" "-e DOCKER_HOST" "-e LANG" "-e LC_ALL" "-t"; do
+for unexpected in "-u" "--group-add" "-e CK_USER" "-e PATH" "-e DOCKER_HOST" "-e LANG" "-e LC_ALL" "-t"; do
   [[ "$wrapper " != *" $unexpected "* ]] || fail "the container gets '$unexpected': $wrapper"
 done
 grep -qE "^run .* -v $work/tree:$work/tree .*civikitchen-playwright:[0-9a-f]{12} npm run test:e2e$" "$FAKE_DOCKER_LOG" \
@@ -71,7 +73,8 @@ grep -qE "^run .* -w $root .*civikitchen-ck:[0-9]+ make test lint$" "$FAKE_DOCKE
 
 # One docker CLI for both images.
 cli() { sed -n 's/^FROM \(docker:[^ ]*-cli\).*/\1/p' "$1"; }
-[ "$(cli "$root/scaffold/ck.Dockerfile")" = "$(cli "$root/toolbelt/playwright/Dockerfile")" ] \
-  || fail "scaffold/ck.Dockerfile and toolbelt/playwright/Dockerfile pin different docker CLIs"
+[ -n "$(cli "$root/docker/cli/Dockerfile")" ] || fail "docker/cli/Dockerfile pins no docker CLI"
+[ "$(cli "$root/docker/cli/Dockerfile")" = "$(cli "$root/toolbelt/playwright/Dockerfile")" ] \
+  || fail "docker/cli/Dockerfile and toolbelt/playwright/Dockerfile pin different docker CLIs"
 
 echo "ck wrapper: ok"

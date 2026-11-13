@@ -21,6 +21,12 @@ jobs:
     uses: ./.github/workflows/scan-images.yml
     with:
       tags: '["b"]'
+  scan-a-other-package:
+    needs: merge-a
+    uses: ./.github/workflows/scan-images.yml
+    with:
+      package: civikitchen-cli
+      tags: '["a"]'
   scan-unrelated:
     needs: merge-a
     uses: ./.github/workflows/scan-images.yml
@@ -107,4 +113,14 @@ jobs:
     steps:
       - env:
           DIGEST: ${{ fromJSON(needs.scan-a.outputs.digests)[matrix.tag] }}
+        run: promote-digest.sh a
+  promote-other-package:
+    needs: [test-a, scan-a-other-package]
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        tag: [a]
+    steps:
+      - env:
+          DIGEST: ${{ fromJSON(needs.scan-a-other-package.outputs.digests)[matrix.tag] }}
         run: promote-digest.sh a

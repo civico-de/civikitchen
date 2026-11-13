@@ -166,6 +166,13 @@ docker run -d -p 8080:80 -e CIVIKITCHEN_SITE_URL=http://localhost:8080 \
 On Joomla (see [Joomla](#joomla)) authx password and basic auth do not work;
 use the api_key credential as a bearer token in the X-Civi-Auth header.
 
+## CLI image
+
+`ghcr.io/civico-de/civikitchen-cli` holds no CiviCRM. It carries ck's host
+commands (`run`, `ab`, `demo`, `playwright`) and the docker CLI, and starts
+the stacks from the images above through the host's Docker socket.
+[ck without a checkout](building.md#ck-without-a-checkout) has the command.
+
 ## Profiles (`CIVIKITCHEN_PROFILE`)
 
 A profile adds a curated extension stack, configuration, seed data and API

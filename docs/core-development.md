@@ -113,7 +113,9 @@ directory, needs a rebuilt image.
 
 `ck run` boots a fresh Standalone stack from an image, runs one command in it
 and removes the stack with its volumes. It runs on the host through
-`scaffold/ck` and needs no compose file.
+`scaffold/ck` and needs no compose file. Without a civikitchen checkout the
+[civikitchen-cli image](building.md#ck-without-a-checkout) runs the same
+`ck run`, `ck ab` and `ck demo` command lines.
 
 ```bash
 ck run standalone-master -- ckcoretest tests/phpunit/api/v4/Query

@@ -30,10 +30,19 @@ final class Recorder
      */
     public function record(string $image, string $outDirectory, string $name, array $script, ?string $steps): array
     {
+        // Docker resolves the mount on its own side, which shares $outDirectory but not necessarily this file.
+        $recordScript = tempnam($outDirectory, '.ck-record-');
+        if ($recordScript === false || realpath(dirname($recordScript)) !== realpath($outDirectory)) {
+            throw new RuntimeException("cannot create a file in {$outDirectory}");
+        }
+        if (!copy($this->checkoutRoot . '/toolbelt/demo/record.mts', $recordScript)) {
+            unlink($recordScript);
+            throw new RuntimeException("cannot write {$recordScript}");
+        }
         $command = [
             'docker', 'run', '--rm', '--init', '--network', 'host', '--shm-size', '2g',
             '--user', posix_getuid() . ':' . posix_getgid(), '-e', 'HOME=/tmp',
-            '-v', $this->checkoutRoot . '/toolbelt/demo/record.mts:/ck-demo/record.mts:ro',
+            '-v', $recordScript . ':/ck-demo/record.mts:ro',
             '-v', $outDirectory . ':/out',
         ];
         $script['out'] = "/out/{$name}.webm";
@@ -47,7 +56,11 @@ final class Recorder
         if (is_file($video)) {
             unlink($video);
         }
-        $result = $this->runner->captureStdout($command);
+        try {
+            $result = $this->runner->captureStdout($command);
+        } finally {
+            unlink($recordScript);
+        }
         $lines = array_values(array_filter(explode("\n", trim($result['output'])), 'strlen'));
         $report = json_decode($lines === [] ? '' : $lines[count($lines) - 1], true);
         if ($result['status'] !== 0 || !is_array($report) || !is_array($report['errors'] ?? null)) {

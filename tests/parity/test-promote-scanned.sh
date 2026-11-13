@@ -15,7 +15,7 @@ php "$CHECK" .github/workflows/build-dev-images.yml .github/workflows/build-cms-
 out=$(php "$CHECK" tests/parity/fixtures/workflow.promote-unscanned.yml 2>&1) \
   && fail "checker passed a promote job without a scan"
 for job in promote-unscanned promote-other-family promote-unrelated-scan promote-always \
-           promote-not-cancelled promote-candidate-tag promote-wider-matrix; do
+           promote-not-cancelled promote-candidate-tag promote-wider-matrix promote-other-package; do
   grep -q "'${job}'" <<<"$out" || fail "checker did not name job '${job}' (got: $out)"
 done
 grep -q "'promote-scanned'" <<<"$out" && fail "checker flagged job 'promote-scanned', which promotes its own scanned digests"

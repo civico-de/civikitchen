@@ -16,11 +16,21 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Added
 
+- `ghcr.io/civico-de/civikitchen-cli` runs ck's host commands (`playwright`,
+  `demo`, `ab`, `run`) without a civikitchen checkout, in one `docker run` line
+  ([Building locally](docs/building.md#ck-without-a-checkout)).
+
 - `ck run` and `ck ab` take `--locales <list>`, which sets `CIVIKITCHEN_LOCALES` in
   the stacks they boot, so core tests in `@group locale` can run.
 - The Standalone image generates the `en_US.UTF-8` and `tr_TR.UTF-8` system
   locales, so core's `CRM_Core_I18n_LocaleTest::testInsertTurkish` passes. The
   default locale stays `C`.
+
+### Changed
+
+- `scaffold/ck` builds its container from `docker/cli/Dockerfile`; the container
+  starts as root and its entrypoint drops to your uid and gid plus the Docker
+  socket's group.
 
 ## [1.58.0] - 2026-11-13
 

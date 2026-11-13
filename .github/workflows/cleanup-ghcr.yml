@@ -27,6 +27,7 @@ jobs:
           packages: |
             civikitchen
             civikitchen-buildcache
+            civikitchen-cli
           keep-newest: 1
           min-age-days: 2
           keep-tags: ^(?!.*-[0-9a-f]{40}(-(amd64|arm64))?$)

@@ -8,7 +8,7 @@
 # files, all spelled $(VARIABLE), so Make contributes no dependency graph — it
 # contributes being installed everywhere and `make help`.
 
-# scaffold/ck.Dockerfile sets CK_TOOLCHAIN: the PHP, make and bash these recipes
+# docker/cli/Dockerfile (target toolchain) sets CK_TOOLCHAIN: the PHP, make and bash these recipes
 # expect, on every host.
 ifndef CK_TOOLCHAIN
 $(error make runs in the toolchain container: scaffold/ck make $(MAKECMDGOALS))
@@ -144,7 +144,7 @@ help: ## Show this help
 
 # --- the fast loop -----------------------------------------------------------
 
-test: test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario test-provision test-core-patches test-ckcoretest test-ck-headless test-ck-headless-phpstan test-phpstan-bootstrap test-ckcommon-git test-missing-tool test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-promote-scanned test-promote-digest test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-sibling-vendor test-sibling-build test-database-matrix test-demo-basic-auth test-release-retag test-release-move-major-tag test-release-publish-flags test-release-steps test-ci-gates-step test-release-script test-release-verify-images test-vendored-paths test-ckeslint test-ckcoverage test-make-phony test-make-downloads test-tool-locks test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-cms-families test-changelog test-extension-docs test-compose-config test-playwright-network test-stack-actions ## Run every fast test suite (no Docker daemon)
+test: test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario test-provision test-core-patches test-ckcoretest test-ck-headless test-ck-headless-phpstan test-phpstan-bootstrap test-ckcommon-git test-missing-tool test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-promote-scanned test-promote-digest test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-sibling-vendor test-sibling-build test-database-matrix test-demo-basic-auth test-release-retag test-release-move-major-tag test-release-publish-flags test-release-steps test-ci-gates-step test-release-script test-release-verify-images test-release-attach-cli test-vendored-paths test-ckeslint test-ckcoverage test-make-phony test-make-downloads test-tool-locks test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-cms-families test-changelog test-extension-docs test-compose-config test-playwright-network test-stack-actions ## Run every fast test suite (no Docker daemon)
 
 test-shared-php-coverage: $(PHPUNIT) $(VENDOR_STAMP) ## Shared PHP unit tests and measured line-coverage floor
 	if command -v phpdbg >/dev/null 2>&1; then \
@@ -192,12 +192,13 @@ test-rector: $(PHPUNIT) $(VENDOR_STAMP) ## The rector rules' fixture tests
 # ckinit stamps the template into every extension repo and its --check mode
 # gates those repos' CI, so a silent regression here either rewrites files it
 # must not touch or waves drift through.
-test-ckinit: $(VENDOR_STAMP) ## ckinit seed/update/check integration checks, ckup port picking, the ckx and ck wrappers
+test-ckinit: $(VENDOR_STAMP) ## ckinit seed/update/check integration checks, ckup port picking, the ckx and ck wrappers, the ck image entrypoint
 	bash tests/ckinit/test-ckinit.sh
 	bash tests/ckinit/test-ckinit-wrapper.sh
 	bash tests/ckinit/test-ckup.sh
 	bash tests/ckinit/test-ckx.sh
 	bash tests/ckinit/test-ck.sh
+	bash tests/ckinit/test-ck-entrypoint.sh
 
 test-example-template: $(VENDOR_STAMP) ## The monorepo examples carry the current template files and pass ckconform
 	set -e; for info in examples/monorepo/*/info.xml; do php scaffold/ckinit.php --check "$$(dirname "$$info")"; (cd "$$(dirname "$$info")" && ../../../toolbelt/bin/ckconform >/dev/null) || { echo "ckconform fails in $$(dirname "$$info")" >&2; exit 1; }; done
@@ -384,6 +385,9 @@ test-release-script: $(VENDOR_STAMP) ## Release pre-flight: argument, branch, sy
 
 test-release-verify-images: ## Release image check: standalone mandatory, CMS drift warns and waits, catch-up re-run
 	bash tests/parity/test-release-verify-images.sh
+
+test-release-attach-cli: ## Release tags on civikitchen-cli: only a matching build, never a moved patch tag
+	bash tests/parity/test-release-attach-cli.sh
 
 test-shell-portability: ## Shell portability lint accepts portable edits and rejects BSD-only sed -i
 	bash tests/parity/test-shell-portability.sh

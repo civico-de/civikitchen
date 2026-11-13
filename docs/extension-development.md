@@ -512,7 +512,8 @@ docker compose up -d
 ```
 
 `ck` is `scaffold/ck` of a civikitchen checkout, which runs ck itself in a
-container, so the host needs no PHP. The image is built once per lockfile,
+container, so the host needs no PHP; without a checkout, the
+[civikitchen-cli image](building.md#ck-without-a-checkout) runs the same command. The image is built once per lockfile,
 which takes a few minutes the first time. It mounts the git work tree at its
 own path and shares the host network, so the suite reaches the stack on
 localhost and can call `docker compose`. A `node_modules` on the host is hidden

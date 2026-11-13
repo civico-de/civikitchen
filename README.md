@@ -111,6 +111,11 @@ services:
 `ck demo <PR>` records a core change before and after, on one CMS or all of
 them, as videos side by side on one page.
 
+`ck run`, `ck ab`, `ck demo` and `ck playwright` start their own containers.
+They run from a checkout through `scaffold/ck`, or without one from the image
+`ghcr.io/civico-de/civikitchen-cli`
+([one command](docs/building.md#ck-without-a-checkout)).
+
 → [Core development](docs/core-development.md): other branches, e2e, demos, limits.
 
 ## Demo instances

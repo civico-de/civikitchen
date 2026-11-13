@@ -179,6 +179,9 @@ DIFF;
         $recording = $runner->recordings[0];
         self::assertSame('/ck-demo/steps.mts', $recording['script']['steps']);
         self::assertContains(realpath($steps) . ':/ck-demo/steps.mts:ro', $recording['command']);
+        $mount = preg_grep('~^' . preg_quote(realpath($this->temporary . '/out'), '~') . '/\.ck-record-[^/]+:/ck-demo/record\.mts:ro$~', $recording['command']);
+        self::assertCount(1, $mount);
+        self::assertSame([], glob($this->temporary . '/out/.ck-record-*'));
         self::assertSame(['width' => 1024, 'height' => 768], $recording['script']['size']);
         self::assertSame(0, $recording['script']['dwellMs']);
         self::assertSame('ghcr.io/civico-de/civikitchen:standalone-beta', $runner->images['ck-demo-pr37671-standalone']);
@@ -354,6 +357,15 @@ DIFF;
         file_put_contents($file, '{"name": "x"}');
         $this->expectExceptionMessage('names no port');
         Stack::prepare(Cms::named('joomla'), 'x', $file, 8300, new DemoRunner(''));
+    }
+
+    public function testTheRecorderLeavesAnExistingRecordScriptAlone(): void
+    {
+        file_put_contents($this->temporary . '/.record.mts', 'mine');
+        $runner = new DemoRunner('');
+        (new Recorder(dirname(__DIR__, 2), $runner))->record('img', $this->temporary, 'standalone-before', [], null);
+        self::assertSame('mine', file_get_contents($this->temporary . '/.record.mts'));
+        self::assertSame([], glob($this->temporary . '/.ck-record-*'));
     }
 
     public function testARecordingWithoutAVideoOnTheHostIsAnError(): void

@@ -487,6 +487,109 @@ jobs:
       contents: write  # the release dry run calls a workflow whose publish job declares it
     uses: ./.github/workflows/monorepo-self-test.yml
 
+  # The checkout-free ck image (docker/cli/Dockerfile, target cli) as
+  # civikitchen-cli: built per arch, merged, scanned, smoke-tested, promoted to :latest.
+  build-cli:
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        arch: [arm64, amd64]
+        include:
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push cli candidate image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/cli/Dockerfile
+          target: cli
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-cli:latest-${{ github.sha }}-${{ matrix.arch }}
+          # Small enough to build uncached; every run gets the current apk packages.
+          no-cache: true
+
+  merge-cli:
+    needs: build-cli
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/merge-manifest.yml
+    with:
+      package: civikitchen-cli
+      tags: '["latest"]'
+
+  scan-cli:
+    needs: merge-cli
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/scan-images.yml
+    with:
+      package: civikitchen-cli
+      tags: '["latest"]'
+
+  promote-cli:
+    needs: [merge-cli, scan-cli]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        tag: [latest]
+    env:
+      IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/civikitchen-cli
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout (for the promote script)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Smoke test (ck's usage, as the runner's user)
+        env:
+          DIGEST: ${{ fromJSON(needs.scan-cli.outputs.digests)[matrix.tag] }}
+        run: docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -e CK_USER="$(id -u):$(id -g)" "${IMAGE_PREFIX}@${DIGEST}" run --help
+
+      - name: Promote the scanned candidate to :latest
+        env:
+          DIGEST: ${{ fromJSON(needs.scan-cli.outputs.digests)[matrix.tag] }}
+        run: .github/scripts/promote-digest.sh latest
+
   notify-scheduled-failure:
     # The daily cron rebuild fails SILENTLY otherwise: test-then-promote
     # keeps serving the last good stable tags, so nothing user-visible breaks
@@ -498,7 +601,7 @@ jobs:
     # The scans are listed although promote already waits for them: the daily
     # cron is the run that finds a base-image CVE nobody pushed a commit for,
     # and the edge makes that finding open an issue.
-    needs: [promote-standalone, database-compat-extended, standalone-demo, scan-standalone, monorepo-self-test]
+    needs: [promote-standalone, database-compat-extended, standalone-demo, scan-standalone, monorepo-self-test, scan-cli, promote-cli]
     if: github.event_name == 'schedule' && failure()
     runs-on: ubuntu-24.04
     permissions:

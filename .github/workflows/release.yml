@@ -99,6 +99,18 @@ jobs:
           MAJOR: ${{ steps.tag.outputs.major }}
         run: .github/scripts/release-attach-tags.sh
 
+      - name: Attach the release tags to civikitchen-cli
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          PKG: civikitchen-cli
+          IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/civikitchen-cli
+          TAG: ${{ steps.tag.outputs.tag }}
+          MAJOR: ${{ steps.tag.outputs.major }}
+          RELEASE_SHA: ${{ steps.tag.outputs.sha }}
+          ALLOW_DRIFT: ${{ inputs.allow_image_drift && '1' || '0' }}
+        run: .github/scripts/release-attach-cli.sh
+
   git-tag:
     # Only after the images carry the release tags: the moving major ref must
     # never point at a commit whose images nobody can pull.

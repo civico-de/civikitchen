@@ -32,6 +32,10 @@ on:
         description: Prepended to every entry of `tags`.
         type: string
         default: ''
+      package:
+        description: The GHCR package, e.g. civikitchen-cli.
+        type: string
+        default: civikitchen
     outputs:
       digests:
         description: JSON object tag -> the digest scanned; promote publishes these.
@@ -39,7 +43,7 @@ on:
 
 # A called workflow does not inherit `env`; derived again as in merge-manifest.yml.
 env:
-  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/civikitchen
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/${{ inputs.package }}
 
 permissions:
   contents: read

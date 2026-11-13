@@ -35,12 +35,16 @@ on:
           others pass whole tag names and leave this empty.
         type: string
         default: ''
+      package:
+        description: The GHCR package, e.g. civikitchen-cli.
+        type: string
+        default: civikitchen
 
 # Derived from the run's own repository, exactly as in the calling workflow: a
 # called workflow does not inherit `env`, and deriving it again is better than
 # passing a value that could be passed wrongly.
 env:
-  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/civikitchen
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/${{ inputs.package }}
 
 # Default for the job below; it widens it itself to push the manifest.
 permissions:

@@ -7,8 +7,8 @@ declare(strict_types=1);
  *  - runs only on success: no always(), cancelled() or failure() in its `if`;
  *  - needs, directly, a scan-images.yml call that scans exactly the merged
  *    candidates of its own chain: a merge-manifest.yml call in its transitive
- *    needs (reached without passing through a scan) with the same `tags` and
- *    `prefix`;
+ *    needs (reached without passing through a scan) with the same `tags`,
+ *    `prefix` and `package`;
  *  - promotes `fromJSON(needs.<scan>.outputs.digests)[matrix.<key>]`, the
  *    digests that scan passed, where matrix.<key> iterates those same tags;
  *  - never names this run's candidate tag (github.sha), which another run on
@@ -56,12 +56,12 @@ function ck_tag_list(mixed $value): string
     return is_array($decoded) ? json_encode(array_values($decoded), JSON_THROW_ON_ERROR) : $text;
 }
 
-/** @return array{string, string} */
+/** @return array{string, string, string} tags, prefix and GHCR package */
 function ck_call_set(array $job): array
 {
     $with = (array) ($job['with'] ?? []);
 
-    return [ck_tag_list($with['tags'] ?? ''), (string) ($with['prefix'] ?? '')];
+    return [ck_tag_list($with['tags'] ?? ''), (string) ($with['prefix'] ?? ''), (string) ($with['package'] ?? 'civikitchen')];
 }
 
 $problems = [];

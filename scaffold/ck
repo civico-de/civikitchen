@@ -22,10 +22,10 @@ esac
 command -v docker >/dev/null 2>&1 || die "docker is required"
 
 checkout="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-dockerfile="$checkout/scaffold/ck.Dockerfile"
-image="civikitchen-ck:$(cksum < "$dockerfile" | cut -d' ' -f1)"
+dockerfile=docker/cli/Dockerfile
+image="civikitchen-ck:$(cd "$checkout" && cat "$dockerfile" docker/cli/entrypoint.sh | cksum | cut -d' ' -f1)"
 if ! docker image inspect "$image" >/dev/null 2>&1; then
-  docker build -t "$image" - < "$dockerfile" >&2
+  docker build --target toolchain -f "$checkout/$dockerfile" -t "$image" "$checkout" >&2
 fi
 
 # Docker resolves bind mounts on its own side, so every path ck hands a container
@@ -43,19 +43,16 @@ for dir in "$(cd "$HOME" && pwd -P)" "$checkout" "$tree"; do
   mounts+=("$dir")
 done
 
-# The socket's group as the Docker daemon sees it, which the host may not (colima, Docker Desktop).
+# The image's entrypoint drops to CK_USER with the Docker socket's group as the daemon sees it.
 socket=/var/run/docker.sock
-group="$(docker run --rm --entrypoint stat -v "$socket:$socket" "$image" -c %g "$socket")" \
-  || die "cannot read the group of the Docker socket $socket"
-
-run=(docker run --rm --init -i --network host -u "$(id -u):$(id -g)" --group-add "$group"
+run=(docker run --rm --init -i --network host -e CK_USER="$(id -u):$(id -g)"
      -e HOME=/tmp -v "$socket:$socket" -w "$cwd")
 for dir in "${mounts[@]}"; do run+=(-v "$dir:$dir"); done
 # The rest of the environment reaches ck, which passes it on to the Playwright container.
 # The locale stays the image's: the host's may not exist there.
 while IFS= read -r name; do
   case "$name" in
-    PATH|HOME|TMPDIR|TMP|TEMP|LANG|LANGUAGE|LC_*) ;;
+    PATH|HOME|TMPDIR|TMP|TEMP|LANG|LANGUAGE|LC_*|CK_USER) ;;
     DOCKER_CERT_PATH|DOCKER_CONFIG|DOCKER_CONTEXT|DOCKER_HOST|DOCKER_TLS_VERIFY) ;;
     *) run+=(-e "$name") ;;
   esac
