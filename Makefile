@@ -481,10 +481,11 @@ lint-schema: $(UVX) ## Validate the profile/scenario schemas and every repositor
 
 # --- the slow loop (needs Docker) --------------------------------------------
 
-build: ## Build the standalone image locally; CIVICRM_VERSION=<release>, or CIVICRM_SOURCE=git CIVICRM_VERSION=master
+build: ## Build the standalone image locally; CIVICRM_VERSION=<release>, or CIVICRM_SOURCE=git CIVICRM_VERSION=master [CIVICRM_PACKAGES_VERSION=<ref>]
 	docker build -f docker/standalone/Dockerfile \
 	    $(if $(CIVICRM_VERSION),--build-arg CIVICRM_VERSION=$(CIVICRM_VERSION)) \
 	    $(if $(CIVICRM_SOURCE),--build-arg CIVICRM_SOURCE=$(CIVICRM_SOURCE)) \
+	    $(if $(CIVICRM_PACKAGES_VERSION),--build-arg CIVICRM_PACKAGES_VERSION=$(CIVICRM_PACKAGES_VERSION)) \
 	    -t civikitchen:standalone$(if $(CIVICRM_VERSION),-$(CIVICRM_VERSION)) .
 
 e2e-ckcreate: ## A fresh ckcreate scaffold passes ck ci in its dev stack (Docker; IMAGE=, default :v1)

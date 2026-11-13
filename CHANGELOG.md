@@ -22,6 +22,9 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - `ck run <image> -- <command>` boots one fresh Standalone stack, runs the
   command in it and removes the stack
   ([One command on one version](docs/core-development.md#one-command-on-one-version-ck-run)).
+- The Standalone git build takes `CIVICRM_PACKAGES_VERSION` for a
+  civicrm-packages ref that differs from the core ref; without it both use
+  `CIVICRM_VERSION` as before.
 - `cksmarty` fails a `.tpl` whose literal `{include file="..."}` names a template
   that does not exist, which compiling alone does not notice.
 - `cksmarty` also compiles the column and tally rewrites of the SearchDisplays an

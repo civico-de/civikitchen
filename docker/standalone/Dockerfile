@@ -27,6 +27,8 @@ ARG PHP_VERSION=8.4
 # With CIVICRM_SOURCE=git it is a civicrm-core branch or tag instead (master).
 ARG CIVICRM_VERSION=6.17.0
 ARG CIVICRM_SOURCE=tarball
+# Git builds only: the civicrm-packages ref, when it differs from CIVICRM_VERSION.
+ARG CIVICRM_PACKAGES_VERSION=""
 
 # --- fetch stage: the CiviCRM Standalone release tarball ---------------------
 FROM php:${PHP_VERSION}-apache-bookworm AS download-tarball
@@ -55,6 +57,7 @@ RUN curl -fsSL "${CIVICRM_DOWNLOAD_URL}" -o /tmp/civicrm-standalone.tar.gz \
 # PHP extensions are checked in the runtime stage, which installs them.
 FROM php:${PHP_VERSION}-apache-bookworm AS download-git
 ARG CIVICRM_VERSION
+ARG CIVICRM_PACKAGES_VERSION
 # The composer release install-dev-tools.sh bakes into the image.
 COPY toolbelt/versions.env /tmp/versions.env
 RUN . /tmp/versions.env \
@@ -64,7 +67,7 @@ RUN . /tmp/versions.env \
     && echo "${CK_COMPOSER_SHA256}  /usr/local/bin/composer" | sha256sum -c --strict - \
     && chmod +x /usr/local/bin/composer
 ADD --keep-git-dir=true "https://github.com/civicrm/civicrm-core.git#${CIVICRM_VERSION}" /tmp/civicrm/civicrm-standalone/core
-ADD --keep-git-dir=true "https://github.com/civicrm/civicrm-packages.git#${CIVICRM_VERSION}" /tmp/civicrm/civicrm-standalone/core/packages
+ADD --keep-git-dir=true "https://github.com/civicrm/civicrm-packages.git#${CIVICRM_PACKAGES_VERSION:-${CIVICRM_VERSION}}" /tmp/civicrm/civicrm-standalone/core/packages
 WORKDIR /tmp/civicrm/civicrm-standalone/core
 # composer_auth is an optional BuildKit secret holding a COMPOSER_AUTH JSON. CI passes
 # its job token so GitHub dist downloads are not rate-limited; local builds run without.

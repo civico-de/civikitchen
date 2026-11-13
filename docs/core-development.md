@@ -77,16 +77,25 @@ scaffold/ck make build CIVICRM_SOURCE=git CIVICRM_VERSION=master   # tags civiki
 ```
 
 The build does what core's release script does for the tarball. It checks out
-civicrm-core and civicrm-packages at the same branch, runs
+civicrm-core and civicrm-packages at the same branch or tag, runs
 `composer install --no-dev` with the bower assets, and then applies core's
 standalone scaffold. Every build fetches the branch's current commit.
 `/usr/local/share/civikitchen/civicrm-source.log` names the commits the image
 holds. Unlike the tarball, this core keeps its test directories and seed SQL,
 so `ckcoretest` runs without fetching them.
 
+A core ref that civicrm-packages does not have, such as a single commit,
+takes the packages ref separately:
+
+```bash
+scaffold/ck make build CIVICRM_SOURCE=git CIVICRM_VERSION=<commit> CIVICRM_PACKAGES_VERSION=master
+```
+
 To test a core change, mount the directory it touches from your civicrm-core
-checkout over the image's copy. Toggle the change there with `git stash` and
-`git stash pop` to get a failing and a passing run:
+checkout over the image's copy. Keep the change as a patch file and toggle it
+there with `git apply` and `git apply -R` to get a failing and a passing run,
+or mount one of two worktrees. `git stash` would take the reproducing test
+and any unrelated work along with the change:
 
 ```yaml
 services:

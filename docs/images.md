@@ -73,6 +73,12 @@ services:
 
 Ready to run: [examples/standalone/](https://github.com/civico-de/civikitchen/tree/main/examples/standalone/)
 
+The site's settings live in the app container, the database on its volume.
+An app container replaced without `docker compose down -v` therefore finds
+no settings and installs again over the surviving tables (`cv core:install
+-K` keeps them), then runs the profile again. For a clean start use
+`down -v`.
+
 ## Buildkit flavors (dev)
 
 For CMS-specific behaviour, the drupal10, drupal11, wordpress, joomla and
