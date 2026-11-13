@@ -106,6 +106,8 @@ FROM php:${PHP_VERSION}-apache-bookworm
 #   dependency tree out of the image scan.
 # - jq: the profile driver (CIVIKITCHEN_PROFILE) parses profile.json with it
 # - zstd: compresses and loads seed snapshots (`ck seed`)
+# - locales: generates tr_TR.UTF-8 and en_US.UTF-8, which core's
+#   CRM_Core_I18n_LocaleTest passes to setlocale(); the default locale stays C
 # apt-get upgrade: security updates come from Debian at build time; the base
 # image ships none. The daily rebuild runs without cache, so they land.
 #
@@ -117,7 +119,9 @@ FROM php:${PHP_VERSION}-apache-bookworm
 # .so files link against (the official image's pattern); test-dev-tools.sh loads them.
 RUN apt-get update && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends \
-        ca-certificates curl git unzip zip jq mariadb-client zstd \
+        ca-certificates curl git unzip zip jq mariadb-client zstd locales \
+    && printf '%s\n' 'en_US.UTF-8 UTF-8' 'tr_TR.UTF-8 UTF-8' > /etc/locale.gen \
+    && locale-gen \
     && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && savedAptMark="$(apt-mark showmanual)" \

@@ -18,6 +18,9 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 - `ck run` and `ck ab` take `--locales <list>`, which sets `CIVIKITCHEN_LOCALES` in
   the stacks they boot, so core tests in `@group locale` can run.
+- The Standalone image generates the `en_US.UTF-8` and `tr_TR.UTF-8` system
+  locales, so core's `CRM_Core_I18n_LocaleTest::testInsertTurkish` passes. The
+  default locale stays `C`.
 
 ## [1.58.0] - 2026-11-13
 

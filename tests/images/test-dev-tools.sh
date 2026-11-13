@@ -170,6 +170,15 @@ if [ "${CIVICRM_UF:-}" = "Standalone" ]; then
     else
         fail "core headless-test seed SQL is missing from the standalone release archive"
     fi
+    # CRM_Core_I18n_LocaleTest passes these to setlocale().
+    SYSTEM_LOCALES="$(locale -a)"
+    for loc in en_US.utf8 tr_TR.utf8; do
+        if grep -qx -- "${loc}" <<<"${SYSTEM_LOCALES}"; then
+            ok "system locale ${loc} is generated"
+        else
+            fail "system locale ${loc} is generated"
+        fi
+    done
 fi
 
 # ---------------------------------------------------------------------------

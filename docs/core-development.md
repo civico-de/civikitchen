@@ -130,8 +130,9 @@ checkout or the current git work tree. The command runs as www-data from
 The images carry no core language files, so CiviCRM offers only en_US.
 `--locales de_DE,es_MX,fr_CA,fr_FR,it_IT,nl_NL` installs those at boot, as
 `CIVIKITCHEN_LOCALES` does ([Configuration](configuration.md)); core's
-`@group locale` tests use these. The image has only the C and POSIX system
-locales, so `CRM_Core_I18n_LocaleTest::testInsertTurkish` (`tr_TR.utf8`) fails.
+`@group locale` tests use these. The Standalone image also generates the
+`en_US.UTF-8` and `tr_TR.UTF-8` system locales that
+`CRM_Core_I18n_LocaleTest` passes to `setlocale()`; the buildkit images do not.
 
 The compose project is `ck-run-<tag>`, or the name given with `--name`; a
 second run on the same tag at the same time needs its own name. With `--keep`
