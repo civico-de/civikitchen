@@ -105,6 +105,14 @@ on:
           docs/extension-standards.md.
         type: string
         default: ''
+      matrix_core_upgrade:
+        description: >-
+          With `core_upgrade_from`, run the upgrade to every matrix_images
+          entry too, each leg on its own stack — for an upgrade path that has
+          to hold for the release candidate and master as well. Fails without
+          `core_upgrade_from` or with empty matrix_images.
+        type: boolean
+        default: false
       npm_ci:
         description: >-
           `npm ci --ignore-scripts` on the runner before the stack boots, so
@@ -1462,30 +1470,36 @@ jobs:
   # environment variable and a second `up`. No second stack, no image build.
   #
   # Skipped entirely when the input is empty — the matrix_images deal: a caller
-  # that never sets it pays nothing.
+  # that never sets it pays nothing. One leg, to `image`; matrix_core_upgrade
+  # adds one per matrix_images entry, from the list compat-images computes.
   core-upgrade:
-    # Cancelled only by this job in a newer run of the same caller workflow,
+    # Cancelled only by the same leg in a newer run of the same caller workflow,
     # ref, directory and image. Literal name: github.job is the caller's job id.
     concurrency:
-      group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-core-upgrade
+      group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-${{ matrix.image }}-core-upgrade
       cancel-in-progress: true
-    needs: key
+    needs: [compat-images, key]
     if: ${{ inputs.core_upgrade_from != '' }}
     runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 120
+    strategy:
+      # One target failing must not hide the result for the others.
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.compat-images.outputs.core_upgrade_images) }}
     env:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
       # Where CiviCRM has the extension enabled — derived by `key`.
       CK_EXT_PATH: ${{ needs.key.outputs.ext_path }}
       CK_CORE_FROM: ${{ inputs.core_upgrade_from }}
-      # The job-level image is the upgrade TARGET: the run's normal image, or
-      # empty for the compose file's own default. Only the first boot overrides
-      # it — at the step — so everything after the swap already runs against the
-      # image this pipeline actually tests on.
-      CIVIKITCHEN_IMAGE: ${{ needs.key.outputs.image }}
+      # The job-level image is the upgrade TARGET: the leg's image, which on
+      # the first leg is the run's normal one, or empty for the compose file's
+      # own default. Only the first boot overrides it, at the step, so everything
+      # after the swap runs against the target.
+      CIVIKITCHEN_IMAGE: ${{ matrix.image }}
       # One compose project per job — see the note in `ci`.
-      COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.key.outputs.key_slug }}-core-upgrade
+      COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.key.outputs.key_slug }}-core-upgrade-${{ strategy.job-index }}
     defaults:
       run:
         working-directory: ${{ inputs.working_directory }}
@@ -1599,8 +1613,8 @@ jobs:
             ${{ env.CK_UPGRADE_OVERRIDE }}
             ${{ steps.deps.outputs.sibling_override }}
           # The old core's image may predate `ck internal composer-install`, and
-          # the site ends on the run's image, whose PHP vendor/ has to fit.
-          vendor_image: ${{ needs.key.outputs.image }}
+          # the site ends on the leg's image, whose PHP vendor/ has to fit.
+          vendor_image: ${{ matrix.image }}
 
       # `cv scr`, not a PHPUnit class, and deliberately so: these assertions have
       # to run against the LIVE site database, while the headless harness points
@@ -1727,13 +1741,14 @@ jobs:
 
   # --- Compatibility matrix (opt-in via matrix_images) ----------------------
   #
-  # Runs when matrix_images, playwright or matrix_playwright is set, skipped
-  # otherwise: a skipped job costs no runner minutes, so callers that set none
-  # of them keep today's run.
+  # Runs when matrix_images, playwright, matrix_playwright, core_upgrade_from
+  # or matrix_core_upgrade is set, skipped otherwise: a skipped job costs no
+  # runner minutes, so callers that set none of them keep today's run.
   #
   # A matrix needs a JSON array, and workflow expressions have no split(), so
-  # the CSV is parsed here and handed on as `images` (the compat legs) and
-  # `playwright_images` (the browser legs). Same shape as build-dev-images.yml's
+  # the CSV is parsed here and handed on as `images` (the compat legs),
+  # `playwright_images` (the browser legs) and `core_upgrade_images` (the
+  # targets of the core upgrade). Same shape as build-dev-images.yml's
   # resolve-civicrm job.
   compat-images:
     # Cancelled only by this job in a newer run of the same caller workflow,
@@ -1741,21 +1756,24 @@ jobs:
     concurrency:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-compat-images
       cancel-in-progress: true
-    if: ${{ inputs.matrix_images != '' || inputs.playwright || inputs.matrix_playwright }}
+    if: ${{ inputs.matrix_images != '' || inputs.playwright || inputs.matrix_playwright || inputs.core_upgrade_from != '' || inputs.matrix_core_upgrade }}
     needs: key
     runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 120
     outputs:
       images: ${{ steps.parse.outputs.images }}
       playwright_images: ${{ steps.parse.outputs.playwright_images }}
+      core_upgrade_images: ${{ steps.parse.outputs.core_upgrade_images }}
     steps:
-      - name: Parse matrix_images into the compat and browser legs
+      - name: Parse matrix_images into the compat, browser and core upgrade legs
         id: parse
         env:
           CK_MATRIX_IMAGES: ${{ inputs.matrix_images }}
           CK_IMAGE: ${{ needs.key.outputs.image }}
           CK_PLAYWRIGHT: ${{ inputs.playwright }}
           CK_MATRIX_PLAYWRIGHT: ${{ inputs.matrix_playwright }}
+          CK_CORE_UPGRADE_FROM: ${{ inputs.core_upgrade_from }}
+          CK_MATRIX_CORE_UPGRADE: ${{ inputs.matrix_core_upgrade }}
         run: |
           set -euo pipefail
           images=$(jq -Rc 'split(",") | map(sub("^ +";"") | sub(" +$";"")) | map(select(length > 0))' \
@@ -1779,12 +1797,24 @@ jobs:
           # file's default); matrix_playwright appends the matrix images that differ.
           playwright_images=$(jq -c --arg image "$CK_IMAGE" --arg matrix "$CK_MATRIX_PLAYWRIGHT" \
             '[$image] + (if $matrix == "true" then . - [$image] else [] end)' <<< "$images")
+          if [ "$CK_MATRIX_CORE_UPGRADE" = true ]; then
+            [ -n "$CK_CORE_UPGRADE_FROM" ] \
+              || { echo "matrix_core_upgrade is on but core_upgrade_from is empty — there is no upgrade job to add legs to" >&2; exit 1; }
+            [ "$images" != '[]' ] \
+              || { echo "matrix_core_upgrade is on but matrix_images is empty — there is no image to add an upgrade leg for" >&2; exit 1; }
+          fi
+          # The run's own image is always the first upgrade target; matrix_core_upgrade
+          # appends the matrix images that are neither it nor the starting image.
+          core_upgrade_images=$(jq -c --arg image "$CK_IMAGE" --arg from "$CK_CORE_UPGRADE_FROM" --arg matrix "$CK_MATRIX_CORE_UPGRADE" \
+            '[$image] + (if $matrix == "true" then . - [$image, $from] else [] end)' <<< "$images")
           {
             echo "images=$images"
             echo "playwright_images=$playwright_images"
+            echo "core_upgrade_images=$core_upgrade_images"
           } >> "$GITHUB_OUTPUT"
           echo "compat matrix: $images"
           echo "browser legs: $playwright_images"
+          echo "core upgrade targets: $core_upgrade_images"
 
   # One boot + suite per extra image. Deliberately NOT the full `ci` pass:
   # cklint, ckconform, phpstan and the coverage floor are enforced by the ck*

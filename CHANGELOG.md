@@ -25,6 +25,9 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - The Standalone git build takes `CIVICRM_PACKAGES_VERSION` for a
   civicrm-packages ref that differs from the core ref; without it both use
   `CIVICRM_VERSION` as before.
+- `extension-ci.yml` takes `matrix_core_upgrade`: with `core_upgrade_from`,
+  the core upgrade also runs to every `matrix_images` entry, one leg each
+  ([Core upgrade](docs/extension-standards.md#core-upgrade-what-an-existing-site-goes-through)).
 - `cksmarty` fails a `.tpl` whose literal `{include file="..."}` names a template
   that does not exist, which compiling alone does not notice.
 - `cksmarty` also compiles the column and tally rewrites of the SearchDisplays an

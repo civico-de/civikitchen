@@ -1225,7 +1225,7 @@ pin `config.platform.php` in composer.json to the PHP the extension runs on.
 ## Compatibility: test the range you claim
 
 `<compatibility><ver>` in info.xml is a promise, and the default CI run
-checks one CiviCRM version, installed from scratch. Five opt-in inputs on
+checks one CiviCRM version, installed from scratch. Six opt-in inputs on
 extension-ci.yml close that gap, all off by default:
 
 | Input | What it adds |
@@ -1235,6 +1235,7 @@ extension-ci.yml close that gap, all off by default:
 | `upgrade_from_last_release` | Installs the newest reachable tag, swaps to the tested commit, runs `cv upgrade:db --mode=ext` and asserts no upgrade stayed pending. |
 | `schema_parity` | Own job: diffs the extension's tables after upgrading from the last release against a fresh install. See [below](#schema-parity-does-the-upgrader-arrive-where-install-does). |
 | `core_upgrade_from` | Own job: installs on an older image, then upgrades that database to the run's image. See [below](#core-upgrade-what-an-existing-site-goes-through). |
+| `matrix_core_upgrade` | Runs that upgrade to every matrix_images entry as well. Needs core_upgrade_from and matrix_images. |
 
 Pick the ends of your claimed range: the oldest minor you support and current
 stable. The tags are `:standalone-<minor>` and the moving `:standalone`; see
@@ -1321,7 +1322,10 @@ Configure it with the oldest minor you claim:
 
 The target is the run's image, or the compose file's default. If both are the
 same version, the job fails rather than pass over an upgrade that never
-happened. In one stack it:
+happened. `matrix_core_upgrade: true` adds one leg per matrix_images entry,
+each upgrading from core_upgrade_from to that image in a stack of its own,
+for example to the release candidate and master. An entry that is the run's
+image or core_upgrade_from itself gets no leg. In one stack, a leg:
 
 1. boots on core_upgrade_from, installing CiviCRM and your extension,
 2. runs `tests/upgrade/seed.php` if present,

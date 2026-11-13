@@ -2,8 +2,9 @@
 # Matrix legs of the shared extension CI workflow: every leg boots its own
 # compose project and uploads under its own name (checker plus fixture, as the
 # check is silent on success), the compat-images step turns the inputs into
-# the compat and browser legs as written, and without matrix_playwright the
-# browser job keeps its single leg on `image`.
+# the compat, browser and core upgrade legs as written, and without
+# matrix_playwright or matrix_core_upgrade those jobs keep their single leg on
+# `image`.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -32,17 +33,22 @@ for job in indexed hosted; do
 done
 
 # --- the legs, computed by the step as written --------------------------------
-step='Parse matrix_images into the compat and browser legs'
+step='Parse matrix_images into the compat, browser and core upgrade legs'
 php "$root/tests/parity/workflow-step.php" "$workflow" compat-images "$step" > "$work/step.sh"
 
 # legs <matrix_images> <image> <playwright> <matrix_playwright>: runs the step (<image>: the key job's resolved image)
 # with its own env: mapping, each expression resolved from these inputs.
+# upgrade_from and matrix_upgrade stand for core_upgrade_from and matrix_core_upgrade.
+upgrade_from=''
+matrix_upgrade=false
 legs() {
   local -A inputs=(
     ['${{ inputs.matrix_images }}']=$1
     ['${{ needs.key.outputs.image }}']=$2
     ['${{ inputs.playwright }}']=$3
     ['${{ inputs.matrix_playwright }}']=$4
+    ['${{ inputs.core_upgrade_from }}']=$upgrade_from
+    ['${{ inputs.matrix_core_upgrade }}']=$matrix_upgrade
   )
   local step_env=() name expression
   while IFS=$'\t' read -r name expression; do
@@ -88,10 +94,31 @@ refuse ' , ' '' true true 'matrix_images is empty'
 refuse 'ex/a:1, ex/a:1' '' false false 'more than once'
 refuse 'ex/a b' '' false false 'not an image reference'
 
+# Core upgrade targets: the run's image alone, unless matrix_core_upgrade adds
+# the matrix images that are neither it nor the image the upgrade starts from.
+# upgrade_targets <matrix_images> <image> <core_upgrade_from> <matrix_core_upgrade> <targets>
+upgrade_targets() {
+  upgrade_from=$3 matrix_upgrade=$4
+  legs "$1" "$2" false false
+  [ "$rc" = 0 ] || fail "upgrade inputs '$1' / '$2' / '$3' / $4 refused (rc=$rc): $out"
+  [ "$(output core_upgrade_images)" = "$5" ] \
+    || fail "upgrade targets for '$1' / '$2' / '$3' / $4: $(output core_upgrade_images), expected $5"
+  upgrade_from='' matrix_upgrade=false
+}
+upgrade_targets '' '' ex/old:1 false '[""]'
+upgrade_targets 'ex/a:1, ex/b:2' ex/run:1 ex/old:1 false '["ex/run:1"]'
+upgrade_targets 'ex/a:1, ex/b:2' ex/run:1 ex/old:1 true '["ex/run:1","ex/a:1","ex/b:2"]'
+upgrade_targets 'ex/old:1, ex/run:1, ex/b:2' ex/run:1 ex/old:1 true '["ex/run:1","ex/b:2"]'
+matrix_upgrade=true
+refuse 'ex/a:1' '' false false 'core_upgrade_from is empty'
+upgrade_from=ex/old:1
+refuse '' '' false false 'matrix_images is empty'
+upgrade_from='' matrix_upgrade=false
+
 # --- the wiring around the step -------------------------------------------------
 [ "$(value on workflow_call inputs matrix_playwright type)" = boolean ] || fail "matrix_playwright is not a boolean"
 [ "$(value on workflow_call inputs matrix_playwright default)" = false ] || fail "matrix_playwright is not off by default"
-[ "$(value jobs compat-images if)" = "\${{ inputs.matrix_images != '' || inputs.playwright || inputs.matrix_playwright }}" ] \
+[ "$(value jobs compat-images if)" = "\${{ inputs.matrix_images != '' || inputs.playwright || inputs.matrix_playwright || inputs.core_upgrade_from != '' || inputs.matrix_core_upgrade }}" ] \
   || fail "compat-images condition: $(value jobs compat-images if)"
 [ "$(value jobs compat-images outputs playwright_images)" = '${{ steps.parse.outputs.playwright_images }}' ] \
   || fail "compat-images does not output the browser legs"
@@ -106,5 +133,13 @@ refuse 'ex/a b' '' false false 'not an image reference'
 artifact=$(value jobs playwright steps 'Playwright report + traces on failure' with name)
 [ "$artifact" = "playwright-\${{ needs.key.outputs.key }}\${{ strategy.job-index != 0 && format('-{0}', strategy.job-index) || '' }}" ] \
   || fail "browser artifact name: $artifact"
+
+[ "$(value on workflow_call inputs matrix_core_upgrade type)" = boolean ] || fail "matrix_core_upgrade is not a boolean"
+[ "$(value on workflow_call inputs matrix_core_upgrade default)" = false ] || fail "matrix_core_upgrade is not off by default"
+[ "$(value jobs core-upgrade if)" = "\${{ inputs.core_upgrade_from != '' }}" ] || fail "core-upgrade condition: $(value jobs core-upgrade if)"
+[ "$(value jobs core-upgrade strategy matrix image)" = '${{ fromJSON(needs.compat-images.outputs.core_upgrade_images) }}' ] \
+  || fail "the upgrade targets are not the ones compat-images computes"
+[ "$(value jobs core-upgrade env CIVIKITCHEN_IMAGE)" = '${{ matrix.image }}' ] || fail "an upgrade leg does not end on its own image"
+[ "$(value jobs core-upgrade strategy fail-fast)" = false ] || fail "one failing upgrade leg cancels the others"
 
 echo "matrix legs suite OK"
