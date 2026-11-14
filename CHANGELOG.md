@@ -14,6 +14,16 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- ckconform's `media-lfs` check fails on binary media (png, jpg, jpeg, gif,
+  webp, mp4, webm, pdf) committed to git itself instead of through Git LFS.
+  The template's .gitattributes now routes these types to LFS anywhere in the
+  repo, not only `handbook/images/**/*.png`. Run `ckinit --update`, then
+  `git add --renormalize` the reported files; `policy.lfs_exempt` lists files
+  that stay in git, with a reason
+  ([Committed files](docs/extension-standards.md#committed-files)).
+
 ## [1.60.0] - 2026-11-14
 
 ### Added

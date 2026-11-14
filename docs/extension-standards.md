@@ -488,6 +488,24 @@ shipped build is reproducible.
 `<requires>` in info.xml names every extension actually used, such as
 SearchKit, Afform or CiviRules. A missing entry only surfaces on a fresh site.
 
+Binary media (png, jpg, jpeg, gif, webp, mp4, webm, pdf) is committed through
+Git LFS; the template's .gitattributes routes it there and ckconform's
+media-lfs check fails on a media file in git itself. SVG is text and stays in
+git. To move an existing file, run `git add --renormalize <file>` and commit.
+A file that must stay in git, such as a test fixture or one an upstream owns,
+is listed with its reason:
+
+```yaml
+policy:
+  lfs_exempt:
+    paths: [tests/fixtures]
+    reason: "Fixtures the parser reads byte for byte."
+```
+
+The same paths need a .gitattributes of their own that takes them out of the
+filter (`*.png -filter -diff -merge`), or git reports them as modified in
+every checkout; the check fails until it is there.
+
 ### Dev stack and workflow permissions
 
 The dev stack is `.docker/docker-compose.yml` on a civikitchen image, and

@@ -158,6 +158,7 @@ abstract class CheckTestCase extends TestCase
                 case 'bundles': $policy['bundles'] = ['mode' => $plain, 'reason' => $reason]; break;
                 case 'deploy_hygiene':
                 case 'deploy_hygiene': $policy['deploy_hygiene'] = ['paths' => $list, 'reason' => $reason]; break;
+                case 'lfs_exempt': $policy['lfs_exempt'] = ['paths' => $list, 'reason' => $reason]; break;
                 case 'vendored_paths': $policy['vendored_paths'][] = ['path' => $plain, 'reason' => $reason]; break;
                 case 'smarty_skip_templates': $policy['smarty_skip_templates'][] = ['template' => $plain, 'reason' => $reason]; break;
                 case 'release': $policy['release'] = ['mode' => $plain, 'reason' => $reason]; break;

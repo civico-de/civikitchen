@@ -699,6 +699,31 @@ final class Context
     }
 
     /**
+     * Is the committed (index) version of this file a Git LFS pointer? Read
+     * from the index because the work tree holds the pointer or the real file
+     * depending on whether the checkout ran git-lfs.
+     */
+    public function isLfsPointer(string $relative): bool
+    {
+        $entry = ':./' . ltrim($relative, '/');
+        $size = $this->git(['cat-file', '-s', $entry]);
+        // A pointer is three short lines; the spec caps it at 1024 bytes.
+        if ($size === null || (int) $size > 1024) {
+            return false;
+        }
+
+        return str_starts_with((string) $this->git(['cat-file', 'blob', $entry]), 'version https://git-lfs.github.com/spec/v1');
+    }
+
+    /** The value git resolves for an attribute of a path: 'lfs', 'set', 'unset' or 'unspecified'. */
+    public function gitAttribute(string $relative, string $attribute): string
+    {
+        $output = $this->git(['check-attr', '-z', $attribute, '--', ltrim($relative, '/')]);
+
+        return $output === null ? 'unspecified' : (explode("\0", $output)[2] ?? 'unspecified');
+    }
+
+    /**
      * Does the repo ship this file? Tracked when in git (repo principle: an
      * uncommitted local file must not sway a verdict), on disk otherwise.
      */

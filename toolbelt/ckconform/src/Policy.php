@@ -45,6 +45,7 @@ final class Policy
         'optional_extensions' => 'ckconform: extensions the code checks for at runtime before use, so they need no <requires>; reason mandatory',
         'bundles' => 'ckconform: vendored front-end bundles that are not repo source',
         'deploy_hygiene' => 'ckconform: deploy-only files deliberately shipped, reason mandatory',
+        'lfs_exempt' => 'ckconform: media files deliberately kept in git instead of Git LFS, reason mandatory',
         'vendored_paths' => 'cklint + ckfmt + ckeslint: third-party source this repo carries verbatim, reason mandatory',
         'smarty_skip_templates' => 'cksmarty: managed MessageTemplates this repo renders without Smarty, reason mandatory',
         'npm_license' => 'ckconform: accepted npm licence identifiers',
@@ -200,6 +201,7 @@ final class Policy
         if (isset($policy['optional_extensions'])) $out['optional_extensions'] = [implode(',', $policy['optional_extensions']['extensions']) . ' -- ' . $policy['optional_extensions']['reason']];
         if (isset($policy['bundles'])) $out['bundles'] = [$policy['bundles']['mode'] . ' -- ' . $policy['bundles']['reason']];
         if (isset($policy['deploy_hygiene'])) $out['deploy_hygiene'] = [implode(',', $policy['deploy_hygiene']['paths']) . ' -- ' . $policy['deploy_hygiene']['reason']];
+        if (isset($policy['lfs_exempt'])) $out['lfs_exempt'] = [implode(',', $policy['lfs_exempt']['paths']) . ' -- ' . $policy['lfs_exempt']['reason']];
         foreach ($policy['vendored_paths'] ?? [] as $item) $out['vendored_paths'][] = $item['path'] . ' -- ' . $item['reason'];
         foreach ($policy['smarty_skip_templates'] ?? [] as $item) $out['smarty_skip_templates'][] = $item['template'] . ' -- ' . $item['reason'];
         if (isset($policy['release'])) $out['release'] = [$policy['release']['mode'] . ' -- ' . $policy['release']['reason']];

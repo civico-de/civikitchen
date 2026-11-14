@@ -69,6 +69,7 @@ final class Registry
         Check\CommittedArtifactCheck::class,
         Check\VendoredBundleCheck::class,
         Check\DeployHygieneCheck::class,
+        Check\MediaLfsCheck::class,
         Check\GitignoreCheck::class,
         Check\GitignoreCoverageCheck::class,
         Check\SettingsMetadataCheck::class,
