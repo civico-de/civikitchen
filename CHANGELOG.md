@@ -14,6 +14,13 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Fixed
+
+- The composer installs of civikitchen's own tooling in extension CI and
+  release authenticate with the job token, so parallel runs on self-hosted
+  runners behind one IP no longer fail with "Could not authenticate against
+  github.com".
+
 ## [1.61.0] - 2026-11-14
 
 ### Changed

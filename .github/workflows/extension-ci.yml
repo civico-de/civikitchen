@@ -363,6 +363,8 @@ jobs:
         id: dist-build
         env:
           CK_WD: ${{ steps.key.outputs.wd }}
+          # Self-hosted runners share one IP, so anonymous GitHub downloads hit its quota.
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
           CK_USE_BUN: ${{ inputs.bun }}
         run: |
           set -euo pipefail
@@ -483,6 +485,8 @@ jobs:
       # directory, so they are addressed absolutely.
       - name: Check template drift (ckinit --check)
         env:
+          # Self-hosted runners share one IP, so anonymous GitHub downloads hit its quota.
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
           CK_POLICY_DEFAULTS: ${{ inputs.policy_defaults || vars.CK_POLICY_DEFAULTS }}
           CK_WORKING_DIRECTORY: ${{ inputs.working_directory }}
         run: |

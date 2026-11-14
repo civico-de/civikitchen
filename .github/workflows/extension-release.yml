@@ -151,6 +151,9 @@ jobs:
 
       - name: Install the locked CiviKitchen configuration parser
         working-directory: .
+        env:
+          # Self-hosted runners share one IP, so anonymous GitHub downloads hit its quota.
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: |
           composer install --no-dev --no-interaction --no-progress --classmap-authoritative \
             --working-dir=.civikitchen-ci
