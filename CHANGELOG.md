@@ -34,6 +34,12 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - The Playwright toolbelt image carries Docker CLI 29.9.3, which clears the
   fixable HIGH Go standard library CVEs of the 29.5.2 binary.
 
+### Fixed
+
+- The Drupal 10 images build again: their site skips robo 5.2.1 to 5.2.3,
+  which call a Symfony Console method that Drupal 10's Console 6.4 lacks, so
+  every drush command failed.
+
 ## [1.58.0] - 2026-11-13
 
 ### Added

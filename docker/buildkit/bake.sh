@@ -43,6 +43,15 @@ sed -i 's@^  drush8 -y role-add-perm demoadmin "access toolbar"$@  drush8 -y rol
 grep -q 'access navigation' /home/buildkit/buildkit/src/civibuild.lib.sh \
     || echo "bake.sh: NOTE: upstream 'access toolbar' line changed; Drupal 11.4 toolbar-perm patch no longer applies (probably fixed upstream)" >&2
 
+# robo 5.2.1-5.2.3 call Application::addCommand(), which Symfony Console has
+# only from 7.4 (consolidation/robo#1197). Drupal 10 ships Console 6.4, so every
+# drush command dies and civibuild with it. Skip those releases; a fixed robo
+# past 5.2.3 still resolves. Drop this once drush requires such a release.
+sed -i 's@^  composer require drush/drush$@&\n  composer require "consolidation/robo:<5.2.1 || >5.2.3"@' \
+    "/home/buildkit/buildkit/app/config/drupal10-demo/download.sh"
+grep -q 'consolidation/robo' /home/buildkit/buildkit/app/config/drupal10-demo/download.sh \
+    || echo "bake.sh: NOTE: upstream drupal10-demo 'composer require drush/drush' line changed; robo 5.2.1-5.2.3 exclusion no longer applies" >&2
+
 # Upstream civibuild has no drupal11-demo site type — only drupal11-dev (a
 # git/path-repo dev build without demo data, components, or a demoadmin) and
 # drupal11-empty (CMS-only). Install CiviKitchen's own drupal11-demo type
