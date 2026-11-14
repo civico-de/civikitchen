@@ -31,6 +31,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - `scaffold/ck` builds its container from `docker/cli/Dockerfile`; the container
   starts as root and its entrypoint drops to your uid and gid plus the Docker
   socket's group.
+- The Playwright toolbelt image carries Docker CLI 29.9.3, which clears the
+  fixable HIGH Go standard library CVEs of the 29.5.2 binary.
 
 ## [1.58.0] - 2026-11-13
 

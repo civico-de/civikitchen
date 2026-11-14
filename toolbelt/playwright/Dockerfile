@@ -5,7 +5,7 @@ ARG PACKAGE_MANAGER=npm
 ARG BUN_VERSION=none
 ARG PLAYWRIGHT_VERSION=none
 
-FROM docker:29.5.2-cli AS docker-cli
+FROM docker:29.9.3-cli AS docker-cli
 
 # No lifecycle scripts: an install hook in a browser suite's tree would run unseen.
 # The wildcards take the project's install settings when it has them.

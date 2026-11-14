@@ -1,7 +1,7 @@
 # Two images around ck: toolchain (scaffold/ck, a checkout's own code and make targets)
 # and cli (ck's host commands without a checkout). The build context is the repo root.
 # Same docker CLI as toolbelt/playwright/Dockerfile (tests/ckinit/test-ck.sh).
-FROM docker:29.5.2-cli AS docker-cli
+FROM docker:29.9.3-cli AS docker-cli
 
 # Debian: make fetches glibc builds of Node, uv and mago.
 FROM debian:trixie-slim AS toolchain
@@ -16,7 +16,8 @@ ENV CK_TOOLCHAIN=1 LANG=C.UTF-8
 ENTRYPOINT ["ck-entrypoint"]
 
 FROM docker-cli AS cli
-RUN apk add --no-cache curl git setpriv \
+RUN apk upgrade --no-cache \
+ && apk add --no-cache curl git setpriv \
       php84 php84-ctype php84-dom php84-mbstring php84-openssl php84-pcntl php84-posix php84-tokenizer \
  && ln -s /usr/bin/php84 /usr/local/bin/php
 COPY docker/cli/entrypoint.sh /usr/local/bin/ck-entrypoint
