@@ -14,6 +14,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.60.0] - 2026-11-14
+
 ### Added
 
 - ckconform's `changelog` check fails when info.xml's `<releaseDate>` differs
@@ -2797,7 +2799,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.59.0...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.60.0...HEAD
+[1.60.0]: https://github.com/civico-de/civikitchen/compare/v1.59.0...v1.60.0
 [1.59.0]: https://github.com/civico-de/civikitchen/compare/v1.58.0...v1.59.0
 [1.58.0]: https://github.com/civico-de/civikitchen/compare/v1.57.2...v1.58.0
 [1.57.2]: https://github.com/civico-de/civikitchen/compare/v1.57.1...v1.57.2
