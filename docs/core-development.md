@@ -168,9 +168,9 @@ side only, or one without test cases, is an error.
 
 The output names the CiviCRM version of each side, and for a git-built image
 the commits it holds. The daily tags move, so note those commits with a
-result. The compose files and both reports stay in the output directory
-(`--out`, default `./ck-ab-<A>-vs-<B>`); the stacks and their volumes are
-removed at the end unless `--keep` is given.
+result. Both reports stay in the output directory (`--out`, default
+`./ck-ab-<A>-vs-<B>`). The stacks, their volumes and their compose files are
+removed at the end; with `--keep` the stacks and the compose files stay.
 
 ## Recording a change before and after: `ck demo`
 

@@ -24,7 +24,7 @@ ck ab — run the same check on two CiviCRM versions and compare the results
                        e.g. an extension: --mount "$PWD:/var/www/html/ext/myext"
   --locales <list>     install these core language files in both, e.g. it_IT,fr_FR
                        (sets CIVIKITCHEN_LOCALES; default: en_US only)
-  --out <dir>          for the compose files and JUnit reports (default: ./ck-ab-<A>-vs-<B>)
+  --out <dir>          for the JUnit reports and, with --keep, the compose files (default: ./ck-ab-<A>-vs-<B>)
   --keep               leave both stacks running
 
 The command runs in each app container as www-data, from /var/www/html. When it
