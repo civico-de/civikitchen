@@ -31,10 +31,13 @@ final class HandbookCheckTest extends CheckTestCase
         $this->assertFails($this->run_(new HandbookCheck(), $context), 'no workflow calls extension-docs.yml');
     }
 
-    public function testAPublishedHandbookPasses(): void
+    public function testAPublishedAndLinkedHandbookPasses(): void
     {
         $context = $this->repo([
-            'info.xml' => $this->infoXml(license: 'AGPL-3.0-or-later'),
+            'info.xml' => $this->infoXml(
+                license: 'AGPL-3.0-or-later',
+                extra: '<urls><url desc="Documentation">https://example.github.io/fixture/</url></urls>',
+            ),
             'handbook/index.md' => "# Fixture\n",
             '.github/workflows/docs.yml' => self::DOCS_CALLER,
         ], git: true);
@@ -69,5 +72,31 @@ final class HandbookCheckTest extends CheckTestCase
             '__policy_fixture' => "ci=gitlab\n",
         ], git: true);
         $this->assertSilent($this->run_(new HandbookCheck(), $context));
+    }
+
+    public function testAPublishedHandbookWithoutADocumentationLinkFails(): void
+    {
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(
+                license: 'AGPL-3.0-or-later',
+                extra: '<urls><url desc="Main Extension Page">https://github.com/example/fixture</url></urls>',
+            ),
+            'handbook/index.md' => "# Fixture\n",
+            '.github/workflows/docs.yml' => self::DOCS_CALLER,
+        ], git: true);
+        $this->assertFails($this->run_(new HandbookCheck(), $context), 'does not link the published handbook');
+    }
+
+    public function testADocumentationLinkToTheRepositoryFails(): void
+    {
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(
+                license: 'AGPL-3.0-or-later',
+                extra: '<urls><url desc="Documentation">https://github.com/example/fixture</url></urls>',
+            ),
+            'handbook/index.md' => "# Fixture\n",
+            '.github/workflows/docs.yml' => self::DOCS_CALLER,
+        ], git: true);
+        $this->assertFails($this->run_(new HandbookCheck(), $context), 'does not link the published handbook');
     }
 }

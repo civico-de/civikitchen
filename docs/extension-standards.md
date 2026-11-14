@@ -443,7 +443,9 @@ releases is published, and the handbook check then asks for
 `handbook/index.md` plus a job calling
 `extension-docs.yml`
 ([Documentation site](reusable-workflows.md#documentation-site)). A repository of several
-extensions and one on GitLab need only the index.
+extensions and one on GitLab need only the index. Once the site is published,
+info.xml links it as `<url desc="Documentation">` on its `github.io` address,
+which the CiviCRM extension list shows.
 
 ### Versions and tags
 

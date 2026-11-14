@@ -8,7 +8,10 @@ use CiviKitchen\Ckconform\Check;
 use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
-/** An open-source extension ships handbook/ and publishes it through the shared docs workflow. */
+/**
+ * An open-source extension ships handbook/, publishes it through the shared docs workflow
+ * and links the site from info.xml.
+ */
 final class HandbookCheck implements Check
 {
     public const INDEX = 'handbook/index.md';
@@ -42,6 +45,16 @@ final class HandbookCheck implements Check
             $reporter->fail(
                 'handbook/ is not published: no workflow calls ' . self::SHARED_DOCS
                 . ' — add the docs caller from civikitchen\'s docs/reusable-workflows.md#documentation-site'
+            );
+
+            return;
+        }
+        $documentation = $context->infoXml()?->xpath('urls/url[@desc="Documentation"]') ?: [];
+        $host = (string) parse_url(trim((string) ($documentation[0] ?? '')), PHP_URL_HOST);
+        if (!str_ends_with($host, '.github.io')) {
+            $reporter->fail(
+                'info.xml does not link the published handbook: set <url desc="Documentation"> to its site, '
+                . 'https://<owner>.github.io/<repository>/, which the extension list shows'
             );
         }
     }

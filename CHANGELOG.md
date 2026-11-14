@@ -18,6 +18,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 - ckconform's `changelog` check fails when info.xml's `<releaseDate>` differs
   from the date of its version in CHANGELOG.md.
+- ckconform's `handbook` check asks a repository that publishes its handbook to
+  link the site from info.xml as `<url desc="Documentation">` on `github.io`.
 
 ### Changed
 
