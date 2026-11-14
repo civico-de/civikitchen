@@ -7,7 +7,8 @@
 # boots with CIVIKITCHEN_PROFILE=<profile>[,<profile>...] and additionally
 # asserts the runtime profile apply worked (every enabled dependency of each
 # profile and its includes installed, no credentials in the logs, one credentials line per apiUser even
-# when combined profiles share usernames).
+# when combined profiles share usernames), then runs each applied profile's
+# browser suite from tests/e2e/profiles through `scaffold/ck playwright`.
 #
 # Usage:
 #   bash tests/images/boot-test-demo.sh <image> [profile[,profile...]]
@@ -209,9 +210,20 @@ if [ -n "${PROFILE}" ]; then
     else
         echo "  ✗ no API credentials file in the container"; fail=1
     fi
+
+    # 8) What each applied profile promises, in a real browser: its pages,
+    # public forms and extension workflows (tests/e2e/profiles). The browser
+    # shares the app's network namespace, so http://localhost is the site.
+    echo "==> profile e2e (Playwright)"
+    if (cd "$(dirname "$0")/../.." && CIVICRM_BASE_URL=http://localhost CIVIKITCHEN_E2E_CONTAINER="${APP}" \
+        scaffold/ck playwright --network "container:${APP}" -- playwright test tests/e2e/profiles); then
+        echo "  ✓ profile e2e suite passed"
+    else
+        echo "  ✗ profile e2e suite failed"; fail=1
+    fi
 fi
 
-# 8) CIVIKITCHEN_SITE_URL rewrite (no-profile runs only): the demo must also
+# 9) CIVIKITCHEN_SITE_URL rewrite (no-profile runs only): the demo must also
 # work on a non-80 host port when CIVIKITCHEN_SITE_URL is set — the entrypoint
 # rewrites the baked http://localhost base at boot. This must be asserted from
 # the HOST side (the in-container checks above always see port 80), so a second

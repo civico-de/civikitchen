@@ -498,7 +498,7 @@ e2e-ckcreate: ## A fresh ckcreate scaffold passes ck ci in its dev stack (Docker
 test-images: ## Boot tests + dev-tool tests against the published images (~1 h)
 	bash tests/images/run-local.sh
 
-e2e: ## Playwright smoke tests against a running compose stack (in Docker; CIVICRM_BASE_URL)
+e2e: ## Playwright smoke tests against a running compose stack (in Docker; CIVICRM_BASE_URL; CIVIKITCHEN_E2E_CONTAINER adds its profile suites)
 	php toolbelt/bin/ck playwright npm run test:e2e
 
 # --- fetched inputs ----------------------------------------------------------

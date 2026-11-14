@@ -160,6 +160,16 @@ jobs:
           docker pull "$IMG"
           bash tests/images/boot-test-demo.sh "$IMG" ${PROFILE:+"$PROFILE"}
 
+      # A profile leg runs the profile browser suites (tests/e2e/profiles).
+      - name: Upload Playwright report on failure
+        if: failure() && matrix.variant.profile != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report-${{ matrix.variant.tag }}-${{ strategy.job-index }}
+          path: playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
   promote:
     # Stable demo tags only move once the candidates passed the smoke tests
     # (including the runtime profile legs) and the scan, onto the scanned digest.

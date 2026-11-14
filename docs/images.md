@@ -247,6 +247,19 @@ permissions, with the last profile's password and api_key valid. Profiles with
 API users must agree on one AuthX header policy, or the boot fails before any
 change.
 
+Each bundled profile has a browser suite in
+[tests/e2e/profiles/](https://github.com/civico-de/civikitchen/tree/main/tests/e2e/profiles/):
+the data profiles' demo pages, the anonymous event registration and test
+donation, Mosaico's template dialog for `common` and a CiviSEPA batching run
+for `dach`. The demo boot test runs it on every profile leg, on every flavor.
+The suite reads the applied profiles and every URL from the container, so a
+new CiviCRM version runs against the same checks:
+
+```bash
+CIVICRM_BASE_URL=http://localhost CIVIKITCHEN_E2E_CONTAINER=civicrm \
+    scaffold/ck playwright --network container:civicrm -- playwright test tests/e2e/profiles
+```
+
 The first boot clones extensions from GitHub, so it needs network and takes a
 few minutes; the container turns healthy when done. Follow it with
 `docker logs -f civicrm`. API credentials stay out of the logs, in a mode-0600

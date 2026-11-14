@@ -24,6 +24,10 @@ except that a break the consumers are adjusted for ships as a minor, marked
   anonymous visitors through each CMS's own role, on every flavor. `events`
   and `fundraising` use it, so their public registration and donation pages
   work for anonymous visitors on Backdrop and Joomla too.
+- Browser suites per bundled profile in `tests/e2e/profiles`: the demo pages,
+  an anonymous event registration and test donation, Mosaico's template
+  dialog (`common`) and a CiviSEPA batching run (`dach`). Point
+  `CIVIKITCHEN_E2E_CONTAINER` at a booted demo container to run them.
 
 ### Changed
 
@@ -48,7 +52,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
   processor. The `events` events take online registrations with core's
   registration profile.
 - The demo boot test checks every enabled dependency of a profile and its
-  includes, not only the first.
+  includes, not only the first, and runs each applied profile's browser suite
+  (`tests/e2e/profiles`) on every profile leg.
 
 ### Fixed
 
