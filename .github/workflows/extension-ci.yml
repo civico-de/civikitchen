@@ -275,7 +275,7 @@ jobs:
     concurrency:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-key
       cancel-in-progress: true
-    runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON_SMALL || vars.CK_RUNS_ON || 'ubuntu-latest' }}
     # Every job stops at 120 minutes, about twice the longest measured healthy job;
     # the default of 6 hours lets a hung job hold its runner.
     timeout-minutes: 120
@@ -414,7 +414,7 @@ jobs:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-template
       cancel-in-progress: true
     if: ${{ inputs.check_template }}
-    runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON_SMALL || vars.CK_RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 120
     defaults:
       run:
@@ -531,7 +531,7 @@ jobs:
     concurrency:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-osv
       cancel-in-progress: true
-    runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON_SMALL || vars.CK_RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 120
     defaults:
       run:
@@ -637,7 +637,7 @@ jobs:
     concurrency:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-security
       cancel-in-progress: true
-    runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON_SMALL || vars.CK_RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 120
     defaults:
       run:

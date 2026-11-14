@@ -14,6 +14,13 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.61.2] - 2026-11-14
+
+### Changed
+
+- Bare-runner extension checks use `CK_RUNS_ON_SMALL` when set, falling back
+  to the existing runner selection. Explicit `runs_on` still takes precedence.
+
 ## [1.61.1] - 2026-11-14
 
 ### Fixed
@@ -2828,7 +2835,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.61.1...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.61.2...HEAD
+[1.61.2]: https://github.com/civico-de/civikitchen/compare/v1.61.1...v1.61.2
 [1.61.1]: https://github.com/civico-de/civikitchen/compare/v1.61.0...v1.61.1
 [1.61.0]: https://github.com/civico-de/civikitchen/compare/v1.60.0...v1.61.0
 [1.60.0]: https://github.com/civico-de/civikitchen/compare/v1.59.0...v1.60.0
