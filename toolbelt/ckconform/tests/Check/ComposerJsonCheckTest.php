@@ -20,4 +20,22 @@ final class ComposerJsonCheckTest extends CheckTestCase
         $context = $this->repo(['composer.json' => '{}']);
         $this->assertSilent($this->run_(new ComposerJsonCheck(), $context));
     }
+
+    public function testFailsWhenComposerJsonRepeatsTheDescription(): void
+    {
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(extra: '<description>Sends greetings.</description>'),
+            'composer.json' => '{"name": "example/fixture", "description": "Sends greetings."}',
+        ]);
+        $this->assertFails($this->run_(new ComposerJsonCheck(), $context), 'remove "description" from composer.json');
+    }
+
+    public function testSilentWhenOnlyInfoXmlDescribes(): void
+    {
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(extra: '<description>Sends greetings.</description>'),
+            'composer.json' => '{"name": "example/fixture"}',
+        ]);
+        $this->assertSilent($this->run_(new ComposerJsonCheck(), $context));
+    }
 }

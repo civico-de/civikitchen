@@ -14,6 +14,13 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** the description lives only in info.xml. ckconform's
+  `composer-json` check fails when composer.json carries a `description`, and
+  the extension template no longer writes one. Remove the field from
+  composer.json; CiviCRM and the documentation site read info.xml.
+
 ## [1.59.0] - 2026-11-14
 
 ### Added

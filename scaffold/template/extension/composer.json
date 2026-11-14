@@ -1,6 +1,5 @@
 {
   "name": "__VENDOR__/__EXTKEY__",
-  "description": "CiviCRM extension __EXTKEY__",
   "type": "civicrm-ext",
   "license": "__LICENSE__",
   "require": {

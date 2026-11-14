@@ -467,7 +467,9 @@ SemVer are ignored.
 
 ### Committed files
 
-Each repo has a composer.json with the extension metadata. Do not commit
+Each repo has a composer.json with the extension metadata. The description
+lives only in info.xml, which CiviCRM shows; composer.json carries no
+`description`, so the two cannot drift apart. Do not commit
 node_modules, vendor or build artifacts; a frontend build commits only dist/,
 or declares the build under `policy.dist.build` so the release zip carries it.
 .gitignore covers every artifact the repo can produce, such as the phpunit

@@ -1,6 +1,5 @@
 {
   "name": "civico/ckmonobase",
-  "description": "CiviCRM extension ckmonobase",
   "type": "civicrm-ext",
   "license": "AGPL-3.0-or-later",
   "require": {

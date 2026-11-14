@@ -1,6 +1,5 @@
 {
   "name": "civico/ckmonoaddon",
-  "description": "CiviCRM extension ckmonoaddon",
   "type": "civicrm-ext",
   "license": "AGPL-3.0-or-later",
   "require": {
