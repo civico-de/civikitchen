@@ -260,6 +260,14 @@ CIVICRM_BASE_URL=http://localhost CIVIKITCHEN_E2E_CONTAINER=civicrm \
     scaffold/ck playwright --network container:civicrm -- playwright test tests/e2e/profiles
 ```
 
+Every Monday, *Profile E2E (beta)* boots `common,dach` on `:standalone-beta`,
+the next CiviCRM release, and runs the same suites. A failure opens an issue
+and holds back no image. Run it by hand from the Actions tab with another tag
+or profile set, or locally with
+`bash tests/images/e2e-profiles-standalone.sh <image> <profiles>`;
+`CK_CHECKOUT_PROFILES=1` mounts the checkout's profiles and profile schema over
+the image's.
+
 The first boot clones extensions from GitHub, so it needs network and takes a
 few minutes; the container turns healthy when done. Follow it with
 `docker logs -f civicrm`. API credentials stay out of the logs, in a mode-0600

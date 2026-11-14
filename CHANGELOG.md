@@ -28,6 +28,9 @@ except that a break the consumers are adjusted for ships as a minor, marked
   an anonymous event registration and test donation, Mosaico's template
   dialog (`common`) and a CiviSEPA batching run (`dach`). Point
   `CIVIKITCHEN_E2E_CONTAINER` at a booted demo container to run them.
+- *Profile E2E (beta)*: every Monday, the profile browser suites run against
+  `common,dach` on `:standalone-beta`, so an upcoming CiviCRM release that
+  breaks a bundled extension opens an issue before it ships.
 
 ### Changed
 

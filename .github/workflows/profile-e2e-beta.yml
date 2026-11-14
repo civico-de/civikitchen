@@ -1,0 +1,89 @@
+# Weekly: the bundled extension stacks on :standalone-beta, the head of core's
+# newest release branch, through the profile browser suites, so an upcoming
+# CiviCRM release that breaks them shows up before it ships. Reports only: a
+# failure opens an issue and holds back no image.
+name: Profile E2E (beta)
+
+on:
+  schedule:
+    # Mondays, after Build Git Images (03:00) has refreshed :standalone-beta.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Image tag to test, e.g. standalone-beta, standalone-master or standalone.
+        default: standalone-beta
+        type: string
+      profile:
+        description: Comma-separated profile set.
+        default: common,dach
+        type: string
+
+concurrency:
+  group: profile-e2e-beta
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout (for the test script and the suites)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Boot the profile set and run its browser suites
+        env:
+          IMG: ghcr.io/${{ github.repository_owner }}/civikitchen:${{ inputs.tag || 'standalone-beta' }}
+          PROFILE: ${{ inputs.profile || 'common,dach' }}
+        run: |
+          docker pull "$IMG"
+          bash tests/images/e2e-profiles-standalone.sh "$IMG" "$PROFILE"
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report-profile-e2e
+          path: playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  notify-scheduled-failure:
+    needs: [e2e]
+    if: github.event_name == 'schedule' && failure()
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+
+    steps:
+      - name: Checkout (for the notify script)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Open or bump the profile e2e issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LABEL: ci-profile-e2e-beta-failure
+          LABEL_DESCRIPTION: "Weekly profile e2e on :standalone-beta failed"
+          TITLE: Profile e2e on the upcoming CiviCRM release is failing
+          BODY: "The weekly profile browser suites failed on :standalone-beta: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nAn extension in a bundled profile, or a profile seed, does not work on the head of core's newest release branch. No image is held back."
+          AGAIN: "The weekly profile e2e on :standalone-beta failed again: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        run: .github/scripts/notify-scheduled-failure.sh
