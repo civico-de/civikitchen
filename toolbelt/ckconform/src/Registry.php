@@ -27,6 +27,7 @@ final class Registry
         Check\ComposerJsonCheck::class,
         Check\AutoloadPathCheck::class,
         Check\PhpVersionCoherenceCheck::class,
+        Check\CivicrmFloorCheck::class,
         Check\Psr0ClassPathCheck::class,
         Check\CiWorkflowCheck::class,
         Check\ReleaseWorkflowCheck::class,

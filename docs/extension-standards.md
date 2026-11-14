@@ -811,6 +811,12 @@ minor must be on the supported list in
 [images.md](images.md#tags-and-versions). GitLab picks its job image before
 the repository is read, so there CK_IMAGE still names it.
 
+A floor for the CiviCRM versions an extension supports, typically the
+organisation's ESR, is `civicrm_floor: "6.16"`. ckconform's civicrm-floor
+check fails while info.xml's lowest `<compatibility><ver>` is below it; an
+extension that needs a newer core declares a higher floor and passes. It is
+one of the keys an organisation defaults file may set.
+
 A repo whose production server runs another MariaDB names it as
 `database: mariadb:10.11`. ckinit writes it into the managed
 .docker/docker-compose.ci.yml, and into .docker/docker-compose.yml when it

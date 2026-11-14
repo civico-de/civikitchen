@@ -16,6 +16,10 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Added
 
+- `policy.civicrm_floor` ("6.16") sets the lowest CiviCRM minor an
+  extension may declare, typically the ESR; ckconform's `civicrm-floor` check
+  fails while info.xml's `<compatibility>` is below it. An organisation
+  defaults file may set it for every repo.
 - `ghcr.io/civico-de/civikitchen-cli` runs ck's host commands (`playwright`,
   `demo`, `ab`, `run`) without a civikitchen checkout, in one `docker run` line
   ([Building locally](docs/building.md#ck-without-a-checkout)).

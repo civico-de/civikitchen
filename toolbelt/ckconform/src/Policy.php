@@ -51,6 +51,7 @@ final class Policy
         'release' => "ckconform: 'none -- <reason>' for a repo that deliberately cuts no releases",
         'untagged_versions' => 'ckconform: versions the repo moved past that deliberately stay untagged, reason mandatory',
         'max_unreleased_days' => 'ckconform: days of unreleased shipped changes before it is reported',
+        'civicrm_floor' => 'ckconform: the lowest CiviCRM minor info.xml <compatibility> may declare',
         // read by the ck* tools
         'mutation_min_msi' => 'ckmutate: mutation score floor (--min-msi)',
         'mutation_min_covered_msi' => 'ckmutate: covered-code mutation floor (--min-covered-msi)',
@@ -104,7 +105,7 @@ final class Policy
      *
      * @var list<string>
      */
-    public const SHARED = ['license', 'npm_license', 'copyright', 'vendor', 'hook_style', 'max_unreleased_days', 'renovate_preset'];
+    public const SHARED = ['license', 'npm_license', 'copyright', 'vendor', 'hook_style', 'max_unreleased_days', 'renovate_preset', 'civicrm_floor'];
 
     /**
      * The defaults file's contents, null when the variable is unset. A variable
@@ -187,7 +188,7 @@ final class Policy
         self::validateDocument($document);
         $policy = $document['policy'] ?? [];
         $out = [];
-        foreach (['license', 'copyright', 'hook_style', 'npm_license', 'max_unreleased_days', 'renovate_preset', 'ci', 'civicrm', 'database'] as $key) {
+        foreach (['license', 'copyright', 'hook_style', 'npm_license', 'max_unreleased_days', 'renovate_preset', 'ci', 'civicrm', 'civicrm_floor', 'database'] as $key) {
             if (array_key_exists($key, $policy)) $out[$key] = [(string) $policy[$key]];
         }
         if (isset($policy['coverage']['minimum'])) $out['min_coverage'] = [(string) $policy['coverage']['minimum']];
