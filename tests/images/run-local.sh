@@ -7,7 +7,7 @@
 #   bash tests/images/run-local.sh                        # everything, published images
 #   bash tests/images/run-local.sh drupal11 drupal11-demo # a subset
 #   bash tests/images/run-local.sh -p civikitchen drupal11-demo   # locally built tags
-#   CK_PROFILE=verein bash tests/images/run-local.sh drupal10-demo # + a profile leg
+#   CK_PROFILE=common bash tests/images/run-local.sh drupal10-demo # + a profile leg
 #
 # What runs per flavor (same scripts as CI):
 #   dev flavors    test-dev-tools.sh (bundled tooling works)

@@ -4,7 +4,7 @@
 # reinstall` on first boot), the demo image carries an EMBEDDED MariaDB whose
 # data dir was baked at build time (the civibuild `-demo` site). So first boot
 # is just: start MariaDB on the baked data → run the shared opt-in
-# provisioning (incl. an optional CIVIKITCHEN_PROFILE apply, e.g. verein) →
+# provisioning (incl. an optional CIVIKITCHEN_PROFILE apply, e.g. common) →
 # start Apache. No external DB, no reinstall, no 127.0.0.1->host rewrite (the
 # DB host is 127.0.0.1 at both bake and run time, so the baked grants stay
 # valid).

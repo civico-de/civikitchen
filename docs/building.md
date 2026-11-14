@@ -200,7 +200,7 @@ in a throwaway VM. It needs only bash and docker, not gh or node:
 bash tests/images/run-local.sh                          # everything, published images
 bash tests/images/run-local.sh drupal11 drupal11-demo   # a subset
 bash tests/images/run-local.sh -p civikitchen drupal11-demo   # your locally built tags
-CK_PROFILE=verein bash tests/images/run-local.sh drupal10-demo # + a profile leg
+CK_PROFILE=common bash tests/images/run-local.sh drupal10-demo # + a profile leg
 ```
 
 For each dev flavor it runs the dev-tools functional check and the

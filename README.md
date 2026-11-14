@@ -127,11 +127,12 @@ docker run -d -p 80:80 --name civicrm ghcr.io/civico-de/civikitchen:standalone-d
 Open http://localhost and log in as admin / admin. For another host port, set
 `CIVIKITCHEN_SITE_URL` to the URL you open.
 
-A profile adds extensions, seed data and API users on first boot: verein,
-fundraising, events or mailing:
+A profile adds extensions, seed data and API users on first boot: the
+core-only data profiles membership, fundraising, events and mailing, the
+everyday stack common, and the DACH payments stack dach:
 
 ```bash
-docker run -d -p 80:80 --name civicrm -e CIVIKITCHEN_PROFILE=verein \
+docker run -d -p 80:80 --name civicrm -e CIVIKITCHEN_PROFILE=common,dach \
     ghcr.io/civico-de/civikitchen:drupal10-demo
 docker logs -f civicrm   # first boot installs the profile, takes a few minutes
 docker exec civicrm cat /home/buildkit/api-credentials.txt

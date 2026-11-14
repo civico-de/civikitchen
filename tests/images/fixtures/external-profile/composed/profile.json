@@ -1,6 +1,6 @@
 {
   "description": "Composition fixture: a bundled core-only data profile from an external root",
-  "include": ["fundraising-data"],
+  "include": ["fundraising"],
   "dependencies": [],
   "config": {
     "components": ["CiviPledge"]

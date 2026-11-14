@@ -20,6 +20,10 @@ except that a break the consumers are adjusted for ships as a minor, marked
   from the date of its version in CHANGELOG.md.
 - ckconform's `handbook` check asks a repository that publishes its handbook to
   link the site from info.xml as `<url desc="Documentation">` on `github.io`.
+- A profile's `config.anonymous_permissions` adds CiviCRM permissions for
+  anonymous visitors through each CMS's own role, on every flavor. `events`
+  and `fundraising` use it, so their public registration and donation pages
+  work for anonymous visitors on Backdrop and Joomla too.
 
 ### Changed
 
@@ -27,6 +31,30 @@ except that a break the consumers are adjusted for ships as a minor, marked
   `composer-json` check fails when composer.json carries a `description`, and
   the extension template no longer writes one. Remove the field from
   composer.json; CiviCRM and the documentation site read info.xml.
+- **Breaking:** the bundled profiles are now four core-only data profiles,
+  `membership`, `fundraising`, `events` and `mailing` (formerly
+  `verein-data`, `fundraising-data`, `events-data` and `mailing-data`), and
+  two stack profiles: `common`, the most-installed extensions without an
+  external account on all four, and `dach`, CiviSEPA, CiviBanking, Contract,
+  Donation Receipts, CiviOffice, Twingle and GDPRX on `membership`. The stack
+  profiles `verein`, `fundraising`, `events` and `mailing` are gone, and with
+  them RemoteEvent and RemoteTools. Replace `verein` with `dach` (or
+  `common,dach`) and an old stack name with `common`; an external profile
+  that includes a `*-data` profile names it without the suffix. A database
+  seeded by the old profiles keeps its content and gains the demo pages, the
+  donation page and the events' registration profile.
+- Each data profile seeds a SearchKit table with an Afform page under
+  `civicrm/demo/`, and `fundraising` a donation page with a Dummy payment
+  processor. The `events` events take online registrations with core's
+  registration profile.
+- The demo boot test checks every enabled dependency of a profile and its
+  includes, not only the first.
+
+### Fixed
+
+- A bundled data seed writes in one transaction, so a seed that fails part-way
+  leaves nothing behind and the next boot seeds it in full instead of skipping
+  it as already seeded.
 
 ## [1.59.0] - 2026-11-14
 

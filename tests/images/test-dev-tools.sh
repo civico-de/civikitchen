@@ -111,7 +111,7 @@ fi
 # one-off miss on a CI runner is undiagnosable from "✗" alone.
 ck_out=$(ck help 2>&1) || true
 if grep -q 'ck scenario' <<<"${ck_out}"; then ok "ck dispatcher"; else fail "ck dispatcher"; echo "      ${ck_out}"; fi
-ck_out=$(ck profile validate /opt/civikitchen/docker/profiles/verein 2>&1) && ck_rc=0 || ck_rc=$?
+ck_out=$(ck profile validate /opt/civikitchen/docker/profiles/common 2>&1) && ck_rc=0 || ck_rc=$?
 if [ "${ck_rc}" -eq 0 ]; then
     ok "ck profile validates a bundled profile"
 else

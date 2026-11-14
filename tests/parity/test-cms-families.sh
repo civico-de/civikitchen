@@ -16,7 +16,7 @@ output() { sed -n "s/^$1=//p" "$work/out"; }
 
 families ''
 [ "$(output families)" = '["drupal10","drupal11","wordpress","joomla","backdrop"]' ] || fail "default families: $(output families)"
-[ "$(jq length <<<"$(output demo_smoke)")" = 25 ] || fail "every demo family smokes every profile"
+[ "$(jq length <<<"$(output demo_smoke)")" = 10 ] || fail "every demo family smokes every profile"
 while IFS= read -r compose; do
   [ -f "$root/$compose" ] || fail "e2e names a missing compose file: $compose"
 done < <(jq -r '.[].compose' <<<"$(output e2e)")

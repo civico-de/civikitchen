@@ -5,15 +5,15 @@
 # assert the baked site + embedded DB come up. This guards the build-time bake
 # of the embedded DB and the demo entrypoint. An optional second argument
 # boots with CIVIKITCHEN_PROFILE=<profile>[,<profile>...] and additionally
-# asserts the runtime profile apply worked (each profile's extension
-# installed, no credentials in the logs, one credentials line per apiUser even
+# asserts the runtime profile apply worked (every enabled dependency of each
+# profile and its includes installed, no credentials in the logs, one credentials line per apiUser even
 # when combined profiles share usernames).
 #
 # Usage:
 #   bash tests/images/boot-test-demo.sh <image> [profile[,profile...]]
 #   bash tests/images/boot-test-demo.sh civikitchen:drupal10-demo
-#   bash tests/images/boot-test-demo.sh civikitchen:drupal10-demo verein
-#   bash tests/images/boot-test-demo.sh civikitchen:drupal10-demo verein,mailing
+#   bash tests/images/boot-test-demo.sh civikitchen:drupal10-demo common
+#   bash tests/images/boot-test-demo.sh civikitchen:drupal10-demo common,dach
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
@@ -31,7 +31,7 @@ else
     HEALTH_TIMEOUT=300   # baked site → first boot is fast; allow slack
 fi
 
-cleanup() { docker rm -f "${APP}" "${APP}-url" >/dev/null 2>&1 || true; rm -f "${LOGFILE:-}" "${URLPAGE:-}"; }
+cleanup() { docker rm -f "${APP}" "${APP}-url" >/dev/null 2>&1 || true; rm -f "${LOGFILE:-}" "${URLPAGE:-}" "${INSTALLED:-}"; }
 trap cleanup EXIT
 
 echo "==> boot-test (demo) ${IMAGE}${PROFILE:+ profile=${PROFILE}}"
@@ -89,26 +89,35 @@ check "debian-start reaches root over the socket (no ERROR 1045)" \
     "! grep -qF \"Access denied for user 'root'@'localhost'\" '${LOGFILE}'"
 
 # 5+6) Runtime profile apply worked, per profile in the (possibly
-# comma-separated) list: its first enabled extension is installed. Across all
-# of them: credentials stayed out of the logs, and the credentials file has
-# exactly one line per declared apiUser — combined profiles sharing a
-# username (e.g. "readonly") must upsert, not duplicate or drop.
+# comma-separated) list and per included profile: every enabled dependency not
+# skipped on this UF is installed. Across all of them: credentials stayed out of
+# the logs, and the credentials file has exactly one line per declared apiUser
+# — combined profiles sharing a username (e.g. "readonly") must upsert, not
+# duplicate or drop.
+check_profile_deps() {
+    local prof="$1" json="/opt/civikitchen/docker/profiles/$1/profile.json" ext_key
+    if ! docker exec "${APP}" test -f "${json}"; then
+        echo "  ✗ could not read profile.json for '${prof}' from the image"; fail=1
+        return
+    fi
+    while IFS= read -r ext_key; do
+        [ -n "${ext_key}" ] || continue
+        check "profile extension ${ext_key} installed (${prof})" "grep -qxF '${ext_key}' '${INSTALLED}'"
+    done < <(docker exec "${APP}" jq -r --arg uf "${UF}" \
+        '.dependencies[]? | select(.enable) | select((.skipUf // []) | index($uf) | not) | .name' "${json}")
+}
 if [ -n "${PROFILE}" ]; then
     IFS=',' read -ra PROFILES <<< "${PROFILE}"
+    INSTALLED="$(mktemp)"
+    docker exec -u buildkit -w "${WEB}" "${APP}" \
+        bash -lc 'export PATH=/home/buildkit/buildkit/bin:$PATH; cv api4 Extension.get +w status=installed +s key 2>/dev/null' \
+        | jq -r '.[].key' >"${INSTALLED}" || true
     for prof in "${PROFILES[@]}"; do
-        ext_key=$(docker exec "${APP}" \
-            jq -r '[.dependencies[] | select(.enable)][0].name // empty' \
-            "/opt/civikitchen/docker/profiles/${prof}/profile.json" 2>/dev/null || true)
-        if [ -n "${ext_key}" ]; then
-            status=$(docker exec -u buildkit -w /home/buildkit/buildkit/build/site/web "${APP}" \
-                bash -lc "export PATH=/home/buildkit/buildkit/bin:\$PATH; cv api4 Extension.get +w key=${ext_key} +w status=installed +s key 2>/dev/null" || true)
-            check "profile extension ${ext_key} installed (${prof})" "echo '${status}' | grep -q '${ext_key}'"
-        else
-            echo "  ✗ could not read profile.json for '${prof}' from the image"; fail=1
-        fi
+        check_profile_deps "${prof}"
         while IFS= read -r included; do
             [ -n "${included}" ] || continue
             check "included profile ${included} applied (${prof})" "grep -qF '==> [${included}] profile applied' '${LOGFILE}'"
+            check_profile_deps "${included}"
             # The demo image has no snapshot store: a snapshot profile runs its scripts.
             if docker exec "${APP}" jq -e '.snapshot' "/opt/civikitchen/docker/profiles/${included}/profile.json" >/dev/null 2>&1; then
                 check "snapshot profile ${included} ran its scripts (${prof})" \
@@ -159,8 +168,8 @@ if [ -n "${PROFILE}" ]; then
     if [ -n "${api_user}" ] && [ -n "${api_pass}" ]; then
         # Each call asserts BOTH the body and the HTTP status. The body alone
         # is not enough: a fatal during request shutdown (e.g. the standalone
-        # session writer failing after output was sent — exactly what the
-        # remoteevent civicrm_session table collision caused) still produces
+        # session writer failing after output was sent, as an extension that
+        # replaces the civicrm_session table causes on Standalone) still produces
         # a complete JSON body, but with HTTP 500 on every request. A
         # body-only grep shipped that breakage as a green test.
         #

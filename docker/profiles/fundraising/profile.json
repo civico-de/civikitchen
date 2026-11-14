@@ -1,58 +1,40 @@
 {
-  "description": "Fundraising: campaigns, pledges, recurring donors, CiviRules automation, donation receipts",
-  "include": ["fundraising-data"],
-  "authx": {
-    "header_cred": ["jwt", "api_key", "pass"]
-  },
-  "apiUsers": [
-    {
-      "username": "readonly",
-      "role": "civikitchen_api_readonly",
-      "permissions": [
-        "access CiviCRM",
-        "access AJAX API",
-        "view all contacts",
-        "access Contact Dashboard",
-        "access CiviContribute",
-        "access CiviPledge",
-        "access CiviReport",
-        "view all activities"
-      ]
-    },
-    {
-      "username": "fundraiser",
-      "role": "civikitchen_api_fundraiser",
-      "permissions": [
-        "access CiviCRM",
-        "access AJAX API",
-        "view all contacts",
-        "edit all contacts",
-        "add contacts",
-        "access CiviContribute",
-        "edit contributions",
-        "delete in CiviContribute",
-        "access CiviPledge",
-        "edit pledges",
-        "manage campaign",
-        "administer CiviCampaign",
-        "access CiviReport",
-        "view all activities",
-        "delete activities"
-      ]
-    }
-  ],
+  "description": "Spendenwerk Musterstadt e.V.: campaigns, donors with a year of giving, recurring donors, pledges, a donation page with a test payment processor, core only",
   "dependencies": [
     {
-      "name": "org.civicoop.civirules",
-      "repo": "https://lab.civicrm.org/extensions/civirules.git",
-      "version": "848521359f64c413d0bc8c3e20e155a79f370e55",
+      "name": "org.civicrm.search_kit",
       "enable": true
     },
     {
-      "name": "de.systopia.donrec",
-      "repo": "https://github.com/systopia/de.systopia.donrec.git",
-      "version": "c9be29ae1cdd03c251dd92e5ca6a29f54d775de1",
+      "name": "org.civicrm.afform",
       "enable": true
     }
+  ],
+  "config": {
+    "settings": {
+      "defaultCurrency": "EUR"
+    },
+    "components": [
+      "CiviContribute",
+      "CiviCampaign",
+      "CiviPledge"
+    ],
+    "anonymous_permissions": [
+      "make online contributions"
+    ]
+  },
+  "snapshot": {
+    "calendar": "year",
+    "sizes": [
+      "demo"
+    ],
+    "after_restore": [
+      "scripts/20-search.php"
+    ]
+  },
+  "scripts": [
+    "scripts/10-fundraising.php",
+    "scripts/20-search.php",
+    "scripts/30-donation-page.php"
   ]
 }

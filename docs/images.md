@@ -185,8 +185,9 @@ Profiles live in
 one directory each with a `profile.json` and the PHP scripts it names. The
 driver applies dependencies, config, seed and scripts in that order:
 
-- config is written back wherever it differs; components are only switched
-  on, so composed profiles keep each other's.
+- config is written back wherever it differs; components and the
+  permissions of anonymous visitors are only added, so composed profiles keep
+  each other's.
 - seed contacts and contributions are created once per anchor, so UI edits
   survive.
 - scripts run in list order. A seeds/ directory is an error.
@@ -210,35 +211,36 @@ problem. The
 [schema README](https://github.com/civico-de/civikitchen/blob/main/packages/civicrm-profile-schema/README.md)
 has the exact rules.
 
-| Profile | Includes | Extensions | API users |
-|---|---|---|---|
-| `verein` | `verein-data` | CiviBanking, CiviSEPA, Contract, Twingle, GDPRX, XCM, IdentityTracker, ContactLayout; adds a SEPA creditor + 21 direct-debit mandates | readonly, fundraiser, eventmanager, caseworker, bankimporter |
-| `fundraising` | `fundraising-data` | CiviRules, DonRec | readonly, fundraiser |
-| `events` | `events-data` | RemoteEvent, EventMessages, RemoteTools, XCM, IdentityTracker | readonly, eventmanager |
-| `mailing` | `mailing-data` | Mosaico (+ core FlexMailer) | readonly, mailer |
-
-The data profiles hold the records and need only CiviCRM core:
+The data profiles hold the records and need only CiviCRM core. Each also
+seeds a SearchKit table with an Afform page under `civicrm/demo/`:
 
 | Data profile | Components | Seed data |
 |---|---|---|
-| `verein-data` | CiviContribute, CiviMember | Musterverein e.V.: membership types (Voll-/Förder-/Ehrenmitglied), 24 members with addresses + fee history |
-| `fundraising-data` | CiviContribute, CiviCampaign, CiviPledge | 2 campaigns, 18 donors with varied giving history, 6 recurring donors, 4 pledges with installment schedules |
-| `events-data` | CiviEvent | 6 past + upcoming events, 18 contacts with participant records in varied statuses |
-| `mailing-data` | CiviMail | 3 segmented mailing lists, 30 subscribers, a draft newsletter |
+| `membership` | CiviContribute, CiviMember | Musterverein e.V.: membership types (Voll-/Förder-/Ehrenmitglied), 24 members with addresses + fee history; page `civicrm/demo/members` |
+| `fundraising` | CiviContribute, CiviCampaign, CiviPledge | 2 campaigns, 18 donors with varied giving history, 6 recurring donors, 4 pledges with installment schedules, a donation page (`civicrm/contribute/transact`) with a Dummy payment processor, open to anonymous visitors; page `civicrm/demo/donors` |
+| `events` | CiviEvent | 6 past + upcoming events open for anonymous online registration with core's registration profile, 18 contacts with participant records in varied statuses; page `civicrm/demo/events` |
+| `mailing` | CiviMail | 3 segmented mailing lists, 30 subscribers, a draft newsletter; page `civicrm/demo/mailing-lists` |
 
-Includes apply first, depth-first, each profile once; a cycle fails the boot.
-So verein gives the whole Verein world and verein-data only its records.
-RemoteEvent is skipped on Standalone, and ContactLayout on Standalone and
-Joomla, via skipUf in their profile.json.
+Two stack profiles add extensions on top:
+
+| Profile | Includes | Extensions | API users |
+|---|---|---|---|
+| `common` | all four data profiles | CiviRules, Contact Layout, Email API, Mosaico (+ core FlexMailer), SearchKit Tokens, EventMessages, CiviDiscount, Extended Reports, XCM, Identity Tracker | readonly, fundraiser, eventmanager, mailer |
+| `dach` | `membership` | CiviBanking, CiviSEPA, Contract, Donation Receipts, CiviOffice, Twingle, GDPRX, XCM, Identity Tracker; adds a SEPA creditor + 21 direct-debit mandates | readonly, bankimporter |
+
+`common` follows the most-installed extensions on civicrm.org that need no
+external account. `dach` is the payments and receipts stack of German-speaking
+associations. Includes apply first, depth-first, each profile once; a cycle
+fails the boot. A dependency can skip a CMS with `skipUf` in its profile.json.
 
 ```bash
-# German Verein showcase: Drupal 10 + DACH extension stack + seed data + API users
+# Everyday stack plus the DACH payments stack on Drupal 10
 docker run -d -p 80:80 --name civicrm \
-    -e CIVIKITCHEN_PROFILE=verein \
+    -e CIVIKITCHEN_PROFILE=common,dach \
     ghcr.io/civico-de/civikitchen:drupal10-demo
 ```
 
-A comma-separated list such as `verein,mailing` applies left to right without
+A comma-separated list such as `common,dach` applies left to right without
 collisions: present extensions are skipped, config converges, seed records
 exist once, and a user declared by several profiles gets the union of
 permissions, with the last profile's password and api_key valid. Profiles with

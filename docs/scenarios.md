@@ -37,7 +37,7 @@ scenario:
     - de_DE
   default_locale: de_DE
   profiles:
-    - verein
+    - common
   profile_paths:
     - ./profiles
   trust_external_profiles: true

@@ -459,11 +459,9 @@ jobs:
       # apiUser names ("readonly") must upsert, not duplicate.
       smoke: >-
         [{"tag": "standalone-demo", "profile": ""},
-         {"tag": "standalone-demo", "profile": "verein"},
-         {"tag": "standalone-demo", "profile": "fundraising"},
-         {"tag": "standalone-demo", "profile": "events"},
-         {"tag": "standalone-demo", "profile": "mailing"},
-         {"tag": "standalone-demo", "profile": "verein,mailing"}]
+         {"tag": "standalone-demo", "profile": "common"},
+         {"tag": "standalone-demo", "profile": "dach"},
+         {"tag": "standalone-demo", "profile": "common,dach"}]
       civicrm_version: ${{ needs.resolve-civicrm.outputs.stable }}
       civicrm_build_version: ${{ needs.resolve-civicrm.outputs.minor }}
 

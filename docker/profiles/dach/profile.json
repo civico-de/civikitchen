@@ -1,0 +1,103 @@
+{
+  "description": "DACH payments and receipts on the membership data: CiviSEPA with a creditor and mandates, CiviBanking, Contract, Donation Receipts, CiviOffice, Twingle, GDPRX, XCM and Identity Tracker",
+  "include": [
+    "membership"
+  ],
+  "authx": {
+    "header_cred": [
+      "jwt",
+      "api_key",
+      "pass"
+    ]
+  },
+  "apiUsers": [
+    {
+      "username": "readonly",
+      "role": "civikitchen_api_readonly",
+      "permissions": [
+        "access CiviCRM",
+        "access AJAX API",
+        "view all contacts",
+        "access Contact Dashboard",
+        "access CiviContribute",
+        "access CiviMember",
+        "access CiviReport",
+        "view all activities"
+      ]
+    },
+    {
+      "username": "bankimporter",
+      "role": "civikitchen_api_bankimporter",
+      "permissions": [
+        "access CiviCRM",
+        "access AJAX API",
+        "view all contacts",
+        "edit all contacts",
+        "access CiviContribute",
+        "edit contributions",
+        "administer CiviCRM",
+        "view all activities",
+        "delete activities"
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "name": "org.project60.banking",
+      "repo": "https://github.com/Project60/org.project60.banking.git",
+      "version": "3d9c0c0008a48ada0271ae7ff8f832403921d5f6",
+      "enable": true
+    },
+    {
+      "name": "org.project60.sepa",
+      "repo": "https://github.com/Project60/org.project60.sepa.git",
+      "version": "0a82dffd70178be2d37540e5dffe32d8e7857c8b",
+      "enable": true
+    },
+    {
+      "name": "de.systopia.contract",
+      "repo": "https://github.com/systopia/de.systopia.contract.git",
+      "version": "82250a27835e6af4b32d38af0ebd8faca48753cd",
+      "enable": true
+    },
+    {
+      "name": "de.systopia.donrec",
+      "repo": "https://github.com/systopia/de.systopia.donrec.git",
+      "version": "c9be29ae1cdd03c251dd92e5ca6a29f54d775de1",
+      "enable": true
+    },
+    {
+      "name": "de.systopia.civioffice",
+      "repo": "https://github.com/systopia/de.systopia.civioffice.git",
+      "version": "ba1ed9e23f5b972b689fb0e4786e86f658837845",
+      "enable": true
+    },
+    {
+      "name": "de.systopia.xcm",
+      "repo": "https://github.com/systopia/de.systopia.xcm.git",
+      "version": "2eed2d1a38e735444b0ff2ae39903efdd167f196",
+      "enable": true
+    },
+    {
+      "name": "de.systopia.identitytracker",
+      "repo": "https://github.com/systopia/de.systopia.identitytracker.git",
+      "version": "e8d37e9c7d5f15653b1e308390ef55f3a7899a58",
+      "enable": true
+    },
+    {
+      "name": "de.systopia.twingle",
+      "repo": "https://github.com/systopia/de.systopia.twingle.git",
+      "version": "a4c0273bb2546f9f18400c127c8c680aeb47efb2",
+      "enable": true
+    },
+    {
+      "name": "de.systopia.gdprx",
+      "repo": "https://github.com/systopia/de.systopia.gdprx.git",
+      "version": "fbe735bff1d4a68ac9884aef5b239db24c30c262",
+      "enable": true
+    }
+  ],
+  "scripts": [
+    "scripts/20-sepa-mandate.php"
+  ]
+}

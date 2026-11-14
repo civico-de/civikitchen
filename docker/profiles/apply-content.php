@@ -4,7 +4,8 @@
  *
  * Runs via `cv scr` from apply.sh; the profile path comes in CK_PROFILE_JSON
  * (`cv scr` has no argv passthrough).
- *   config  converges on every apply: whatever differs is written back.
+ *   config  converges on every apply: whatever differs is written back;
+ *           anonymous_permissions are added, never revoked.
  *   seed    creates each record once, matched by its anchor (contacts by
  *           external_identifier = ref, contributions by a synthetic trxn_id),
  *           and never touches an existing one, so edits in the UI survive.
@@ -21,11 +22,13 @@ use Civi\Api4\Group;
 use Civi\Api4\GroupContact;
 use Civi\Api4\MailSettings;
 use Civi\Api4\MembershipType;
+use Civi\Api4\Permission;
 use Civi\Api4\Setting;
 use Civi\Api4\SiteEmailAddress;
 use CiviKitchen\Toolbelt\Runtime\ProfileData;
 
 require_once dirname(__DIR__, 2) . '/toolbelt/lib/php/bootstrap.php';
+require_once __DIR__ . '/cms-permissions.php';
 
 $file = getenv('CK_PROFILE_JSON');
 if (!$file || !is_readable($file)) {
@@ -107,6 +110,14 @@ if ($enable !== []) {
 }
 
 // ── preflight 2: everything the remaining writes need ──
+if (!empty($config['anonymous_permissions'])) {
+  // Runs after the components are on: their permissions count as active only then.
+  $active = Permission::get(FALSE)->addSelect('name')->addWhere('group', '=', 'civicrm')
+    ->addWhere('is_active', '=', TRUE)->execute()->column('name');
+  foreach (array_diff($config['anonymous_permissions'], $active) as $name) {
+    $missing[] = "config.anonymous_permissions: {$name} is no active CiviCRM permission";
+  }
+}
 $groupNames = [];
 foreach ($config['groups'] ?? [] as $group) {
   $groupNames[$group['name']] = $group['name'];
@@ -238,6 +249,15 @@ foreach ($config['membership_types'] ?? [] as $type) {
     MembershipType::save(FALSE)->addRecord($wanted)->setMatch(['name'])->execute();
     $changed[] = "membership type {$type['name']}";
   }
+}
+
+if (!empty($config['anonymous_permissions'])) {
+  // The CMS learns the permissions of components switched on above only from a flush.
+  if ($enable !== []) {
+    civicrm_api3('System', 'flush');
+  }
+  ck_grant_anonymous(CRM_Core_Config::singleton()->userFramework, $config['anonymous_permissions']);
+  echo '  anonymous visitors may: ', implode(', ', $config['anonymous_permissions']), "\n";
 }
 
 // ── seed: create what is missing, leave what exists ──

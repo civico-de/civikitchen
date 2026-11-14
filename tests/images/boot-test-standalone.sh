@@ -183,9 +183,9 @@ check "content profile was applied" "docker logs '${APP}' 2>&1 | grep -F '[conte
 order=$(docker logs "${APP}" 2>&1 | grep -E '\[content\] (asserting config|script 10-after-seed)|seed: 2 contact|content fixture script saw' | cut -c1-40 | tr '\n' '|')
 check "content: config + seed before the script (got ${order})" "echo '${order}' | grep -Eq '^==> \[content\] asserting config.*\|  seed: 2 contact.*\|==> \[content\] script 10-after-seed.*\|  content fixture script saw'"
 # 6b') include: the bundled core-only fundraising data loads before the profile
-# that includes it, without any extension.
-order=$(docker logs "${APP}" 2>&1 | grep -E '^==> \[(fundraising-data|composed)\] profile applied' | tr '\n' '|')
-check "include: fundraising-data applied before composed (got ${order})" "[ '${order}' = '==> [fundraising-data] profile applied|==> [composed] profile applied|' ]"
+# that includes it, core extensions only.
+order=$(docker logs "${APP}" 2>&1 | grep -E '^==> \[(fundraising|composed)\] profile applied' | tr '\n' '|')
+check "include: fundraising applied before composed (got ${order})" "[ '${order}' = '==> [fundraising] profile applied|==> [composed] profile applied|' ]"
 pledged=$(cv ev 'echo \Civi\Api4\Pledge::get(FALSE)->selectRowCount()->execute()->count() > 0 && \Civi\Api4\Campaign::get(FALSE)->selectRowCount()->execute()->count() > 0 ? "yes" : "no";' | tr -d '"' || true)
 check "include: core-only pledges and campaigns seeded (got ${pledged:-absent})" "[ '${pledged}' = yes ]"
 check "content: a profile script sees the mounted extension enabled" "docker logs '${APP}' 2>&1 | grep -F 'content fixture script saw the mounted extension' >/dev/null"

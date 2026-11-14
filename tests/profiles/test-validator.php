@@ -36,9 +36,11 @@ $badIdentity = json_decode('{"description":"bad identity","dependencies":[],"api
 validator_expect($profileValidator->validate($badIdentity) !== [], 'credential delimiters are rejected in usernames');
 $tooLongIdentity = json_decode('{"description":"long identity","dependencies":[],"apiUsers":[{"username":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","role":"civikitchen_safe","permissions":["access CiviCRM"]}]}');
 validator_expect($profileValidator->validate($tooLongIdentity) !== [], 'cross-CMS usernames are bounded to 60 characters');
-validator_expect($profileValidator->validate(json_decode('{"description":"composed","include":["verein-data"],"dependencies":[],"config":{"components":["CiviPledge"]}}')) === [], 'include and config.components are part of the format');
+validator_expect($profileValidator->validate(json_decode('{"description":"composed","include":["membership"],"dependencies":[],"config":{"components":["CiviPledge"]}}')) === [], 'include and config.components are part of the format');
 validator_expect($profileValidator->validate(json_decode('{"description":"escape","include":["../other"],"dependencies":[]}')) !== [], 'an include is a profile name, not a path');
 validator_expect($profileValidator->validate(json_decode('{"description":"twice","dependencies":[],"config":{"components":["CiviPledge","CiviPledge"]}}')) !== [], 'a component is listed once');
+validator_expect($profileValidator->validate(json_decode('{"description":"public","dependencies":[],"config":{"anonymous_permissions":["register for events"]}}')) === [], 'config.anonymous_permissions is part of the format');
+validator_expect($profileValidator->validate(json_decode('{"description":"public","dependencies":[],"config":{"anonymous_permissions":[""]}}')) !== [], 'an anonymous permission is no empty string');
 $badRole = json_decode('{"description":"bad role","dependencies":[],"apiUsers":[{"username":"safe","role":"Api-Role","permissions":["access CiviCRM"]}]}');
 validator_expect($profileValidator->validate($badRole) !== [], 'role identifiers use the portable lowercase machine-name intersection');
 $missingGitVersion = json_decode('{"description":"missing pin","dependencies":[{"name":"org.example.demo","repo":"https://example.org/demo.git"}]}');
@@ -63,24 +65,19 @@ foreach (glob(dirname(__DIR__, 2) . '/docker/profiles/*/profile.json') ?: [] as 
   }
 }
 
-$verein = json_decode(
-  (string) file_get_contents(dirname(__DIR__, 2) . '/docker/profiles/verein/profile.json'),
-  TRUE,
-  512,
-  JSON_THROW_ON_ERROR,
-);
-$contactLayout = array_values(array_filter(
-  $verein['dependencies'],
-  static fn(array $dependency): bool => $dependency['name'] === 'org.civicrm.contactlayout',
-));
-validator_expect(count($contactLayout) === 1, 'verein declares Contact Layout exactly once');
-validator_expect(
-  !isset($contactLayout[0]['repo'])
-    && !isset($contactLayout[0]['version'])
-    && ($contactLayout[0]['enable'] ?? false) === true
-    && ($contactLayout[0]['skipUf'] ?? []) === ['Standalone', 'Joomla']
-    && trim((string) ($contactLayout[0]['skipUfReason'] ?? '')) !== '',
-  'verein enables the core-packaged Contact Layout without replacing it and skips Joomla where it is absent',
-);
+// Profiles that apply together must pin a shared git dependency to one commit:
+// the second checkout of a different ref fails the apply.
+$pins = [];
+foreach (glob(dirname(__DIR__, 2) . '/docker/profiles/*/profile.json') as $profileFile) {
+  $profile = json_decode((string) file_get_contents($profileFile), TRUE, 512, JSON_THROW_ON_ERROR);
+  foreach ($profile['dependencies'] ?? [] as $dependency) {
+    if (isset($dependency['repo'])) {
+      $pins[$dependency['name']][$dependency['version']] = TRUE;
+    }
+  }
+}
+foreach ($pins as $name => $versions) {
+  validator_expect(count($versions) === 1, "{$name} is pinned to one commit across the bundled profiles");
+}
 
 echo "profile validator tests passed\n";

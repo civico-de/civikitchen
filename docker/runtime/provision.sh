@@ -481,7 +481,7 @@ ck_fetch_locales() {
 }
 
 # Resolve one profile name across explicit external roots plus the bundled root.
-# Ambiguity is an error rather than an implicit override: selecting `verein`
+# Ambiguity is an error rather than an implicit override: selecting `common`
 # must identify the same scenario on every host regardless of mount order.
 ck_resolve_profile() {
     local name="$1" root candidate

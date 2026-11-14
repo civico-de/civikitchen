@@ -1,78 +1,38 @@
 {
-  "description": "Event management: remote registration, event messages, past + upcoming events with participants",
-  "include": ["events-data"],
-  "authx": {
-    "header_cred": ["jwt", "api_key", "pass"]
-  },
-  "apiUsers": [
-    {
-      "username": "readonly",
-      "role": "civikitchen_api_readonly",
-      "permissions": [
-        "access CiviCRM",
-        "access AJAX API",
-        "view all contacts",
-        "access Contact Dashboard",
-        "access CiviEvent",
-        "view event info",
-        "view event participants",
-        "access CiviReport",
-        "view all activities"
-      ]
-    },
-    {
-      "username": "eventmanager",
-      "role": "civikitchen_api_eventmanager",
-      "permissions": [
-        "access CiviCRM",
-        "access AJAX API",
-        "view all contacts",
-        "edit all contacts",
-        "add contacts",
-        "access CiviEvent",
-        "edit all events",
-        "delete in CiviEvent",
-        "register for events",
-        "view event info",
-        "edit event participants",
-        "view event participants",
-        "access CiviReport",
-        "view all activities"
-      ]
-    }
-  ],
+  "description": "Past and upcoming events with participants in varied statuses, core only",
   "dependencies": [
     {
-      "name": "de.systopia.xcm",
-      "repo": "https://github.com/systopia/de.systopia.xcm.git",
-      "version": "2eed2d1a38e735444b0ff2ae39903efdd167f196",
+      "name": "org.civicrm.search_kit",
       "enable": true
     },
     {
-      "name": "de.systopia.identitytracker",
-      "repo": "https://github.com/systopia/de.systopia.identitytracker.git",
-      "version": "e8d37e9c7d5f15653b1e308390ef55f3a7899a58",
-      "enable": true
-    },
-    {
-      "name": "de.systopia.remotetools",
-      "repo": "https://github.com/systopia/de.systopia.remotetools.git",
-      "version": "040010ce78e3e2aac52c72672657bab961a70ea6",
-      "enable": true
-    },
-    {
-      "name": "de.systopia.remoteevent",
-      "repo": "https://github.com/systopia/de.systopia.remoteevent.git",
-      "version": "a9e8c143243bef3a7f1ee1079dfc79a221aa61c7",
-      "enable": true,
-      "skipUf": ["Standalone"],
-      "skipUfReason": "its civicrm_session table DROPs/replaces standaloneusers' session storage, after which every web request fatals with HTTP 500 - see https://github.com/systopia/de.systopia.remoteevent/issues/128"
-    },
-    {
-      "name": "de.systopia.eventmessages",
-      "repo": "https://github.com/systopia/de.systopia.eventmessages.git",
-      "version": "461a930b3d4768cb65089568f4dda66f1c0e107b",
+      "name": "org.civicrm.afform",
       "enable": true
     }
+  ],
+  "config": {
+    "settings": {
+      "defaultCurrency": "EUR"
+    },
+    "components": [
+      "CiviEvent"
+    ],
+    "anonymous_permissions": [
+      "profile create",
+      "register for events"
+    ]
+  },
+  "snapshot": {
+    "calendar": "none",
+    "sizes": [
+      "demo"
+    ],
+    "after_restore": [
+      "scripts/20-search.php"
+    ]
+  },
+  "scripts": [
+    "scripts/10-events.php",
+    "scripts/20-search.php"
   ]
 }

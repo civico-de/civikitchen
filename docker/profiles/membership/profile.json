@@ -1,0 +1,35 @@
+{
+  "description": "Musterverein e.V.: membership types, members with addresses and last year's fees, core only",
+  "dependencies": [
+    {
+      "name": "org.civicrm.search_kit",
+      "enable": true
+    },
+    {
+      "name": "org.civicrm.afform",
+      "enable": true
+    }
+  ],
+  "config": {
+    "settings": {
+      "defaultCurrency": "EUR"
+    },
+    "components": [
+      "CiviContribute",
+      "CiviMember"
+    ]
+  },
+  "snapshot": {
+    "calendar": "year",
+    "sizes": [
+      "demo"
+    ],
+    "after_restore": [
+      "scripts/20-search.php"
+    ]
+  },
+  "scripts": [
+    "scripts/10-membership.php",
+    "scripts/20-search.php"
+  ]
+}

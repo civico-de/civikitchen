@@ -31,9 +31,9 @@ Reusable `$defs` for consumers that only need a slice:
   are never part of a profile: the applying tool issues random passwords and
   API keys. Usernames and roles follow a bounded cross-CMS identifier grammar.
 
-`config` covers settings, core components, the domain organization,
-from-address, mailbox domain, groups and membership types
-(`membership_types`, asserted by name).
+`config` covers settings, core components, permissions of anonymous visitors
+(`anonymous_permissions`), the domain organization, from-address, mailbox
+domain, groups and membership types (`membership_types`, asserted by name).
 
 `include` names profiles that apply before this one, so a profile can be
 composed from others: for example a data profile that needs core only, plus
@@ -47,7 +47,9 @@ A profile applies in this order: `dependencies` → `config` → `seed` →
   `settings` go first, then `components`, so both count for the rest.
   `settings.enable_components` is the whole list; `components` only switches
   components on, which keeps composed profiles from undoing each other. A
-  component name core does not know is an error.
+  component name core does not know is an error. `anonymous_permissions` are
+  added to the CMS role of anonymous visitors and never revoked; a permission
+  that is not active once the components are on is an error.
 - **`seed`** creates each record once and never touches it again, so edits
   made in the UI survive a re-apply. Contacts are matched by
   `external_identifier` = `ref` and contributions by `trxn_id`

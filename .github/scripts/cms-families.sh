@@ -10,7 +10,7 @@ table='[
   {"name": "joomla",    "site_type": "joomla-demo",   "path": "/administrator/index.php?option=com_civicrm"},
   {"name": "backdrop",  "site_type": "backdrop-demo", "path": "/civicrm"}
 ]'
-profiles='["", "verein", "fundraising", "events", "mailing"]'
+profiles='["", "common,dach"]'
 
 skip=$(jq -cn --arg s "${SKIP:-}" '$s | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(. != ""))')
 unknown=$(jq -cn --argjson t "$table" --argjson s "$skip" '$s - ($t | map(.name))')

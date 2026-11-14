@@ -1,48 +1,34 @@
 {
-  "description": "Email campaigns: Mosaico drag-and-drop templates, segmented newsletter groups, draft mailing",
-  "include": ["mailing-data"],
-  "authx": {
-    "header_cred": ["jwt", "api_key", "pass"]
-  },
-  "apiUsers": [
-    {
-      "username": "readonly",
-      "role": "civikitchen_api_readonly",
-      "permissions": [
-        "access CiviCRM",
-        "access AJAX API",
-        "view all contacts",
-        "access Contact Dashboard",
-        "access CiviMail",
-        "view public CiviMail content",
-        "access CiviReport"
-      ]
-    },
-    {
-      "username": "mailer",
-      "role": "civikitchen_api_mailer",
-      "permissions": [
-        "access CiviCRM",
-        "access AJAX API",
-        "view all contacts",
-        "edit all contacts",
-        "add contacts",
-        "access CiviMail",
-        "delete in CiviMail",
-        "view public CiviMail content",
-        "access CiviReport"
-      ]
-    }
-  ],
+  "description": "Segmented newsletter groups, subscribers and a draft mailing, core only",
   "dependencies": [
     {
-      "name": "org.civicrm.flexmailer",
+      "name": "org.civicrm.search_kit",
       "enable": true
     },
     {
-      "name": "uk.co.vedaconsulting.mosaico",
-      "registry": true,
+      "name": "org.civicrm.afform",
       "enable": true
     }
+  ],
+  "config": {
+    "settings": {
+      "defaultCurrency": "EUR"
+    },
+    "components": [
+      "CiviMail"
+    ]
+  },
+  "snapshot": {
+    "calendar": "none",
+    "sizes": [
+      "demo"
+    ],
+    "after_restore": [
+      "scripts/20-search.php"
+    ]
+  },
+  "scripts": [
+    "scripts/10-mailing.php",
+    "scripts/20-search.php"
   ]
 }

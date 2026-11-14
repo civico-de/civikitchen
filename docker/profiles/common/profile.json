@@ -1,0 +1,154 @@
+{
+  "description": "Everyday stack on the four core domains: CiviRules, Mosaico, Contact Layout, Email API, SearchKit tokens, EventMessages, CiviDiscount, Extended Reports, XCM and Identity Tracker",
+  "include": [
+    "events",
+    "fundraising",
+    "mailing",
+    "membership"
+  ],
+  "authx": {
+    "header_cred": [
+      "jwt",
+      "api_key",
+      "pass"
+    ]
+  },
+  "apiUsers": [
+    {
+      "username": "readonly",
+      "role": "civikitchen_api_readonly",
+      "permissions": [
+        "access AJAX API",
+        "access CiviCRM",
+        "access CiviContribute",
+        "access CiviEvent",
+        "access CiviMail",
+        "access CiviMember",
+        "access CiviPledge",
+        "access CiviReport",
+        "access Contact Dashboard",
+        "view all activities",
+        "view all contacts",
+        "view event info",
+        "view event participants",
+        "view public CiviMail content"
+      ]
+    },
+    {
+      "username": "fundraiser",
+      "role": "civikitchen_api_fundraiser",
+      "permissions": [
+        "access AJAX API",
+        "access CiviCRM",
+        "access CiviContribute",
+        "access CiviPledge",
+        "access CiviReport",
+        "add contacts",
+        "administer CiviCampaign",
+        "delete activities",
+        "delete in CiviContribute",
+        "edit all contacts",
+        "edit contributions",
+        "edit pledges",
+        "manage campaign",
+        "view all activities",
+        "view all contacts"
+      ]
+    },
+    {
+      "username": "eventmanager",
+      "role": "civikitchen_api_eventmanager",
+      "permissions": [
+        "access AJAX API",
+        "access CiviCRM",
+        "access CiviEvent",
+        "access CiviReport",
+        "add contacts",
+        "delete in CiviEvent",
+        "edit all contacts",
+        "edit all events",
+        "edit event participants",
+        "register for events",
+        "view all activities",
+        "view all contacts",
+        "view event info",
+        "view event participants"
+      ]
+    },
+    {
+      "username": "mailer",
+      "role": "civikitchen_api_mailer",
+      "permissions": [
+        "access AJAX API",
+        "access CiviCRM",
+        "access CiviMail",
+        "access CiviReport",
+        "add contacts",
+        "delete in CiviMail",
+        "edit all contacts",
+        "view all contacts",
+        "view public CiviMail content"
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "name": "org.civicoop.civirules",
+      "repo": "https://lab.civicrm.org/extensions/civirules.git",
+      "version": "848521359f64c413d0bc8c3e20e155a79f370e55",
+      "enable": true
+    },
+    {
+      "name": "org.civicrm.contactlayout",
+      "registry": true,
+      "enable": true
+    },
+    {
+      "name": "org.civicoop.emailapi",
+      "registry": true,
+      "enable": true
+    },
+    {
+      "name": "org.civicrm.flexmailer",
+      "enable": true
+    },
+    {
+      "name": "uk.co.vedaconsulting.mosaico",
+      "registry": true,
+      "enable": true
+    },
+    {
+      "name": "sktokens",
+      "registry": true,
+      "enable": true
+    },
+    {
+      "name": "de.systopia.eventmessages",
+      "repo": "https://github.com/systopia/de.systopia.eventmessages.git",
+      "version": "461a930b3d4768cb65089568f4dda66f1c0e107b",
+      "enable": true
+    },
+    {
+      "name": "org.civicrm.module.cividiscount",
+      "registry": true,
+      "enable": true
+    },
+    {
+      "name": "nz.co.fuzion.extendedreport",
+      "registry": true,
+      "enable": true
+    },
+    {
+      "name": "de.systopia.xcm",
+      "repo": "https://github.com/systopia/de.systopia.xcm.git",
+      "version": "2eed2d1a38e735444b0ff2ae39903efdd167f196",
+      "enable": true
+    },
+    {
+      "name": "de.systopia.identitytracker",
+      "repo": "https://github.com/systopia/de.systopia.identitytracker.git",
+      "version": "e8d37e9c7d5f15653b1e308390ef55f3a7899a58",
+      "enable": true
+    }
+  ]
+}

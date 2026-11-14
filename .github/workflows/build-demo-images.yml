@@ -4,7 +4,7 @@
 # build-cms-images.yml for the CMS demo flavors, so the two pipelines share one
 # definition and cannot cancel each other.
 #
-# Profiles (e.g. verein) are not baked into a separate image — they apply at
+# Profiles (e.g. common) are not baked into a separate image — they apply at
 # first boot via CIVIKITCHEN_PROFILE, so there is exactly one demo image per
 # flavor. joomla-demo has the same profile support as the others: the bake
 # finishes civibuild's deliberately-incomplete joomla-demo install (it leaves

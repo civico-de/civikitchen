@@ -1,13 +1,15 @@
 <?php
 // Seed CiviSEPA: a creditor for the Verein and recurring direct-debit (RCUR)
-// mandates for the members created by 10-verein.php — Vollmitglieder pay
+// mandates for the members created by the membership profile — Vollmitglieder pay
 // 120 EUR annually, Fördermitglieder 5 EUR monthly. Uses the CiviSEPA API3
 // actions (the extension has no API4); IBANs are the well-known German test
 // IBANs (valid checksums, no real accounts).
-// Idempotent at each step (get-or-create creditor, skip when mandates exist),
-// so a re-run after a partial failure finishes the job instead of skipping it.
+// Idempotent: gets or creates the creditor; writes the mandates in one
+// transaction and skips them when any exist.
 // cv scr runs without a logged-in user, so every API call disables permission
 // checks explicitly.
+
+require_once __DIR__ . '/../../lib.php';
 
 use Civi\Api4\Contact;
 use Civi\Api4\Extension;
@@ -18,8 +20,7 @@ $installed = Extension::get(FALSE)
   ->addWhere('status', '=', 'installed')
   ->execute()->count();
 if (!$installed) {
-  echo "org.project60.sepa not installed, skipping\n";
-  return;
+  throw new RuntimeException("org.project60.sepa is not installed");
 }
 
 // API3 getcount returns a plain int, not a result array.
@@ -33,8 +34,7 @@ $verein = Contact::get(FALSE)
   ->addWhere('organization_name', '=', 'Musterverein e.V.')
   ->execute()->first();
 if (!$verein) {
-  echo "Verein org not found - run 10-verein.php first\n";
-  return;
+  throw new RuntimeException("Musterverein e.V. not found: the membership profile seeds it");
 }
 
 $creditorIdentifier = 'DE98ZZZ09999999999';
@@ -86,25 +86,27 @@ $members = Contact::get(FALSE)
   ->execute();
 
 $count = 0;
-foreach ($members as $i => $m) {
-  $isFull = $m['membership.membership_type_id:name'] === 'Vollmitgliedschaft';
-  civicrm_api3('SepaMandate', 'createfull', [
-    // Must be a real bool: the v3 wrapper feeds this untouched into the
-    // strictly typed Api4\SepaMandate::createFull(bool $checkPermissions).
-    'check_permissions' => FALSE,
-    'contact_id' => $m['id'],
-    'type' => 'RCUR',
-    'iban' => $testIbans[$i % count($testIbans)],
-    'bic' => 'COBADEFFXXX',
-    'amount' => $isFull ? 120.00 : 5.00,
-    'frequency_unit' => 'month',
-    'frequency_interval' => $isFull ? 12 : 1,
-    'financial_type_id' => $financialType,
-    'start_date' => date('Y-m-d'),
-    'cycle_day' => 1,
-    'creditor_id' => $creditorId,
-  ]);
-  $count++;
-}
+ck_seed_atomically(function () use ($members, $testIbans, $financialType, $creditorId, &$count) {
+  foreach ($members as $i => $m) {
+    $isFull = $m['membership.membership_type_id:name'] === 'Vollmitgliedschaft';
+    civicrm_api3('SepaMandate', 'createfull', [
+      // Must be a real bool: the v3 wrapper feeds this untouched into the
+      // strictly typed Api4\SepaMandate::createFull(bool $checkPermissions).
+      'check_permissions' => FALSE,
+      'contact_id' => $m['id'],
+      'type' => 'RCUR',
+      'iban' => $testIbans[$i % count($testIbans)],
+      'bic' => 'COBADEFFXXX',
+      'amount' => $isFull ? 120.00 : 5.00,
+      'frequency_unit' => 'month',
+      'frequency_interval' => $isFull ? 12 : 1,
+      'financial_type_id' => $financialType,
+      'start_date' => date('Y-m-d'),
+      'cycle_day' => 1,
+      'creditor_id' => $creditorId,
+    ]);
+    $count++;
+  }
+});
 
 echo "created {$count} SEPA mandates\n";

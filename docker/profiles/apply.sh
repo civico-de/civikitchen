@@ -20,7 +20,7 @@
 # profile.schema.json (draft 2020-12, enforced in CI; published as
 # @civico-de/civicrm-profile-schema).
 #
-#   apply.sh <profile-dir> [all|deps|content]   # e.g. /opt/civikitchen/docker/profiles/verein
+#   apply.sh <profile-dir> [all|deps|content]   # e.g. /opt/civikitchen/docker/profiles/common
 set -euo pipefail
 
 # provision-profile appends each packaged extension it swaps for a Git pin to REPLACED_STATE (target<TAB>backup).
@@ -90,10 +90,7 @@ fi
 # "Drupal8", ... A dependency may declare `"skipUf": ["Standalone"]` (values
 # compared against CIVICRM_UF verbatim) plus an optional human "skipUfReason";
 # it is then neither fetched nor enabled on that framework. This exists
-# because an extension can be structurally incompatible with one flavor —
-# e.g. remoteevent's `civicrm_session` table DROPs/replaces standaloneusers'
-# session storage on Standalone, after which every web request fatals
-# (https://github.com/systopia/de.systopia.remoteevent/issues/128).
+# because an extension can be structurally incompatible with one flavor.
 UF="$(cv ev 'echo CIVICRM_UF;')"
 
 if [ "${PHASE}" != content ]; then

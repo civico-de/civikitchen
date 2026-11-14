@@ -2,14 +2,17 @@
 // Shared helpers for profile scripts (listed in profile.json "scripts", run via
 // `cv scr` with a booted CiviCRM). Include from scripts/<file>.php with:
 //   require_once __DIR__ . '/../../lib.php';
-// Helpers are create-only; idempotency guards (skip when already seeded)
-// stay in each script, keyed on data only that script creates.
+// Helpers are create-only, except ck_seed_search_page, which converges by name;
+// idempotency guards stay in each script, keyed on data only that script creates.
 
 use Civi\Api4\Address;
+use Civi\Api4\Afform;
 use Civi\Api4\Contact;
 use Civi\Api4\Email;
 use Civi\Api4\Group;
 use Civi\Api4\GroupContact;
+use Civi\Api4\SavedSearch;
+use Civi\Api4\SearchDisplay;
 
 /**
  * Create an Individual with email and optional address; returns the contact id.
@@ -106,4 +109,50 @@ function ck_seed_org_exists(string $name): bool {
     ->addWhere('organization_name', '=', $name)
     ->selectRowCount()
     ->execute()->count();
+}
+
+/**
+ * Runs a seed's writes in one transaction: a failed seed leaves nothing behind,
+ * so its "already seeded" guard never skips a half-written seed on the next boot.
+ */
+function ck_seed_atomically(callable $seed): void {
+  CRM_Core_Transaction::create()->run(fn () => $seed());
+}
+
+/**
+ * A SavedSearch "$name" with a table display and an Afform page at $route
+ * showing it, matched by name so a re-run converges. The Afform lives in a
+ * file, so a snapshot profile lists the calling script in after_restore too.
+ * $columns maps select keys to column labels.
+ */
+function ck_seed_search_page(string $name, string $title, string $entity, array $apiParams, array $columns, string $route): void {
+  $search = SavedSearch::save(FALSE)
+    ->setRecords([['name' => $name, 'label' => $title, 'api_entity' => $entity, 'api_params' => ['version' => 4] + $apiParams]])
+    ->setMatch(['name'])
+    ->execute()->single();
+  $fields = [];
+  foreach ($columns as $key => $label) {
+    $fields[] = ['type' => 'field', 'key' => $key, 'label' => $label, 'sortable' => TRUE];
+  }
+  SearchDisplay::save(FALSE)
+    ->setRecords([[
+      'name' => "{$name}_Table",
+      'label' => $title,
+      'saved_search_id' => $search['id'],
+      'type' => 'table',
+      'settings' => ['limit' => 50, 'pager' => [], 'actions' => FALSE, 'classes' => ['table', 'table-striped'], 'columns' => $fields],
+    ]])
+    ->setMatch(['name', 'saved_search_id'])
+    ->execute();
+  Afform::save(FALSE)
+    ->setLayoutFormat('html')
+    ->addRecord([
+      'name' => "afsearch{$name}",
+      'type' => 'search',
+      'title' => $title,
+      'server_route' => $route,
+      'permission' => ['access CiviCRM'],
+      'layout' => "<div af-fieldset=\"\"><crm-search-display-table search-name=\"{$name}\" display-name=\"{$name}_Table\"></crm-search-display-table></div>",
+    ])
+    ->execute();
 }

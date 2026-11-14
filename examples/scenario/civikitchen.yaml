@@ -15,7 +15,7 @@ scenario:
     - de_DE
   default_locale: de_DE
   profiles:
-    - verein
+    - common
   credentials_output: file
   checks:
     - conform

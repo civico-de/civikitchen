@@ -37,7 +37,7 @@ A profile without `snapshot` behaves as before.
 The selected profiles (`CIVIKITCHEN_PROFILE` with its dependencies) share one
 snapshot. It holds every profile up to the last one with a `snapshot` block,
 expires with the finest `calendar` among them, and is named after them
-(`fundraising-data+events-data`).
+(`fundraising+events`).
 
 On a database that has not been provisioned yet, the profile driver runs
 `ck seed restore <profile>` before each profile's config, seed and scripts.

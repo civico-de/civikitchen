@@ -164,6 +164,15 @@
         "minLength": 1
       }
     },
+    "anonymous_permissions": {
+          "type": "array",
+          "description": "CiviCRM permissions added for anonymous visitors through the CMS's own role (Drupal and Backdrop anonymous, WordPress anonymous_user, Joomla's guest group, Standalone everyone) — e.g. register for events for a public registration form. Additive and never revoked, so profiles combine. Applied after components; a permission that is not active then is an error.",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
     "domain_name": {
           "type": "string",
           "minLength": 1,

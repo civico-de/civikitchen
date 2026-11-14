@@ -25,6 +25,7 @@ if (!is_readable($credentialsHelper)) {
   throw new \RuntimeException("configure-api-users: missing credentials helper {$credentialsHelper}");
 }
 require_once $credentialsHelper;
+require_once __DIR__ . '/cms-permissions.php';
 $credentialsOutput = ck_credentials_output_mode();
 $apiUsers = $config['apiUsers'] ?? [];
 $uf = CRM_Core_Config::singleton()->userFramework;
@@ -32,52 +33,6 @@ if (!in_array($uf, ['Drupal8', 'Backdrop', 'WordPress', 'Standalone', 'Joomla'],
   throw new \RuntimeException("configure-api-users: unsupported user framework '{$uf}'");
 }
 echo "  🔑 Configuring API access ({$uf})...\n";
-
-/**
- * CiviCRM permission → WordPress capability — the same mapping core applies
- * in CRM_Core_Permission_WordPress::check(): munge(strtolower($perm)).
- */
-function ck_wp_cap(string $perm): string {
-  return CRM_Utils_String::munge(strtolower($perm));
-}
-
-/**
- * Grant permissions to a Drupal role (created on demand). Unknown permission
- * names fail closed: extensions are enabled before this script, so Drupal's
- * inventory is authoritative and a typo must not yield a marker-complete site.
- */
-function ck_drupal_grant(string $roleId, array $perms, bool $exact = FALSE): void {
-  $role = \Drupal\user\Entity\Role::load($roleId)
-    ?: \Drupal\user\Entity\Role::create(['id' => $roleId, 'label' => $roleId]);
-  $known = array_keys(\Drupal::service('user.permissions')->getPermissions());
-  if ($exact) {
-    foreach (array_diff($role->getPermissions(), $perms) as $stale) {
-      $role->revokePermission($stale);
-    }
-  }
-  foreach ($perms as $perm) {
-    if (in_array($perm, $known, TRUE)) {
-      $role->grantPermission($perm);
-    }
-    else {
-      throw new \RuntimeException("configure-api-users: unknown Drupal permission '{$perm}' for role '{$roleId}'");
-    }
-  }
-  $role->save();
-}
-
-/** Backdrop counterpart of ck_drupal_grant(): same fail-closed inventory check. */
-function ck_backdrop_grant(string $roleName, array $perms): void {
-  $role = user_role_load($roleName) ?: (object) ['name' => $roleName, 'label' => $roleName];
-  $known = array_keys(user_permission_get_modules());
-  foreach ($perms as $perm) {
-    if (!in_array($perm, $known, TRUE)) {
-      throw new \RuntimeException("configure-api-users: unknown Backdrop permission '{$perm}' for role '{$roleName}'");
-    }
-  }
-  $role->permissions = array_values(array_unique($perms));
-  user_role_save($role);
-}
 
 const CK_PROFILE_CONTACT_SOURCE = 'CiviKitchen profile API user';
 const CK_PROFILE_ROLE_OPTION_GROUP = 'civikitchen_managed_api_roles';
@@ -422,22 +377,8 @@ if ($apiUsers || ($authxPolicy !== FALSE && $authxPolicy !== '') || isset($confi
       break;
 
     case 'Joomla':
-      // CRM_Core_Permission_Joomla checks permissions via $user->authorise(perm,
-      // 'com_civicrm'), which needs a com_civicrm ACL asset. civibuild never
-      // registers the component (its install script can't run on the layout), so
-      // that asset is absent — create it the way Joomla's installer would, once,
-      // so the per-user grants below have something to attach to. Idempotent.
-      $jdb = \Joomla\CMS\Factory::getContainer()->get(\Joomla\Database\DatabaseInterface::class);
-      $civiAsset = new \Joomla\CMS\Table\Asset($jdb);
-      if (!$civiAsset->loadByName('com_civicrm')) {
-        $civiAsset->name = 'com_civicrm';
-        $civiAsset->title = 'CiviCRM';
-        $civiAsset->setLocation((new \Joomla\CMS\Table\Asset($jdb))->getRootId(), 'last-child');
-        $civiAsset->rules = '{}';
-        if (!$civiAsset->check() || !$civiAsset->store()) {
-          throw new \RuntimeException('configure-api-users: could not create com_civicrm ACL asset: ' . $civiAsset->getError());
-        }
-      }
+      // The per-user grants below attach to the com_civicrm ACL asset.
+      ck_joomla_civicrm_asset();
       break;
   }
 }
@@ -560,25 +501,7 @@ foreach ($apiUsers as $spec) {
       }
       $gid = (int) $grp->id;
 
-      // Grant this role's permissions to the group on the com_civicrm asset.
-      $permObj = new \CRM_Core_Permission_Joomla();
-      $rules = json_decode($db->setQuery(
-        $db->getQuery(TRUE)->select('rules')->from('#__assets')->where($db->quoteName('name') . ' = ' . $db->quote('com_civicrm'))
-      )->loadResult() ?: '{}', TRUE);
-      foreach ($rules as &$groups) {
-        if (is_array($groups)) unset($groups[$gid]);
-      }
-      unset($groups);
-      foreach (array_merge($perms, $authPermissions) as $perm) {
-        $action = $permObj->translateJoomlaPermission($perm);
-        if (is_array($action)) {
-          $rules[$action[0]][$gid] = 1;
-        }
-      }
-      $db->setQuery(
-        $db->getQuery(TRUE)->update('#__assets')->set($db->quoteName('rules') . ' = ' . $db->quote(json_encode($rules)))
-          ->where($db->quoteName('name') . ' = ' . $db->quote('com_civicrm'))
-      )->execute();
+      ck_joomla_grant($gid, array_merge($perms, $authPermissions), TRUE);
 
       // Create/load the user in Registered + the role group (NOT Super Users).
       $jUserFactory = \Joomla\CMS\Factory::getContainer()->get(\Joomla\CMS\User\UserFactoryInterface::class);
