@@ -107,6 +107,10 @@ pushd "${CMS_ROOT}/sites/${DRUPAL_SITE_DIR}" >> /dev/null
   if [ -d "$CIVI_CORE/tools/extensions/org.civicrm.contactlayout" ]; then
     mv $CIVI_CORE/tools/extensions/org.civicrm.contactlayout files/civicrm/ext
   fi
+  # vendor/ is not served either: without the move their JS and CSS answer 404.
+  for ext in org.civicoop.civirules cividiscount; do
+    if [ -d "$CIVI_CORE/tools/extensions/$ext" ]; then mv "$CIVI_CORE/tools/extensions/$ext" files/civicrm/ext/; fi
+  done
   cv api extension.refresh local=1 remote=0
 
   ## Demo sites always disable email and often disable cron

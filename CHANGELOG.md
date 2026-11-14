@@ -24,6 +24,13 @@ except that a break the consumers are adjusted for ships as a minor, marked
   that stay in git, with a reason
   ([Committed files](docs/extension-standards.md#committed-files)).
 
+### Fixed
+
+- The Drupal 10 and 11 demo sites serve CiviRules and CiviDiscount from the
+  site's extension directory. Their packaged copies sat under `vendor/`, which
+  a Composer site does not serve, so their scripts and styles answered 404, for
+  CiviDiscount on every contribution page.
+
 ## [1.60.0] - 2026-11-14
 
 ### Added

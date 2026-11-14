@@ -52,6 +52,15 @@ sed -i 's@^  composer require drush/drush$@&\n  composer require "consolidation/
 grep -q 'consolidation/robo' /home/buildkit/buildkit/app/config/drupal10-demo/download.sh \
     || echo "bake.sh: NOTE: upstream drupal10-demo 'composer require drush/drush' line changed; robo 5.2.1-5.2.3 exclusion no longer applies" >&2
 
+# drupal10-demo clones CiviRules and CiviDiscount into core's tools/extensions
+# under vendor/, which a composer site does not serve: their JS and CSS answer
+# 404 (CiviDiscount's on every contribution page). Move them next to
+# ContactLayout, which upstream already moves into files/civicrm/ext.
+sed -i 's@^  cv api extension.refresh local=1 remote=0$@  for ext in org.civicoop.civirules cividiscount; do\n    if [ -d "$CIVI_CORE/tools/extensions/$ext" ]; then mv "$CIVI_CORE/tools/extensions/$ext" files/civicrm/ext/; fi\n  done\n&@' \
+    "/home/buildkit/buildkit/app/config/drupal10-demo/install.sh"
+grep -q 'for ext in org.civicoop.civirules cividiscount' /home/buildkit/buildkit/app/config/drupal10-demo/install.sh \
+    || echo "bake.sh: NOTE: upstream drupal10-demo 'cv api extension.refresh' line changed; the extension move no longer applies" >&2
+
 # Upstream civibuild has no drupal11-demo site type — only drupal11-dev (a
 # git/path-repo dev build without demo data, components, or a demoadmin) and
 # drupal11-empty (CMS-only). Install CiviKitchen's own drupal11-demo type
