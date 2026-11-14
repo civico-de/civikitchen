@@ -11,7 +11,8 @@
   <urls>
     <url desc="Main Extension Page">https://example.org/ckmonoaddon</url>
   </urls>
-  <releaseDate>2026-01-01</releaseDate>
+  <!-- The repository's CHANGELOG.md, civikitchen's own, dates 1.0.0. -->
+  <releaseDate>2026-07-31</releaseDate>
   <version>1.0.0</version>
   <develStage>stable</develStage>
   <compatibility>

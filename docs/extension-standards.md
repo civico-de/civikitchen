@@ -447,6 +447,9 @@ extensions and one on GitLab need only the index.
 
 ### Versions and tags
 
+info.xml's `<releaseDate>` is the date of its version's section in
+CHANGELOG.md; the changelog check fails when they differ.
+
 The `<version>` in info.xml is X.Y.Z or `X.Y.Z-<pre-release>`: SemVer 2.0
 without build metadata or leading zeros. The ckconform check version-format
 fails on anything else, such as 2.2.7.1, 1.0 or 1.3.0+build.5, because the

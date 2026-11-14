@@ -14,6 +14,11 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- ckconform's `changelog` check fails when info.xml's `<releaseDate>` differs
+  from the date of its version in CHANGELOG.md.
+
 ### Changed
 
 - **Breaking:** the description lives only in info.xml. ckconform's

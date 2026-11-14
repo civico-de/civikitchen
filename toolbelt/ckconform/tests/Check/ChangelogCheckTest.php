@@ -58,4 +58,35 @@ final class ChangelogCheckTest extends CheckTestCase
         $context = $this->monorepoExtension(['CHANGELOG.md' => self::RELEASED], []);
         $this->assertSilent($this->run_(new ChangelogCheck(), $context));
     }
+
+    public function testFailsWhenTheReleaseDateDiffersFromTheChangelog(): void
+    {
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(extra: '<version>1.0.0</version><releaseDate>2026-01-03</releaseDate>'),
+            'CHANGELOG.md' => self::RELEASED,
+        ], git: true);
+        $this->assertFails(
+            $this->run_(new ChangelogCheck(), $context),
+            "<releaseDate> 2026-01-03 differs from 2026-01-01, the date of 1.0.0 in CHANGELOG.md",
+        );
+    }
+
+    public function testAMatchingReleaseDatePasses(): void
+    {
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(extra: '<version>1.0.0</version><releaseDate>2026-01-01</releaseDate>'),
+            'CHANGELOG.md' => self::RELEASED,
+        ], git: true);
+        $this->assertSilent($this->run_(new ChangelogCheck(), $context));
+    }
+
+    /** A version still being prepared has no dated section to compare with. */
+    public function testAVersionWithoutASectionLeavesTheReleaseDateAlone(): void
+    {
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(extra: '<version>1.1.0</version><releaseDate>2026-02-01</releaseDate>'),
+            'CHANGELOG.md' => self::RELEASED,
+        ], git: true);
+        $this->assertSilent($this->run_(new ChangelogCheck(), $context));
+    }
 }

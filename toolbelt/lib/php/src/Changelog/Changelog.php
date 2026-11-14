@@ -70,6 +70,12 @@ final class Changelog
         return $errors;
     }
 
+    /** The date of $version's section, null when it has none. */
+    public function date(string $version): ?string
+    {
+        return $this->versions[self::version($version)] ?? null;
+    }
+
     /** The body of $version's section without its heading, null when there is none. */
     public function section(string $version): ?string
     {

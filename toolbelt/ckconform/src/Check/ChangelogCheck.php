@@ -9,7 +9,10 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 use CiviKitchen\Toolbelt\Changelog\Changelog;
 
-/** The root CHANGELOG.md follows ckchangelog's grammar; its version section is the release notes. */
+/**
+ * The root CHANGELOG.md follows ckchangelog's grammar; its version section is the release notes,
+ * and its date is the one info.xml's <releaseDate> carries.
+ */
 final class ChangelogCheck implements Check
 {
     public function name(): string
@@ -37,6 +40,15 @@ final class ChangelogCheck implements Check
         if ($version !== '' && in_array('v' . $version, $context->tags(), true)
             && !in_array($version, $changelog->versions(), true)) {
             $reporter->fail("info.xml {$version} is released as v{$version}, but " . Changelog::FILE . ' has no section for it');
+        }
+
+        $released = $version === '' ? null : $changelog->date($version);
+        $releaseDate = trim((string) ($context->infoXml()?->releaseDate ?? ''));
+        if ($released !== null && $releaseDate !== '' && $releaseDate !== $released) {
+            $reporter->fail(
+                "info.xml's <releaseDate> {$releaseDate} differs from {$released}, the date of {$version} in "
+                . Changelog::FILE . ": set <releaseDate> to the date of the release"
+            );
         }
     }
 }
