@@ -33,6 +33,12 @@ export function api4<T = Record<string, unknown>>(call: string, params: object =
   return JSON.parse(cv(['api4', call, JSON.stringify(params)])) as T[];
 }
 
+/** APIv3 through cv, for the extensions that offer nothing else; scalar params only. */
+export function api3<T = Record<string, unknown>>(call: string, params: Record<string, string | number> = {}): T {
+  const args = Object.entries(params).map(([key, value]) => `${key}=${value}`);
+  return (JSON.parse(cv(['api3', call, ...args])) as { values: T }).values;
+}
+
 let applied: Set<string> | undefined;
 
 /** The profiles applied to the site, includes resolved the way the driver does. */
@@ -63,6 +69,29 @@ function appliedProfiles(): Set<string> {
 /** Skip the enclosing describe unless the profile was applied. */
 export function requireProfile(name: string) {
   test.skip(!appliedProfiles().has(name), `profile ${name} is not applied`);
+}
+
+let core: number[] | undefined;
+
+/** Major and minor of the site's CiviCRM, so a beta counts as its release. */
+function coreMinor(): number[] {
+  core ??= cv(['ev', 'echo CRM_Utils_System::version();']).split('.').slice(0, 2).map(Number);
+  return core;
+}
+
+const before = (a: number[], b: number[]) => a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]);
+const minor = (version: string) => version.split('.').map(Number);
+
+/**
+ * Call first in a test a known upstream bug breaks (docs/upstream-bugs.md): on
+ * the affected versions, with the profile that triggers it, it must fail, and a
+ * pass turns it red.
+ */
+export function upstreamBug(bug: { url: string; since?: string; fixedIn?: string; profile?: string }) {
+  const site = coreMinor();
+  const affected = !(bug.profile && !appliedProfiles().has(bug.profile))
+    && !(bug.since && before(site, minor(bug.since))) && !(bug.fixedIn && !before(site, minor(bug.fixedIn)));
+  test.fail(affected, `known upstream bug: ${bug.url}`);
 }
 
 let uf: UserFramework | undefined;

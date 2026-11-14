@@ -24,6 +24,7 @@ nav = [
     { "Images and demos" = "images.md" },
     { "Configuration" = "configuration.md" },
     { "Seed snapshots" = "seed-snapshots.md" },
+    { "Known upstream bugs" = "upstream-bugs.md" },
   ] },
   { "Project" = [
     { "Releases" = "releases.md" },

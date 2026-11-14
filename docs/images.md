@@ -250,8 +250,11 @@ change.
 Each bundled profile has a browser suite in
 [tests/e2e/profiles/](https://github.com/civico-de/civikitchen/tree/main/tests/e2e/profiles/):
 the data profiles' demo pages, the anonymous event registration and test
-donation, Mosaico's template dialog for `common` and a CiviSEPA batching run
-for `dach`. The demo boot test runs it on every profile leg, on every flavor.
+donation, a mailing preview with resolved tokens, Mosaico's template dialog for
+`common`, and for `dach` a CiviSEPA batching run, a new contract and a Twingle
+donation. With `common` applied, two checks cover every enabled extension at
+once: each backend menu page renders without a PHP error, and core records are
+created, updated and deleted through all their hooks. The demo boot test runs it on every profile leg, on every flavor.
 The suite reads the applied profiles and every URL from the container, so a
 new CiviCRM version runs against the same checks:
 
@@ -262,7 +265,8 @@ CIVICRM_BASE_URL=http://localhost CIVIKITCHEN_E2E_CONTAINER=civicrm \
 
 Every Monday, *Profile E2E (beta)* boots `common,dach` on `:standalone-beta`,
 the next CiviCRM release, and runs the same suites. A failure opens an issue
-and holds back no image. Run it by hand from the Actions tab with another tag
+and holds back no image; a failure that turns out to be an upstream defect
+follows [Known upstream bugs](upstream-bugs.md). Run it by hand from the Actions tab with another tag
 or profile set, or locally with
 `bash tests/images/e2e-profiles-standalone.sh <image> <profiles>`;
 `CK_CHECKOUT_PROFILES=1` mounts the checkout's profiles and profile schema over

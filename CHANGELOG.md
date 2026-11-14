@@ -14,6 +14,16 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- Profile browser suites: every backend menu page of the applied extension
+  stack must render without a PHP error, core records pass every extension's
+  hooks on create, update and delete, and `dach` signs a contract and takes a
+  Twingle donation; `mailing` previews a mailing with resolved tokens.
+- A documented flow for checks an upstream defect breaks: `upstreamBug()` marks
+  the test as expected to fail on the affected versions, and
+  [Known upstream bugs](docs/upstream-bugs.md) lists them.
+
 ## [1.61.2] - 2026-11-14
 
 ### Changed
