@@ -14,10 +14,13 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
-### Added
+## [1.61.0] - 2026-11-14
 
-- ckconform's `media-lfs` check fails on binary media (png, jpg, jpeg, gif,
-  webp, mp4, webm, pdf) committed to git itself instead of through Git LFS.
+### Changed
+
+- **Breaking:** ckconform's `media-lfs` check fails on binary media (png, jpg,
+  jpeg, gif, webp, mp4, webm, pdf) committed to git itself instead of through
+  Git LFS.
   The template's .gitattributes now routes these types to LFS anywhere in the
   repo, not only `handbook/images/**/*.png`. Run `ckinit --update`, then
   `git add --renormalize` the reported files; `policy.lfs_exempt` lists files
@@ -2816,7 +2819,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.60.0...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.61.0...HEAD
+[1.61.0]: https://github.com/civico-de/civikitchen/compare/v1.60.0...v1.61.0
 [1.60.0]: https://github.com/civico-de/civikitchen/compare/v1.59.0...v1.60.0
 [1.59.0]: https://github.com/civico-de/civikitchen/compare/v1.58.0...v1.59.0
 [1.58.0]: https://github.com/civico-de/civikitchen/compare/v1.57.2...v1.58.0
