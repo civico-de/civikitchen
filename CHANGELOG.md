@@ -14,6 +14,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.61.1] - 2026-11-14
+
 ### Fixed
 
 - The composer installs of civikitchen's own tooling in extension CI and
@@ -2826,7 +2828,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.61.0...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.61.1...HEAD
+[1.61.1]: https://github.com/civico-de/civikitchen/compare/v1.61.0...v1.61.1
 [1.61.0]: https://github.com/civico-de/civikitchen/compare/v1.60.0...v1.61.0
 [1.60.0]: https://github.com/civico-de/civikitchen/compare/v1.59.0...v1.60.0
 [1.59.0]: https://github.com/civico-de/civikitchen/compare/v1.58.0...v1.59.0
