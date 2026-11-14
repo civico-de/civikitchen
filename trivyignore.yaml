@@ -437,3 +437,32 @@ vulnerabilities:
       symfony/yaml 5.4.23, same tree — ReDoS in Parser::cleanup(), same "only
       parses its own config" argument. Recheck after the next Joomla release.
     expired_at: 2027-01-31
+
+  # -------------------------------------------------------------------------
+  # Docker CLI plugins from the docker:*-cli base image
+  #
+  # The cli and Playwright images copy docker-compose (and the cli image
+  # docker-buildx) as the official image ships them. Trivy reads the module
+  # list from the Go build info; the vulnerable package of these modules is
+  # not compiled into the binary.
+  # -------------------------------------------------------------------------
+  - id: CVE-2026-17106
+    paths:
+      - "usr/local/libexec/docker/cli-plugins/docker-buildx"
+    statement: >-
+      Link following in moby/go-archive's tar extraction. buildx v0.39.0
+      vendors only go-archive/compression, and the binary carries no
+      go-archive symbol, so the extraction code is absent. Delete once a
+      buildx release requires go-archive >= 0.3.0
+      (docker buildx version; vendor/modules.txt at that tag).
+    expired_at: 2027-01-31
+
+  - id: CVE-2026-78661
+    paths:
+      - "usr/local/libexec/docker/cli-plugins/docker-compose"
+    statement: >-
+      Denial of service in golang.org/x/net/html. compose v5.7.1 links x/net's
+      http2, trace, idna and dnsmessage packages but not html (no
+      golang.org/x/net/html symbol in the binary). Delete once a compose
+      release requires x/net >= 0.62.0.
+    expired_at: 2027-01-31
