@@ -60,10 +60,11 @@ cv scr "${SHARE_DIR}/joomla-enable-plugins.php"
 
 # (b) Enable the standard component extensions the Drupal/WP demo types ship
 #     (joomla-demo ships only civi_contribute) so the profiles' APIv4 entities
-#     (MembershipType, …) exist. One at a time, deps first (afform needs
-#     search_kit; civi_case needs afform) — a batched enable can't autoload a
+#     (MembershipType, …) exist, plus civiimport, which core requires and the
+#     import routes need. One at a time, deps first (afform needs search_kit;
+#     civi_case and civiimport need afform) — a batched enable can't autoload a
 #     just-enabled dependency in the same process. ext:enable is idempotent.
-for ext in org.civicrm.search_kit org.civicrm.afform civi_member civi_event civi_case civi_campaign civi_pledge civi_report civi_mail; do
+for ext in org.civicrm.search_kit org.civicrm.afform civiimport civi_member civi_event civi_case civi_campaign civi_pledge civi_report civi_mail; do
     cv ext:enable "${ext}"
 done
 
@@ -91,10 +92,10 @@ mkdir -p "${ext_dst}"
 cp -a "${SHARE_DIR}/ext/ckjoomlaidentity/." "${ext_dst}/"
 cv ext:enable ckjoomlaidentity
 
-# (e) Keep PHP notices out of the pages, as the Drupal and WordPress demos do:
-#     Joomla's 'default' takes PHP's display_errors, which is on without a php.ini.
-sed -i "s/public \$error_reporting = '[a-z]*';/public \$error_reporting = 'none';/" "${SITE_WEB}/configuration.php"
-grep -q "public \$error_reporting = 'none';" "${SITE_WEB}/configuration.php"
+# (e) Keep PHP warnings out of the pages, as the Drupal and WordPress demos do. On a
+#     localhost URL core's Smarty raises error_reporting to E_ALL, so only display_errors
+#     hides them; Joomla's 'simple'/'maximum' still turn it on.
+printf 'php_flag display_errors off\n' > "${SITE_WEB}/.htaccess"
 
 cv flush
 echo "==> joomla-finish: done"
