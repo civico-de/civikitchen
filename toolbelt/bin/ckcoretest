@@ -12,7 +12,8 @@
 #
 # The fetched tree is cached in the container ([core]/tests/.ckcoretest-version
 # marker); re-runs skip the network. A core that already ships tests/ (a
-# CIVICRM_SOURCE=git build) is left untouched.
+# CIVICRM_SOURCE=git build) is left untouched. A tests/ mounted from a checkout
+# into a tarball core stays as it is and gets only the config and the seed SQL.
 #
 # Requires the CIVIKITCHEN_TEST_DB provisioning (the default): without a
 # TEST_DB_DSN in ~/.cv.json this refuses to run, because headless phpunit
@@ -71,9 +72,19 @@ if [ -z "${version}" ]; then
 fi
 
 marker="${CK_CORE_DIR}/tests/.ckcoretest-version"
+# fetch: all (tests/ and what belongs to it), config (a tests/ mounted from a
+# checkout into a release tarball, which still lacks the rest) or none.
+fetch=none
 if [ -d "${CK_CORE_DIR}/tests/phpunit" ] && [ ! -f "${marker}" ]; then
-  echo "[ckcoretest] ${CK_CORE_DIR}/tests already present (git checkout?) — not touching it"
+  if [ -f "${CK_CORE_DIR}/phpunit.xml.dist" ]; then
+    echo "[ckcoretest] ${CK_CORE_DIR}/tests already present (git checkout?) — not touching it"
+  else
+    fetch=config
+  fi
 elif [ ! -f "${marker}" ] || [ "$(cat "${marker}")" != "${version}" ]; then
+  fetch=all
+fi
+if [ "${fetch}" != none ]; then
   # Tarball images carry release versions only, and each has a tag; a version without
   # one (an alpha) comes from a git-source image, which ships tests/ itself.
   rc=0
@@ -85,7 +96,11 @@ elif [ ! -f "${marker}" ] || [ "$(cat "${marker}")" != "${version}" ]; then
   elif [ "${rc}" != 0 ]; then
     ck_die "git ls-remote ${CK_CORE_REPO} failed (exit ${rc})"
   fi
-  echo "[ckcoretest] Fetching tests, phpunit config and seed SQL for core ${version}..."
+  if [ "${fetch}" = config ]; then
+    echo "[ckcoretest] ${CK_CORE_DIR}/tests already present; fetching phpunit config and seed SQL for core ${version}..."
+  else
+    echo "[ckcoretest] Fetching tests, phpunit config and seed SQL for core ${version}..."
+  fi
   src=$(mktemp -d)
   trap 'rm -rf "${src}"' EXIT
   # The dist export-ignores **/tests/** — restore core's tests/ AND the
@@ -95,23 +110,30 @@ elif [ ! -f "${marker}" ] || [ "$(cat "${marker}")" != "${version}" ]; then
   git -C "${src}/core" sparse-checkout set --no-cone \
       '/phpunit.xml.dist' '/tests/' '/ext/**/tests/' \
       '/sql/test_data.mysql' '/sql/test_data_second_domain.mysql'
-  rm -rf "${CK_CORE_DIR}/tests"
-  mv "${src}/core/tests" "${CK_CORE_DIR}/tests"
-  cp "${src}/core/phpunit.xml.dist" "${CK_CORE_DIR}/phpunit.xml.dist"
-  cp "${src}/core/sql/test_data.mysql" "${src}/core/sql/test_data_second_domain.mysql" \
-      "${CK_CORE_DIR}/sql/"
-  # ext suites can nest (ext/afform/core/tests), so walk rather than glob
-  while IFS= read -r d; do
-    rel="${d#"${src}/core/"}"
-    dest="${CK_CORE_DIR}/${rel}"
-    [ -d "$(dirname "${dest}")" ] || continue
-    rm -rf "${dest}"
-    mv "${d}" "${dest}"
-  done < <(find "${src}/core/ext" -type d -name tests -prune 2>/dev/null)
-  echo "${version}" > "${marker}"
-  chown -R www-data:www-data "${CK_CORE_DIR}/tests" "${CK_CORE_DIR}/phpunit.xml.dist" \
-      "${CK_CORE_DIR}/sql/test_data.mysql" "${CK_CORE_DIR}/sql/test_data_second_domain.mysql" \
-      "${CK_CORE_DIR}"/ext/*/tests 2>/dev/null || true
+  owned=()
+  # phpunit.xml.dist last: beside a mounted tests/ it is what says nothing is left to fetch.
+  for file in sql/test_data.mysql sql/test_data_second_domain.mysql phpunit.xml.dist; do
+    # Beside a mounted tests/, a file that is there may be a checkout's: it stays.
+    if [ "${fetch}" = all ] || [ ! -e "${CK_CORE_DIR}/${file}" ]; then
+      cp "${src}/core/${file}" "${CK_CORE_DIR}/${file}"
+      owned+=("${CK_CORE_DIR}/${file}")
+    fi
+  done
+  if [ "${fetch}" = all ]; then
+    rm -rf "${CK_CORE_DIR}/tests"
+    mv "${src}/core/tests" "${CK_CORE_DIR}/tests"
+    # ext suites can nest (ext/afform/core/tests), so walk rather than glob
+    while IFS= read -r d; do
+      rel="${d#"${src}/core/"}"
+      dest="${CK_CORE_DIR}/${rel}"
+      [ -d "$(dirname "${dest}")" ] || continue
+      rm -rf "${dest}"
+      mv "${d}" "${dest}"
+    done < <(find "${src}/core/ext" -type d -name tests -prune 2>/dev/null)
+    echo "${version}" > "${marker}"
+    owned+=("${CK_CORE_DIR}/tests" "${CK_CORE_DIR}"/ext/*/tests)
+  fi
+  chown -R www-data:www-data ${owned[@]+"${owned[@]}"} 2>/dev/null || true
 fi
 
 if [ "${1:-}" = "--fetch-only" ]; then

@@ -53,6 +53,10 @@ except that a break the consumers are adjusted for ships as a minor, marked
   constraint is incorrectly formed" (errno 150) when the test database was
   built by another core version. `ck_headless()` prints both versions and
   rebuilds the test database. Run `ckinit --update` to pick up the template.
+- `ckcoretest` on a release image with `tests/` mounted from a checkout
+  fetches `phpunit.xml.dist` and missing seed SQL of the installed version and
+  leaves the mounted tests as they are. Before, it fetched nothing and every
+  test class failed with `Class "CiviUnitTestCase" not found`.
 
 ## [1.61.2] - 2026-11-14
 

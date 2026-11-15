@@ -2,7 +2,8 @@
 # ckcoretest --e2e runs only @group e2e against the dev site, as www-data when started as root:
 # no UnitTests UF and no TEST_DB_DSN gate. Headless runs keep both and get core's startup ini.
 # A test path below a directory with its own phpunit.xml.dist runs from there.
-# A core version without a tag stops before fetching. Fakes record the calls.
+# A core version without a tag stops before fetching; a mounted tests/ in a release
+# tarball gets its phpunit config from the tag. Fakes record the calls.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -126,5 +127,43 @@ fi
 grep -q 'core 6.21.alpha1 has no tag' "$work/err" || fail "the refusal must name the untagged version: $(cat "$work/err")"
 grep -q 'CIVICRM_SOURCE=git' "$work/err" || fail "the refusal must point at git-source images: $(cat "$work/err")"
 [[ ! -e "$alpha/tests" ]] || fail "a refused fetch must not touch the core tree"
+
+# tests/ from a checkout mounted into a release tarball: the phpunit config and the seed
+# SQL still come from the tag, and the mounted tests stay as they are.
+git init --quiet --initial-branch=main "$work/tagged"
+mkdir -p "$work/tagged/tests/phpunit" "$work/tagged/sql"
+echo '<phpunit bootstrap="tests/phpunit/CiviTest/bootstrap.php"/>' > "$work/tagged/phpunit.xml.dist"
+echo 'of the tag' > "$work/tagged/tests/phpunit/FromTagTest.php"
+echo 'seed' > "$work/tagged/sql/test_data.mysql"
+echo 'second' > "$work/tagged/sql/test_data_second_domain.mysql"
+git -C "$work/tagged" add --all
+git -C "$work/tagged" -c user.name=Test -c user.email=test@example.org -c commit.gpgsign=false commit --quiet --message release
+git -C "$work/tagged" tag 6.20.1
+mounted="$work/mounted"
+mkdir -p "$mounted/xml" "$mounted/sql" "$mounted/tests/phpunit"
+echo '<?xml version="1.0"?><version><version_no>6.20.1</version_no></version>' > "$mounted/xml/version.xml"
+echo 'of the checkout' > "$mounted/tests/phpunit/ReproducerTest.php"
+echo 'of the checkout' > "$mounted/sql/test_data.mysql"
+CK_CORE_DIR="$mounted" CK_CORE_REPO="$work/tagged" bash "$root/toolbelt/bin/ckcoretest" --fetch-only >"$work/out" 2>&1 \
+  || fail "a mounted tests/ without phpunit.xml.dist must fetch the config: $(cat "$work/out")"
+grep -q 'bootstrap=' "$mounted/phpunit.xml.dist" || fail "phpunit.xml.dist was not fetched from the tag: $(cat "$work/out")"
+[ "$(cat "$mounted/sql/test_data_second_domain.mysql")" = second ] || fail "the missing seed SQL was not fetched from the tag"
+[ "$(cat "$mounted/sql/test_data.mysql")" = 'of the checkout' ] || fail "seed SQL that is there, as in a mounted sql/, must stay as it is"
+[[ "$(cat "$mounted/tests/phpunit/ReproducerTest.php")" == 'of the checkout' && ! -e "$mounted/tests/phpunit/FromTagTest.php" \
+  && ! -e "$mounted/tests/.ckcoretest-version" ]] || fail "a mounted tests/ must stay as it is: $(ls -A "$mounted/tests" "$mounted/tests/phpunit")"
+# With the config in place the tree is complete, and nothing is fetched again.
+CK_CORE_DIR="$mounted" CK_CORE_REPO="$work/nowhere" bash "$root/toolbelt/bin/ckcoretest" --fetch-only >"$work/out" 2>&1 \
+  || fail "a complete tree must not fetch: $(cat "$work/out")"
+grep -q 'not touching it' "$work/out" || fail "a complete tree must be left alone: $(cat "$work/out")"
+
+# A fetch that stops halfway leaves no config behind, so the next run fetches again.
+partial="$work/partial"
+mkdir -p "$partial/xml" "$partial/tests/phpunit"
+echo '<?xml version="1.0"?><version><version_no>6.20.1</version_no></version>' > "$partial/xml/version.xml"
+echo 'in the way' > "$partial/sql"
+if CK_CORE_DIR="$partial" CK_CORE_REPO="$work/tagged" bash "$root/toolbelt/bin/ckcoretest" --fetch-only >"$work/out" 2>&1; then
+  fail "seed SQL that cannot be written must fail the fetch: $(cat "$work/out")"
+fi
+[[ ! -e "$partial/phpunit.xml.dist" ]] || fail "a fetch that failed on the seed SQL must not leave the config that ends fetching"
 
 echo "ckcoretest: ok"
