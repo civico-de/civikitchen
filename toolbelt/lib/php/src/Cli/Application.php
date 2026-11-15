@@ -139,6 +139,9 @@ final class Application
         if ($command === 'run') {
             return (new RunCommand($this->runner))->run($arguments);
         }
+        if ($command === 'bisect') {
+            return (new BisectCommand($this->runner))->run($arguments);
+        }
         if ($command === 'demo') {
             return (new DemoCommand($this->checkoutRoot, $this->runner))->run($arguments);
         }
@@ -195,6 +198,7 @@ ck — CiviKitchen extension-development toolbelt
   ck demo [args]          record a core change before and after (on the host: scaffold/ck)
   ck ab [args]            run one check on two CiviCRM versions and compare (on the host: scaffold/ck)
   ck run [args]           run a command in a fresh Standalone stack of one version (on the host: scaffold/ck)
+  ck bisect [args]        find the civicrm-core commit at which a check starts to fail (on the host: scaffold/ck)
   ck playwright [args]    run a command with the project's Playwright in Docker (on the host: scaffold/ck)
 
 Use `ck <command> --help` for command-specific help.

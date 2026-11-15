@@ -111,7 +111,10 @@ services:
 `ck demo <PR>` records a core change before and after, on one CMS or all of
 them, as videos side by side on one page.
 
-`ck run`, `ck ab`, `ck demo` and `ck playwright` start their own containers.
+`ck bisect <image> --core <checkout> --good <rev> --bad <rev> --dir <name> -- <command>`
+finds the core commit at which a command starts to fail.
+
+`ck run`, `ck ab`, `ck bisect`, `ck demo` and `ck playwright` start their own containers.
 They run from a checkout through `scaffold/ck`, or without one from the image
 `ghcr.io/civico-de/civikitchen-cli`
 ([one command](docs/building.md#ck-without-a-checkout)).
@@ -154,7 +157,7 @@ after their tests pass. Extensions pin the v1 release tags.
 |----------|----------|
 | [Images](docs/images.md) | Flavors, demo images, profiles, tags, database compatibility, custom versions |
 | [Configuration](docs/configuration.md) | Environment variables the images read |
-| [Core development](docs/core-development.md) | ckcoretest, unreleased core branches, mounting a core checkout, before/after recordings |
+| [Core development](docs/core-development.md) | ckcoretest, unreleased core branches, mounting a core checkout, comparing versions, bisecting, before/after recordings |
 | [Extension development](docs/extension-development.md) | Dev stack, tests, civix, analysis, Playwright, debugging |
 | [Extension standards](docs/extension-standards.md) | What the gates enforce and why |
 | [Declarative scenarios](docs/scenarios.md) | civikitchen.yaml: policy and stack scenarios |

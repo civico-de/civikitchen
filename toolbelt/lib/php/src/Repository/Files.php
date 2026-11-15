@@ -99,6 +99,18 @@ final class Files
     }
 
     /**
+     * The guarded git command line for a work tree the caller names, which is
+     * not the one around the cwd.
+     *
+     * @param list<string> $arguments
+     * @return non-empty-list<string>
+     */
+    public static function gitCommandIn(string $worktree, array $arguments): array
+    {
+        return ['git', '-C', $worktree, '-c', 'safe.directory=' . $worktree, ...$arguments];
+    }
+
+    /**
      * The worktree root around the cwd, which git must be told to trust: the cwd
      * itself, in an extension subdirectory, would leave dubious ownership standing.
      * Walked rather than asked, because `rev-parse --show-toplevel` is itself

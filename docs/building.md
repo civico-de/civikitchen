@@ -42,7 +42,7 @@ that user plus the Docker socket's group, so files it writes belong to you.
 ## ck without a checkout
 
 `ghcr.io/civico-de/civikitchen-cli` (target `cli` of the same Dockerfile)
-carries ck's host commands — `playwright`, `demo`, `ab` and `run` — and needs
+carries ck's host commands — `playwright`, `demo`, `ab`, `run` and `bisect` — and needs
 no civikitchen checkout. Run it from a directory below `$HOME`:
 
 ```bash

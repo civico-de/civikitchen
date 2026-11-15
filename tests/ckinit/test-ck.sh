@@ -33,7 +33,20 @@ if "$root/scaffold/ck" > /dev/null 2>&1; then fail "a bare ck must fail"; fi
 if "$root/scaffold/ck" lint > /dev/null 2> "$work/err"; then fail "ck lint must fail"; fi
 grep -qF 'ckx ck lint' "$work/err" || fail "no pointer to ckx: $(cat "$work/err")"
 "$root/scaffold/ck" --help | grep -qF 'ck playwright npm run test:e2e' || fail "--help prints no usage"
+# The usage is the header comment, whole: its last line is not a command.
+[ "$("$root/scaffold/ck" --help | tail -n 1)" = 'Every other ck command runs in the dev stack: ckx ck <command>.' ] \
+  || fail "--help does not end with the header's last line"
 test ! -e "$FAKE_DOCKER_LOG" || fail "a refused command reached Docker"
+
+# Every host command of the usage goes to ck in the container.
+for command in demo ab run bisect; do
+  "$root/scaffold/ck" --help | grep -qE "^  .*ck $command " || fail "--help names no ck $command"
+  : > "$FAKE_DOCKER_LOG"
+  (cd "$root" && "$root/scaffold/ck" "$command" --help) > /dev/null || fail "ck $command is refused"
+  grep -qE "^run .*civikitchen-ck:[0-9]+ php $root/toolbelt/bin/ck $command --help$" "$FAKE_DOCKER_LOG" \
+    || fail "ck $command did not reach ck in the container: $(cat "$FAKE_DOCKER_LOG")"
+done
+rm -f "$FAKE_DOCKER_LOG"
 
 # A project outside $HOME: home, checkout and work tree are mounted at their own paths.
 mkdir -p "$work/home" "$work/tree/.git" "$work/tree/e2e"

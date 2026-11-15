@@ -23,6 +23,11 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - A documented flow for checks an upstream defect breaks: `upstreamBug()` marks
   the test as expected to fail on the affected versions, and
   [Known upstream bugs](docs/upstream-bugs.md) lists them.
+- `ck bisect <image> --core <checkout> --good <rev> --bad <rev> --dir <name> -- <command>`
+  finds the civicrm-core commit at which a check starts to fail: one
+  Standalone stack with directories of the checkout mounted, `git bisect run`
+  over the range, and a rerun on the commit found and its parents
+  ([Core development](docs/core-development.md#finding-the-commit-ck-bisect)).
 
 ### Changed
 

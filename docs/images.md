@@ -169,7 +169,7 @@ use the api_key credential as a bearer token in the X-Civi-Auth header.
 ## CLI image
 
 `ghcr.io/civico-de/civikitchen-cli` holds no CiviCRM. It carries ck's host
-commands (`run`, `ab`, `demo`, `playwright`) and the docker CLI, and starts
+commands (`run`, `ab`, `bisect`, `demo`, `playwright`) and the docker CLI, and starts
 the stacks from the images above through the host's Docker socket.
 [ck without a checkout](building.md#ck-without-a-checkout) has the command.
 

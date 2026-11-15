@@ -115,7 +115,7 @@ directory, needs a rebuilt image.
 and removes the stack with its volumes. It runs on the host through
 `scaffold/ck` and needs no compose file. Without a civikitchen checkout the
 [civikitchen-cli image](building.md#ck-without-a-checkout) runs the same
-`ck run`, `ck ab` and `ck demo` command lines.
+`ck run`, `ck ab`, `ck bisect` and `ck demo` command lines.
 
 ```bash
 ck run standalone-master -- ckcoretest tests/phpunit/api/v4/Query
@@ -171,6 +171,65 @@ the commits it holds. The daily tags move, so note those commits with a
 result. Both reports stay in the output directory (`--out`, default
 `./ck-ab-<A>-vs-<B>`). The stacks, their volumes and their compose files are
 removed at the end; with `--keep` the stacks and the compose files stay.
+
+## Finding the commit: `ck bisect`
+
+`ck bisect` names the civicrm-core commit at which a check starts to fail. It
+boots one Standalone stack, mounts directories of a civicrm-core checkout over
+the image's copies and lets `git bisect run` move the checkout from commit to
+commit, running the check in the stack each time. It runs on the host through
+`scaffold/ck`.
+
+```bash
+ck bisect standalone-6.17 --core "$HOME/src/civicrm-core-bisect" --good 6.16.0 --bad 6.17.0 \
+  --dir CRM --dir Civi --dir api \
+  -- cv ev 'exit(array_key_exists("title", CRM_Core_Menu::get("civicrm/search")) ? 1 : 0);'
+```
+
+`--core` is the top of a civicrm-core work tree without local changes, under
+`$HOME` like a `--mount` of `ck run`. Its
+HEAD moves during the run and returns at the end, so give the run a work tree
+of its own: `git worktree add --detach <directory>`. Untracked files stay
+where they are, so a reproducer test that is not committed anywhere goes into
+that work tree, and with its directory mounted every commit runs it.
+
+`--dir` names the directories the stack takes from the checkout, relative to
+its top; each must exist at both ends of the range. Docker binds the directory
+and not its path, so for the run each gets an untracked file,
+`.ck-bisect-keep`: git then leaves the directory in place on a commit that
+does not have it, and the stack sees it empty there. Everything else stays the
+image's on every commit: `vendor/`, the installed database and the directories
+not named. `ck bisect` lists what the commits of the range touch there. The
+site installs on the `--bad` commit, so take the image whose core is that
+commit or close to it; a core far from the mounted code does not install.
+`--mount <src>:<dst>` adds a host path from outside the checkout, as with `ck
+run`: the extension whose test is the check, for example.
+
+With `tests` among the directories, `ckcoretest` runs the checkout's tests. On
+a release image it fetches `phpunit.xml.dist` and the seed SQL of the installed
+version, where they are missing, and leaves the mounted directory as it is.
+The tests of a core extension (`ckcoretest --ext`) are not fetched then: they
+come from the checkout when its directory is mounted too (`--dir ext/<name>`).
+
+The check runs as with `ck run`, after a `cv flush`. Its exit status means
+what it means to `git bisect run`: 0 marks the commit good, 125 says it cannot
+be tested and skips it, any other status up to 127 marks it bad, and a higher
+one stops the bisect. A commit on which `cv flush` fails is skipped.
+
+Before bisecting, the check must pass on `--good` and fail on `--bad`. When
+`--good` is not an ancestor of `--bad`, as with two release tags, git tests
+their merge base first. At the end the check runs once more on the commit
+found and on each of its parents. Exit status 0 means it passed on the parents
+and failed on the commit; a commit without a parent is confirmed by failing
+alone. Status 1 means it did not: the check is unstable, or
+the commit sits on a branch that forked before the check could pass. The stack
+and its volumes are removed either way.
+
+An interrupted run (Ctrl-C) leaves the work tree in the bisect and the stack
+up. `git -C <checkout> bisect reset` returns the work tree and
+`docker compose -p <project> down -v` removes the stack; until then a run on
+that work tree or under that project name stops and names the command. The
+`.ck-bisect-keep` files go with the next run.
 
 ## Recording a change before and after: `ck demo`
 
