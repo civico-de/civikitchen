@@ -29,9 +29,9 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Fixed
 
-- `joomla` and `joomla-demo` images: PHP notices and warnings no longer show
-  in the pages; the site turns `display_errors` off, as the Drupal and
-  WordPress images hide them.
+- `wordpress`, `joomla` and their demo images: PHP notices and warnings no
+  longer show in the pages; Apache turns `display_errors` off for the site, as
+  Drupal and Backdrop hide them. A CMS debug mode still shows them.
 - `joomla` and `joomla-demo` images: the import screens (`civicrm/import/*`)
   load; the install enables the required `civiimport` extension.
 

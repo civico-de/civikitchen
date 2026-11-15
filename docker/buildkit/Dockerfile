@@ -163,6 +163,8 @@ ENV APACHE_RUN_USER=buildkit \
     APACHE_RUN_GROUP=buildkit
 # No MultiViews: Backdrop keeps civicrm.settings.php in the web root, and content
 # negotiation would serve /civicrm/<path> from it instead of the CMS front controller.
+# PHP warnings stay out of the pages: on a localhost URL core's Smarty reports E_ALL,
+# and WordPress and Joomla leave display_errors on. A CMS debug mode still turns it on.
 RUN useradd -m -s /bin/bash buildkit \
     && chown -R buildkit:buildkit /var/log/apache2 /var/run/apache2 \
     && printf '<VirtualHost *:80>\n\
@@ -172,6 +174,7 @@ RUN useradd -m -s /bin/bash buildkit \
         Options Indexes FollowSymLinks\n\
         AllowOverride All\n\
         Require all granted\n\
+        php_flag display_errors off\n\
     </Directory>\n\
     ErrorLog /var/log/apache2/error.log\n\
     CustomLog /var/log/apache2/access.log combined\n\

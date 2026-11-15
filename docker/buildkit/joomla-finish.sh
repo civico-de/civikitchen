@@ -92,10 +92,5 @@ mkdir -p "${ext_dst}"
 cp -a "${SHARE_DIR}/ext/ckjoomlaidentity/." "${ext_dst}/"
 cv ext:enable ckjoomlaidentity
 
-# (e) Keep PHP warnings out of the pages, as the Drupal and WordPress demos do. On a
-#     localhost URL core's Smarty raises error_reporting to E_ALL, so only display_errors
-#     hides them; Joomla's 'simple'/'maximum' still turn it on.
-printf 'php_flag display_errors off\n' > "${SITE_WEB}/.htaccess"
-
 cv flush
 echo "==> joomla-finish: done"
