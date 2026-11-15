@@ -24,6 +24,15 @@ except that a break the consumers are adjusted for ships as a minor, marked
   the test as expected to fail on the affected versions, and
   [Known upstream bugs](docs/upstream-bugs.md) lists them.
 
+### Changed
+
+- Catalogs regenerated from CiviCRM 6.20.0. The hook check knows
+  `alterNonDbTaggableEntities`, `relativeDateSql` and `ufGroupTypes`, and warns
+  on `relativeDate` as deprecated, as core marks it. The APIv4 checks know the
+  `OrderCompletionMetadata` and `TaggedEntity` entities, `Tag.merge`, and the
+  new fields on ContributionPage, Event, MessageTemplate, Navigation,
+  OptionValue, SavedSearch, UFGroup and WordReplacement.
+
 ### Fixed
 
 - With `sibling_repo`, the extension under test's `extension_sources` pins

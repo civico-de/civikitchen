@@ -10,7 +10,7 @@ namespace CiviKitchen\PHPStan;
  * Regenerate with:
  *   php tools/gen-schema-catalog.php <core-dir>
  *
- * Generated from CiviCRM 6.19.0 out of the schema/*.entityType.php
+ * Generated from CiviCRM 6.20.0 out of the schema/*.entityType.php
  * declarations of core and its core-shipped extensions. The SQL rule uses
  * this to reject a `civicrm_`-prefixed table name that no core release and
  * no repo-local schema knows.
@@ -23,7 +23,7 @@ final class SchemaCatalog
      * CI reads this to fetch the matching source tree, so the drift gate
      * compares against the exact release rather than a moving branch.
      */
-    public const CORE_VERSION = '6.19.0';
+    public const CORE_VERSION = '6.20.0';
 
     /**
      * Table names core creates.
@@ -67,26 +67,26 @@ final class SchemaCatalog
         'civicrm_menu', 'civicrm_msg_template', 'civicrm_navigation',
         'civicrm_note', 'civicrm_oauth_client', 'civicrm_oauth_contact_token',
         'civicrm_oauth_systoken', 'civicrm_openid', 'civicrm_option_group',
-        'civicrm_option_value', 'civicrm_participant', 'civicrm_participant_payment',
-        'civicrm_participant_status_type', 'civicrm_payment_processor', 'civicrm_payment_processor_type',
-        'civicrm_payment_token', 'civicrm_pcp', 'civicrm_pcp_block',
-        'civicrm_phone', 'civicrm_pledge', 'civicrm_pledge_block',
-        'civicrm_pledge_payment', 'civicrm_preferences_date', 'civicrm_premiums',
-        'civicrm_premiums_product', 'civicrm_prevnext_cache', 'civicrm_price_field',
-        'civicrm_price_field_value', 'civicrm_price_set', 'civicrm_price_set_entity',
-        'civicrm_print_label', 'civicrm_product', 'civicrm_queue',
-        'civicrm_queue_item', 'civicrm_recurring_entity', 'civicrm_relationship',
-        'civicrm_relationship_cache', 'civicrm_relationship_type', 'civicrm_report_instance',
-        'civicrm_riverlea_stream', 'civicrm_role', 'civicrm_saved_search',
-        'civicrm_search_display', 'civicrm_search_param_set', 'civicrm_search_segment',
-        'civicrm_session', 'civicrm_setting', 'civicrm_site_email_address',
-        'civicrm_site_token', 'civicrm_sms_provider', 'civicrm_state_province',
-        'civicrm_status_pref', 'civicrm_subscription_history', 'civicrm_survey',
-        'civicrm_system_log', 'civicrm_tag', 'civicrm_tell_friend',
-        'civicrm_timezone', 'civicrm_totp', 'civicrm_translation',
-        'civicrm_translation_source', 'civicrm_uf_field', 'civicrm_uf_group',
-        'civicrm_uf_join', 'civicrm_uf_match', 'civicrm_user_job',
-        'civicrm_user_role', 'civicrm_website', 'civicrm_word_replacement',
-        'civicrm_worldregion',
+        'civicrm_option_value', 'civicrm_order_completion_metadata', 'civicrm_participant',
+        'civicrm_participant_payment', 'civicrm_participant_status_type', 'civicrm_payment_processor',
+        'civicrm_payment_processor_type', 'civicrm_payment_token', 'civicrm_pcp',
+        'civicrm_pcp_block', 'civicrm_phone', 'civicrm_pledge',
+        'civicrm_pledge_block', 'civicrm_pledge_payment', 'civicrm_preferences_date',
+        'civicrm_premiums', 'civicrm_premiums_product', 'civicrm_prevnext_cache',
+        'civicrm_price_field', 'civicrm_price_field_value', 'civicrm_price_set',
+        'civicrm_price_set_entity', 'civicrm_print_label', 'civicrm_product',
+        'civicrm_queue', 'civicrm_queue_item', 'civicrm_recurring_entity',
+        'civicrm_relationship', 'civicrm_relationship_cache', 'civicrm_relationship_type',
+        'civicrm_report_instance', 'civicrm_riverlea_stream', 'civicrm_role',
+        'civicrm_saved_search', 'civicrm_search_display', 'civicrm_search_param_set',
+        'civicrm_search_segment', 'civicrm_session', 'civicrm_setting',
+        'civicrm_site_email_address', 'civicrm_site_token', 'civicrm_sms_provider',
+        'civicrm_state_province', 'civicrm_status_pref', 'civicrm_subscription_history',
+        'civicrm_survey', 'civicrm_system_log', 'civicrm_tag',
+        'civicrm_tell_friend', 'civicrm_timezone', 'civicrm_totp',
+        'civicrm_translation', 'civicrm_translation_source', 'civicrm_uf_field',
+        'civicrm_uf_group', 'civicrm_uf_join', 'civicrm_uf_match',
+        'civicrm_user_job', 'civicrm_user_role', 'civicrm_website',
+        'civicrm_word_replacement', 'civicrm_worldregion',
     ];
 }

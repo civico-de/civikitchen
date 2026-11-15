@@ -10,7 +10,7 @@ namespace CiviKitchen\Ckconform;
  * Regenerate with:
  *   php tools/gen-permission-catalog.php <core-dir>
  *
- * Generated from CiviCRM 6.19.0.
+ * Generated from CiviCRM 6.20.0.
  */
 final class PermissionCatalog
 {

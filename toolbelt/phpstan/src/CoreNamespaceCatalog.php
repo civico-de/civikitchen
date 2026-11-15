@@ -10,7 +10,7 @@ namespace CiviKitchen\PHPStan;
  * Regenerate with:
  *   php tools/gen-core-namespace-catalog.php <core-dir>
  *
- * Generated from CiviCRM 6.19.0. The boundary rule in ArchitectureTest
+ * Generated from CiviCRM 6.20.0. The boundary rule in ArchitectureTest
  * allows these prefixes (plus the extension's own); every other CRM_/Civi\
  * symbol is another extension's internals. Core-shipped extensions (ext/)
  * are included — SearchKit, Afform etc. count as core.
@@ -23,7 +23,7 @@ final class CoreNamespaceCatalog
      * CI reads this to fetch the matching source tree, so the drift gate
      * compares against the exact release rather than a moving branch.
      */
-    public const CORE_VERSION = '6.19.0';
+    public const CORE_VERSION = '6.20.0';
 
     /**
      * X in CRM_X_* / CRM_X owned by core.

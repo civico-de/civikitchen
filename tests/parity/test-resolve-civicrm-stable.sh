@@ -13,7 +13,7 @@ set -euo pipefail
 for arg in "$@"; do url=$arg; done
 case "$url" in
   */stable.php) echo "$FAKE_STABLE" ;;
-  */versions.json) echo '{"6.17":{"releases":[{"version":"6.17.3"}]},"6.18":{"releases":[{"version":"6.18.2"}]},"6.19":{"releases":[{"version":"6.19.0"},{"version":"6.19.2"}]}}' ;;
+  */versions.json) echo '{"6.18":{"releases":[{"version":"6.18.2"}]},"6.19":{"releases":[{"version":"6.19.5"}]},"6.20":{"releases":[{"version":"6.20.0"},{"version":"6.20.2"}]}}' ;;
   *standalone.tar.gz) ;;
   *) echo "unexpected url $url" >&2; exit 1 ;;
 esac
@@ -29,12 +29,12 @@ resolve() {
 
 catalog=$(sed -n "s/^ *public const CORE_VERSION = '\([0-9]*\.[0-9]*\)\.[0-9]*';\$/\1/p" \
   "$root/toolbelt/phpstan/src/Api4Catalog.php")
-[ "$catalog" = 6.19 ] || { echo "catalog minor is $catalog; update this test's fake versions.json" >&2; exit 1; }
+[ "$catalog" = 6.20 ] || { echo "catalog minor is $catalog; update this test's fake versions.json" >&2; exit 1; }
 
 # The catalog's minor is the stable one: no extra row.
-test "$(resolve 6.19.2 6.17,6.18)" = '["6.19.2","6.17.3","6.18.2"]'
+test "$(resolve 6.20.2 6.18,6.19)" = '["6.20.2","6.18.2","6.19.5"]'
 # A newer stable keeps the catalog's minor in the matrix, once.
-test "$(resolve 6.20.0 6.17,6.18)" = '["6.20.0","6.17.3","6.18.2","6.19.2"]'
-test "$(resolve 6.20.0 6.19,6.17)" = '["6.20.0","6.19.2","6.17.3"]'
+test "$(resolve 6.21.0 6.18,6.19)" = '["6.21.0","6.18.2","6.19.5","6.20.2"]'
+test "$(resolve 6.21.0 6.20,6.18)" = '["6.21.0","6.20.2","6.18.2"]'
 
 echo 'ok   resolve-civicrm-stable keeps the phpstan catalog minor in the matrix'
