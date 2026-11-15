@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { loginToCms } from '../cms';
+import { ADMIN_USER, loginToCms } from '../cms';
 import { api4, cv, requireProfile, upstreamBug, userFramework } from './site';
 
 // What every extension of the applied stack must survive, whichever profile
@@ -8,20 +8,25 @@ import { api4, cv, requireProfile, upstreamBug, userFramework } from './site';
 // PHP's own error output and CiviCRM's error page; help texts mention "fatal error" too.
 const FATAL = /<b>(?:Fatal error|Parse error|Warning|Deprecated)<\/b>:|Uncaught \w|Sorry, due to an error|DB Error:/;
 
-/** The site-relative URL of every active backend menu entry, one cv call for all. */
+/** The site-relative URL of every backend menu entry core shows the admin, one cv call for all. */
 function menuUrls(): { route: string; url: string }[] {
   const php = `
-    $rows = \\Civi\\Api4\\Navigation::get(FALSE)->addSelect('url')
+    $rows = \\Civi\\Api4\\Navigation::get(FALSE)->addSelect('url', 'permission', 'permission_operator')
       ->addWhere('is_active', '=', TRUE)->addWhere('domain_id', '=', 'current_domain')
       ->addWhere('url', 'LIKE', 'civicrm/%')->execute();
     $urls = [];
     foreach ($rows as $row) {
+      // The menu's own filter: a disabled component's entries stay active but hidden.
+      $item = ['permission' => implode(',', $row['permission'] ?? []), 'operator' => $row['permission_operator']];
+      if (!\\CRM_Core_BAO_Navigation::checkPermission($item)) {
+        continue;
+      }
       $route = html_entity_decode($row['url']);
       [$path, $query] = array_pad(explode('?', $route, 2), 2, '');
       $urls[$route] = ['route' => $route, 'url' => \\CRM_Utils_System::url($path, $query, TRUE, NULL, FALSE)];
     }
     echo json_encode(array_values($urls));`;
-  const rows = JSON.parse(cv(['ev', php])) as { route: string; url: string }[];
+  const rows = JSON.parse(cv(['ev', `--user=${ADMIN_USER}`, php])) as { route: string; url: string }[];
   return rows
     .filter(({ route }) => !/logout|civicrm\/a\/?#/.test(route))
     .map(({ route, url }) => {
