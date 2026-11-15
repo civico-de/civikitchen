@@ -163,7 +163,7 @@ jobs:
       # A profile leg runs the profile browser suites (tests/e2e/profiles).
       - name: Upload Playwright report on failure
         if: failure() && matrix.variant.profile != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report-${{ matrix.variant.tag }}-${{ strategy.job-index }}
           path: playwright-report/
