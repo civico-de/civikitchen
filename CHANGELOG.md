@@ -14,6 +14,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.64.0] - 2026-11-15
+
 ### Added
 
 - Extension docs: a `handbook/images/logo.svg` (or `logo.png`) stands in the
@@ -2914,7 +2916,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.63.0...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.64.0...HEAD
+[1.64.0]: https://github.com/civico-de/civikitchen/compare/v1.63.0...v1.64.0
 [1.63.0]: https://github.com/civico-de/civikitchen/compare/v1.62.0...v1.63.0
 [1.62.0]: https://github.com/civico-de/civikitchen/compare/v1.61.2...v1.62.0
 [1.61.2]: https://github.com/civico-de/civikitchen/compare/v1.61.1...v1.61.2
