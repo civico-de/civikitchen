@@ -19,6 +19,14 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - Extension docs: a poster image linked to an https video file (`.mp4`,
   `.webm`) plays in place, with the poster and the image's text as its label.
 
+### Changed
+
+- Standalone images: headless tests compile CiviCRM's service container once
+  per test process instead of before every test: 9 % less CPU on a 59-test
+  headless subset (27.9 s → 25.4 s)
+  ([civicrm-core#37835](https://github.com/civicrm/civicrm-core/pull/37835),
+  part of CiviCRM 6.22).
+
 ### Fixed
 
 - `joomla` and `joomla-demo` images: PHP notices and warnings no longer show
