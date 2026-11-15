@@ -106,7 +106,12 @@ function ck_restore_core_foreign_keys(): void {
       return;
     }
     if ($built !== \CRM_Utils_System::version()) {
-      fwrite(STDERR, "ck_headless: {$database} was built by CiviCRM {$built}, running " . \CRM_Utils_System::version() . "; rebuilding it\n");
+      fwrite(
+        STDERR,
+        "ck_headless: {$database} was built by CiviCRM {$built}, running "
+        . \CRM_Utils_System::version()
+        . "; rebuilding it\n",
+      );
       if (\Civi\Test::execute('DROP TABLE IF EXISTS `' . $database . '`.civitest_revs') === FALSE) {
         throw new RuntimeException('ck_headless: could not forget the saved signature');
       }
@@ -124,7 +129,11 @@ function ck_restore_core_foreign_keys(): void {
  */
 function ck_test_database_version(string $database): ?string {
   $pdo = \Civi\Test::pdo();
-  $tables = $pdo->query('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ' . $pdo->quote($database) . " AND TABLE_NAME = 'civicrm_domain'");
+  $tables = $pdo->query(
+    'SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = '
+    . $pdo->quote($database)
+    . " AND TABLE_NAME = 'civicrm_domain'",
+  );
   if ($tables === FALSE || (int) $tables->fetchColumn() === 0) {
     return NULL;
   }
