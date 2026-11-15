@@ -56,7 +56,7 @@ final class CiCoverageCheck implements Check
             return;
         }
 
-        $reporter->warn('CI runs tests without coverage — add ckcoverage (or phpunit --coverage-text)');
+        $reporter->warn('CI runs tests without coverage — add ckcoverage');
     }
 
 }

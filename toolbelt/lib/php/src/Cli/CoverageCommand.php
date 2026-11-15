@@ -64,15 +64,16 @@ final class CoverageCommand implements Command
         // so read that file instead of adding a second flag - and leave it behind.
         $callerJunit = $this->junitArgument($arguments);
         $junit = $callerJunit ?? "{$work}/junit.xml";
-        // pcov instruments only pcov.directory, which it guesses as ./src, ./lib or
-        // ./app when one exists - in an extension with a JS src/ that is no PHP at all.
+        // The images ship pcov disabled. It instruments only pcov.directory, which it guesses
+        // as ./src, ./lib or ./app when one exists - in an extension with a JS src/ that is no PHP.
         $iniDir = "{$work}/ini.d";
         $iniFile = $iniDir . '/zz-ckcoverage.ini';
         $cwd = getcwd();
         if ($cwd === false || strpbrk($cwd, '"$') !== false) {
             return $this->error('the extension path must not contain " or $ - pcov.directory cannot be set to it.');
         }
-        if (!mkdir($iniDir, 0700) || file_put_contents($iniFile, 'pcov.directory="' . $cwd . "\"\n") === false) {
+        $ini = "pcov.enabled=1\npcov.directory=\"{$cwd}\"\n";
+        if (!mkdir($iniDir, 0700) || file_put_contents($iniFile, $ini) === false) {
             return $this->error('could not create temporary files.');
         }
 

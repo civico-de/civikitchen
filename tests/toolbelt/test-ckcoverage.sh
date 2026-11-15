@@ -37,8 +37,8 @@ while [ "$#" -gt 0 ]; do
 done
 test -n "$clover"
 test -n "$junit"
-# Like pcov: covers only if pcov.directory (ini, else ./src|lib|app, else cwd) is the
-# cwd. One scan dir follows CK_FIXTURE_SCAN_HEAD; "none" is empty (proc_open drops '').
+# Like pcov in the images: covers only if an ini enables it and pcov.directory (ini, else
+# ./src|lib|app, else cwd) is the cwd. One scan dir follows CK_FIXTURE_SCAN_HEAD; "none" is empty.
 head=${CK_FIXTURE_SCAN_HEAD:-:}
 if [ "$head" = none ]; then head=; fi
 scan=${PHP_INI_SCAN_DIR-}
@@ -55,8 +55,9 @@ if [ -z "$directory" ]; then
     if [ -d "$guess" ]; then directory=$(pwd -P)/$guess; break; fi
   done
 fi
+enabled=$(sed -n 's/^pcov\.enabled=\(.*\)$/\1/p' "$ini_dir"/*.ini 2>/dev/null | tail -n 1)
 covered=0
-if [ "$directory" = "$(pwd -P)" ]; then covered=6; fi
+if [ "$enabled" = 1 ] && [ "$directory" = "$(pwd -P)" ]; then covered=6; fi
 if [ -n "${CK_FIXTURE_FILTER_WARNING:-}" ]; then
   echo "Warning:       ${CK_FIXTURE_FILTER_WARNING}, code coverage will not be processed"
 else

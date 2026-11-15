@@ -33,6 +33,16 @@ except that a break the consumers are adjusted for ships as a minor, marked
   new fields on ContributionPage, Event, MessageTemplate, Navigation,
   OptionValue, SavedSearch, UFGroup and WordReplacement.
 
+- **Breaking:** the standalone and buildkit images load pcov disabled
+  (`pcov.enabled=0`); `ckcoverage` and `ckmutate` enable it for their runs. An
+  enabled pcov slows PHP even when nothing is collected: disabling it cut user
+  CPU on a 59-test headless subset by 29 % (35.7 s → 25.3 s). In these images,
+  `phpunit --coverage-*` called directly writes no report unless Xdebug
+  coverage is on, and PHPUnit at most warns "No code coverage driver"; run it
+  through `ckcoverage`, which also reaches child PHP processes. Code that calls
+  `\pcov\collect()` itself checks `ini_get('pcov.enabled')`: disabled, it
+  returns `null`.
+
 ### Fixed
 
 - With `sibling_repo`, the extension under test's `extension_sources` pins

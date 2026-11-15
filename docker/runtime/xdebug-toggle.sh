@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Xdebug toggle — sourced from each image's entrypoint.
-# pcov is always enabled (cheap, coverage-only). Xdebug is opt-in because it
+# pcov is loaded but disabled; ckcoverage enables it. Xdebug is opt-in because it
 # slows down every request. Set XDEBUG_MODE to debug, develop, or any combo
 # from https://xdebug.org/docs/all_settings#mode to turn it on. Leave unset
 # (or set to "off") to skip.

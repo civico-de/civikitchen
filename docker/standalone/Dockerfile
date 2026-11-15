@@ -113,7 +113,8 @@ FROM php:${PHP_VERSION}-apache-bookworm
 #
 # PHP extensions: the set the official image shipped, plus soap and opcache to stay
 # in lockstep with the buildkit base. gd with webp: Mosaico; imagick: Mosaico too.
-# pcov: fast code-coverage driver (PHPUnit's default coverage path).
+# pcov: code-coverage driver, loaded but disabled: enabled it costs about 30 % PHP CPU
+# even when nothing is collected, and ckcoverage switches it on for its run.
 # xdebug: installed but NOT enabled — entrypoint activates it when XDEBUG_MODE is set.
 # Their -dev headers are purged in the same layer, keeping the libraries the built
 # .so files link against (the official image's pattern); test-dev-tools.sh loads them.
@@ -132,6 +133,7 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends \
     && docker-php-ext-install -j"$(nproc)" gd bcmath intl mysqli pdo_mysql zip soap opcache \
     && pecl install imagick pcov xdebug \
     && docker-php-ext-enable imagick pcov \
+    && echo 'pcov.enabled=0' >> "$PHP_INI_DIR/conf.d/docker-php-ext-pcov.ini" \
     && rm -rf /tmp/pear \
     && apt-mark auto '.*' > /dev/null \
     && apt-mark manual $savedAptMark > /dev/null \

@@ -17,7 +17,7 @@ final class CiCoverageCheckTest extends CheckTestCase
         ]);
         $this->assertWarns(
             $this->run_(new CiCoverageCheck(), $context),
-            'CI runs tests without coverage — add ckcoverage (or phpunit --coverage-text)',
+            'CI runs tests without coverage — add ckcoverage',
         );
     }
 

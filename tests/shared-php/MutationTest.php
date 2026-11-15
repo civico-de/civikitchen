@@ -63,6 +63,21 @@ final class MutationTest extends TestCase
         self::assertSame(['Civi', 'lib'], $runner->config['source']['directories'] ?? null);
     }
 
+    /** The images ship pcov disabled; infection inherits an ini that enables it, after the caller's dirs. */
+    public function testInfectionRunsWithPcovEnabledAndTheCallersScanDirsKept(): void
+    {
+        $before = getenv('PHP_INI_SCAN_DIR');
+        putenv('PHP_INI_SCAN_DIR=/etc/php/extra');
+        try {
+            $runner = new MutationRunner(['mutation_min_msi' => '80']);
+            $this->run_($runner);
+        } finally {
+            putenv($before === false ? 'PHP_INI_SCAN_DIR' : "PHP_INI_SCAN_DIR={$before}");
+        }
+        self::assertStringStartsWith('/etc/php/extra' . PATH_SEPARATOR, $runner->environment['PHP_INI_SCAN_DIR'] ?? '');
+        self::assertSame("pcov.enabled=1\n", $runner->addedIni);
+    }
+
     public function testASetCivicrmUfIsKept(): void
     {
         putenv('CIVICRM_UF=Standalone');
@@ -130,6 +145,9 @@ final class MutationRunner extends Runner
     /** @var array<string, mixed> */
     public array $config = [];
 
+    /** The ini infection found in the last PHP_INI_SCAN_DIR segment while it ran. */
+    public string $addedIni = '';
+
     /** @param array<string, string> $policy */
     public function __construct(
         private readonly array $policy,
@@ -159,6 +177,8 @@ final class MutationRunner extends Runner
     {
         $this->command = $command;
         $this->environment = $environment ?? [];
+        $scanDirs = explode(PATH_SEPARATOR, $this->environment['PHP_INI_SCAN_DIR'] ?? '');
+        $this->addedIni = (string) @file_get_contents(end($scanDirs) . '/zz-ckmutate.ini');
         $this->config = (array) json_decode((string) file_get_contents('.ckmutate.json'), true);
         return $this->infectionStatus;
     }

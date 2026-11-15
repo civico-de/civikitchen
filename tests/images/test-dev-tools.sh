@@ -1534,11 +1534,16 @@ fi
 
 # ---------------------------------------------------------------------------
 # 8. Xdebug toggle
-# pcov should always be loaded; xdebug should only load when XDEBUG_MODE is set
-# via the entrypoint.
+# pcov should always be loaded but disabled until ckcoverage enables it; xdebug
+# should only load when XDEBUG_MODE is set via the entrypoint.
 echo "== xdebug toggle =="
 DEFAULT_MODULES="$(php -m)"
-if grep -qiE "^pcov$" <<<"${DEFAULT_MODULES}"; then ok "pcov enabled by default"; else fail "pcov not enabled"; fi
+if grep -qiE "^pcov$" <<<"${DEFAULT_MODULES}"; then ok "pcov loaded by default"; else fail "pcov not loaded"; fi
+if [ "$(php -r 'echo ini_get("pcov.enabled");')" = "0" ]; then
+    ok "pcov disabled by default"
+else
+    fail "pcov enabled by default (costs about 30 % PHP CPU on every run)"
+fi
 if grep -qiE "^xdebug$" <<<"${DEFAULT_MODULES}"; then
     fail "xdebug enabled by default (should be off until XDEBUG_MODE is set)"
 else

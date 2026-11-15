@@ -65,10 +65,17 @@ final class MutationCommand implements Command
             return $this->error("{$config} already exists - refusing to overwrite it.");
         }
         $temporary = Directory::temporary('ckmutate-run');
-        register_shutdown_function(static function () use ($config, $temporary): void {
+        // The images ship pcov disabled; infection's test runs need a coverage driver.
+        // Outside tmpDir, which infection empties on its own schedule.
+        $iniDir = Directory::temporary('ckmutate-ini');
+        register_shutdown_function(static function () use ($config, $temporary, $iniDir): void {
             @unlink($config);
             Directory::remove($temporary);
+            Directory::remove($iniDir);
         });
+        if (file_put_contents("{$iniDir}/zz-ckmutate.ini", "pcov.enabled=1\n") === false) {
+            return $this->error('could not create temporary files.');
+        }
         $phpunit = $this->runner->which('phpunit') ?? 'phpunit';
         $configuration = [
             '$schema' => 'vendor/infection/infection/resources/schema.json',
@@ -99,6 +106,9 @@ final class MutationCommand implements Command
         }
         $environment = getenv();
         $environment['CIVICRM_UF'] = $environment['CIVICRM_UF'] ?? 'UnitTests';
+        // An empty segment keeps PHP's own scan directory; a variable set to '' scans nothing.
+        $scanDirs = $environment['PHP_INI_SCAN_DIR'] ?? null;
+        $environment['PHP_INI_SCAN_DIR'] = $scanDirs === '' ? $iniDir : $scanDirs . PATH_SEPARATOR . $iniDir;
         $status = $this->runner->passthrough([...$command, ...$arguments], $environment);
         if ($status === 0) {
             echo "ckmutate: floor met.\n";

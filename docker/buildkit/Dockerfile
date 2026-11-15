@@ -51,8 +51,9 @@ ARG DEBIAN_FRONTEND=noninteractive
 #   what the distro package ships in install-dev-tools.sh (NPM_VERSION).
 # apt-get upgrade: security updates come from Debian at build time; the base
 # image ships none. The daily rebuild runs without cache, so they land.
-# PHP extensions, plus pcov (always on) and xdebug (installed, enabled by the
-# entrypoint when XDEBUG_MODE is set). Their -dev headers are purged in the
+# PHP extensions, plus pcov (loaded but disabled, as in the standalone image;
+# ckcoverage enables it) and xdebug (installed, enabled by the entrypoint when
+# XDEBUG_MODE is set). Their -dev headers are purged in the
 # same layer, keeping the libraries the built .so files link against, as in
 # the standalone image; test-dev-tools.sh loads them.
 RUN apt-get update && apt-get upgrade -y --no-install-recommends \
@@ -70,6 +71,7 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends \
         pdo_mysql mysqli gd intl zip bcmath soap opcache \
     && pecl install pcov xdebug \
     && docker-php-ext-enable pcov \
+    && echo 'pcov.enabled=0' >> "$PHP_INI_DIR/conf.d/docker-php-ext-pcov.ini" \
     && rm -rf /tmp/pear \
     && apt-mark auto '.*' > /dev/null \
     && apt-mark manual $savedAptMark > /dev/null \
