@@ -160,7 +160,9 @@ topologies stay in the repository that owns them.
 documentation site on GitHub Pages. These are the same pages the handbook
 extension shows inside CiviCRM, so one set of Markdown files serves both.
 
-The site takes its name and description from `info.xml`. Each page's
+The site takes its name and description from `info.xml`. A
+`handbook/images/logo.svg` (or `logo.png`) stands in the header next to the
+name and serves as favicon; without one the header shows the theme's icon. Each page's
 frontmatter sets its title, its position (`order`) and its group in the
 navigation (`section`), just as it does in the handbook. Links between pages
 are relative, such as `setup.md#first-steps`, and the build fails on a link to

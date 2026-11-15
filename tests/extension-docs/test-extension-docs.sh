@@ -19,6 +19,9 @@ site=$work/site
 grep -q '<html lang="en"' "$site/index.html" || fail "the root is not English"
 grep -q 'fonts.googleapis' "$site/index.html" && fail "the site loads a web font"
 grep -q '<html lang="de"' "$site/de/index.html" || fail "de/ is not German"
+grep -q '<img src="./images/logo.svg" alt="Greeter"' "$site/index.html" || fail "the handbook logo is not in the header"
+grep -q '<link rel="icon" href="./images/logo.svg"' "$site/index.html" || fail "the handbook logo is not the favicon"
+grep -q '<img src="../images/logo.svg"' "$site/de/setup/index.html" || fail "a German subpage does not show the logo"
 grep -q 'Installieren' "$site/de/setup/index.html" || fail "de/ does not use setup.de.md"
 grep -q 'Use it' "$site/de/usage/index.html" || fail "a page without translation does not fall back"
 grep -q 'Grundlagen' "$site/de/index.html" || fail "the German nav does not take the translated section"
@@ -38,6 +41,7 @@ build "$work/plain" "$work/dangling" en >/dev/null 2>&1 && fail "a link to a mis
 printf '# Greeter\n\nSee [usage](usage.md).\n' > "$work/plain/handbook/index.md"
 build "$work/plain" "$work/one" en >/dev/null 2>&1 || fail "one language does not build"
 grep -q 'hreflang' "$work/one/index.html" && fail "one language shows a language switch"
+grep -q 'logo.svg' "$work/one/index.html" && fail "a handbook without a logo names one"
 
 # Heading ids as the handbook extension renders them: umlauts kept, dots and underscores dropped.
 mkdir -p "$work/ids/handbook"

@@ -14,6 +14,11 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- Extension docs: a `handbook/images/logo.svg` (or `logo.png`) stands in the
+  site header next to the name and serves as favicon.
+
 ## [1.63.0] - 2026-11-15
 
 ### Added

@@ -132,6 +132,9 @@ def main():
     if pointers:
         die(f"Git LFS pointers instead of files (check out with lfs: true): {', '.join(pointers)}")
 
+    # The handbook's own logo stands in the header and serves as favicon.
+    logo = next((f"images/logo.{ext}" for ext in ("svg", "png") if (source / "images" / f"logo.{ext}").is_file()), None)
+
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     owner, _, repo_name = repo.partition("/")
     site_url = f"https://{owner}.github.io/{repo_name}/" if repo else None
@@ -170,6 +173,8 @@ def main():
                 "markdown_extensions": {"tables": {}, "toc": {"permalink": True, "slugify": Slugify()}, "pymdownx.highlight": {},
                                         "pymdownx.inlinehilite": {}, "pymdownx.superfences": {}, "video": {}},
             }
+            if logo:
+                config["theme"].update(logo=logo, favicon=logo)
             if site_url:
                 config["site_url"] = site_url + prefix
                 config["repo_url"] = f"https://github.com/{repo}"
