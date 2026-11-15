@@ -91,5 +91,10 @@ mkdir -p "${ext_dst}"
 cp -a "${SHARE_DIR}/ext/ckjoomlaidentity/." "${ext_dst}/"
 cv ext:enable ckjoomlaidentity
 
+# (e) Keep PHP notices out of the pages, as the Drupal and WordPress demos do:
+#     Joomla's 'default' takes PHP's display_errors, which is on without a php.ini.
+sed -i "s/public \$error_reporting = '[a-z]*';/public \$error_reporting = 'none';/" "${SITE_WEB}/configuration.php"
+grep -q "public \$error_reporting = 'none';" "${SITE_WEB}/configuration.php"
+
 cv flush
 echo "==> joomla-finish: done"

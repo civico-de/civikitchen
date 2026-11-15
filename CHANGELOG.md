@@ -19,6 +19,12 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - Extension docs: a poster image linked to an https video file (`.mp4`,
   `.webm`) plays in place, with the poster and the image's text as its label.
 
+### Fixed
+
+- `joomla` and `joomla-demo` images: PHP notices and warnings no longer show
+  in the pages; Joomla's error reporting is set to `none`, as the Drupal and
+  WordPress images hide them.
+
 ## [1.62.0] - 2026-11-15
 
 ### Added
