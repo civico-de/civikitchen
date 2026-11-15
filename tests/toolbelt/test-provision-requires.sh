@@ -42,6 +42,11 @@ ck_enable_extensions
 expect_call as-web "$cli" internal provision-enable --ext-dir "$work/ext" --archive-dir '' \
   --mounted "$work/ext/alpha" --mounted "$work/ext/beta" 'org.example.beta, downloaded'
 
+# The extension under test is named by key and handed over by its ext dir path, ahead of the mounts.
+CIVIKITCHEN_EXTENSION_UNDER_TEST=org.example.beta ck_enable_extensions
+expect_call as-web "$cli" internal provision-enable --ext-dir "$work/ext" --archive-dir '' \
+  --under-test "$work/ext/org.example.beta" --mounted "$work/ext/alpha" --mounted "$work/ext/beta" 'org.example.beta, downloaded'
+
 # Nothing mounted, nothing configured: the call still goes out and decides that.
 unset CIVIKITCHEN_EXTRA_EXTENSIONS CIVIKITCHEN_ENABLE_EXTENSIONS
 CK_MOUNTINFO="$work/none" ck_extra_extensions

@@ -496,7 +496,7 @@ final class ProfileProvisionerTest extends TestCase
     /** @param list<string> $mounted */
     private function provisioner(array $mounted): ProfileProvisioner
     {
-        $extensions = new ExtensionProvisioner(self::root(), $this->ext, '', $mounted, $this->site, static function (): void {
+        $extensions = new ExtensionProvisioner(self::root(), $this->ext, '', $mounted, '', $this->site, static function (): void {
         }, $this->stderr);
         return new ProfileProvisioner(self::root(), $this->ext, $this->state, $extensions, $this->site, $this->stderr);
     }

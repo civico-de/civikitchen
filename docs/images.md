@@ -200,6 +200,8 @@ and enabled before it, staged releases included. A mounted extension's
 dependency takes the pins in that extension's own `civikitchen.yaml`; a profile
 dependency takes the first mounted extension, in mount path order, that pins
 the key (`CIVIKITCHEN_ENABLE_EXTENSIONS` in [configuration](configuration.md)).
+With `CIVIKITCHEN_EXTENSION_UNDER_TEST` set, that extension's pin comes before
+both for every key it pins, including the version a present dependency is checked against.
 
 A profile with a `snapshot` block generates its data once and restores it on
 later fresh boots of the standalone image, with dates moved to today. The four

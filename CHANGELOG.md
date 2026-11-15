@@ -24,6 +24,13 @@ except that a break the consumers are adjusted for ships as a minor, marked
   the test as expected to fail on the affected versions, and
   [Known upstream bugs](docs/upstream-bugs.md) lists them.
 
+### Fixed
+
+- With `sibling_repo`, the extension under test's `extension_sources` pins
+  take precedence over a sibling's for a dependency both pin, so a sibling's
+  older pin no longer aborts provisioning with "extension version … does not
+  satisfy …". A sibling's pin still applies to keys the extension does not pin.
+
 ## [1.61.2] - 2026-11-14
 
 ### Changed

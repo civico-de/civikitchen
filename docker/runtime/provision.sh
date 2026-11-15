@@ -322,13 +322,16 @@ ck_wire_test_db_boot() {
     fi
 }
 
-# Run `ck internal provision-OPERATION` as the web user, pinned by the mounted
-# extensions and installing staged releases from CK_DEP_ARCHIVE_DIR.
+# Run `ck internal provision-OPERATION` as the web user, pinned by the extension
+# under test, then the mounted extensions, installing staged releases from CK_DEP_ARCHIVE_DIR.
 ck_provision() {
     local operation="$1" cli ext_dir
     local -a mounted=()
     shift
     cli="$(ck_runtime_cli)" || return 1
+    if [[ -n "${CIVIKITCHEN_EXTENSION_UNDER_TEST:-}" ]]; then
+        mounted+=(--under-test "${CK_EXT_DIR}/${CIVIKITCHEN_EXTENSION_UNDER_TEST}")
+    fi
     while IFS= read -r ext_dir; do
         if [[ -n "${ext_dir}" ]]; then mounted+=(--mounted "${ext_dir}"); fi
     done < <(ck_mounted_extension_dirs)

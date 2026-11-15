@@ -231,7 +231,8 @@ on:
           read-only beside this one under the key from ITS info.xml — for
           extensions implementing a sibling's interfaces. Enabled LEFT TO
           RIGHT in list order before this extension, so a sibling another
-          sibling requires comes first. A sibling whose composer.lock carries
+          sibling requires comes first. This extension's extension_sources
+          pins take precedence over a sibling's for a key both pin. A sibling whose composer.lock carries
           runtime packages gets `composer install --no-dev` first, and one
           declaring policy.dist.build its build (on node_version); a private
           sibling or package needs the composer_app_* secrets. Empty mounts nothing.

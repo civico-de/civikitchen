@@ -124,6 +124,34 @@ final class ExtensionProvisionerTest extends TestCase
         self::assertSame([], $this->site->log);
     }
 
+    public function testPinOfTheExtensionUnderTestPrecedesASiblingsPin(): void
+    {
+        $dep = $this->extension('org.example.dep', 'org.example.dep', [], '', '0.4.0');
+        $sibling = $this->extension('org.example.sibling', 'org.example.sibling', ['org.example.dep'], self::config(self::sourcePin('org.example.dep', self::DIGEST_URL, self::ZERO, '0.3.1')));
+        $fixture = $this->fixtureRequiringDep(self::sourcePin('org.example.dep', self::DIGEST_URL, self::ZERO, '0.4.0'));
+        $this->site->site = ['org.example.dep' => 'uninstalled', 'org.example.sibling' => 'uninstalled'];
+
+        self::assertNull($this->attempt(fn () => $this->provisioner([$dep, $sibling, $fixture], '', $fixture)->enable('org.example.dep,org.example.sibling,fixture')));
+
+        self::assertSame(['enable org.example.dep', 'enable org.example.sibling', 'enable fixture'], $this->site->log);
+        self::assertSame([], $this->site->curls);
+    }
+
+    public function testSiblingsPinAppliesToAKeyTheExtensionUnderTestDoesNotPin(): void
+    {
+        $this->extension('org.example.widget', 'org.example.widget', [], '', '1.0.0');
+        $sibling = $this->extension('org.example.sibling', 'org.example.sibling', ['org.example.widget'], self::config(str_replace('org.example.dep', 'org.example.widget', self::sourcePin('org.example.dep', self::DIGEST_URL, self::ZERO, '^2.0'))));
+        $fixture = $this->fixtureRequiringDep(self::sourcePin('org.example.dep', self::DIGEST_URL, self::ZERO, '0.4.0'));
+        $this->site->site = ['org.example.widget' => 'uninstalled'];
+
+        self::assertSame('extension version 1.0.0 does not satisfy ^2.0', $this->attempt(fn () => $this->provisioner([$sibling, $fixture], '', $fixture)->enable('org.example.sibling')));
+    }
+
+    public function testExtensionUnderTestWithoutInfoXmlFails(): void
+    {
+        self::assertSame("the extension under test has no info.xml in {$this->ext}/absent", $this->attempt(fn () => $this->provisioner([], '', "{$this->ext}/absent")));
+    }
+
     public function testUnpinnedRequirementComesFromTheRegistryAfterItsRequiresWereRead(): void
     {
         $this->feed('org.example.dep');
@@ -730,6 +758,8 @@ final class ExtensionProvisionerTest extends TestCase
             'a third requires operand' => [['provision-requires', '--ext-dir', '/ext', 'key', '/dir', 'more']],
             'an unknown option' => [['provision-requires', '--ext-dir', '/ext', '--verbose', 'yes', 'key']],
             'an option without its value' => [['provision-requires', '--ext-dir']],
+            'two extensions under test' => [['provision-requires', '--ext-dir', '/ext', '--under-test', '/a', '--under-test', '/b', 'key']],
+            'an empty extension under test' => [['provision-requires', '--ext-dir', '/ext', '--under-test', '', 'key']],
             'two archive dirs' => [['provision-requires', '--ext-dir', '/ext', '--archive-dir', '/a', '--archive-dir', '/b', 'key']],
             'a profile without its replaced state' => [['provision-profile', '--ext-dir', '/ext', '/p/profile.json', 'Standalone']],
             'an empty replaced state' => [['provision-profile', '--ext-dir', '/ext', '--replaced-state', '', '/p/profile.json', 'Standalone']],
@@ -769,12 +799,12 @@ final class ExtensionProvisionerTest extends TestCase
     }
 
     /** @param list<string> $mounted */
-    private function provisioner(array $mounted = [], string $archiveDir = ''): ExtensionProvisioner
+    private function provisioner(array $mounted = [], string $archiveDir = '', string $underTest = ''): ExtensionProvisioner
     {
         $pause = function (int $seconds): void {
             $this->pauses[] = $seconds;
         };
-        return new ExtensionProvisioner(self::root(), $this->ext, $archiveDir, $mounted, $this->site, $pause, $this->stderr);
+        return new ExtensionProvisioner(self::root(), $this->ext, $archiveDir, $mounted, $underTest, $this->site, $pause, $this->stderr);
     }
 
     /** The failure message of STEP, or null when it succeeded; what it printed lands in $this->stdout. */

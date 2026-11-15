@@ -40,6 +40,7 @@ final class ExtensionProvisioner
 
     /**
      * @param list<string> $mounted the extension directories mounted into the ext dir, in pin precedence
+     * @param string $underTest the directory of the extension under test, whose pins precede every other; '' for none
      * @param (Closure(int): void)|null $pause the wait between attempts, in seconds
      * @param resource|null $stderr where warnings go
      */
@@ -48,6 +49,7 @@ final class ExtensionProvisioner
         private readonly string $extDir,
         private readonly string $archiveDir,
         private readonly array $mounted,
+        private readonly string $underTest = '',
         private readonly Runner $runner = new Runner(),
         ?Closure $pause = null,
         $stderr = null,
@@ -59,6 +61,9 @@ final class ExtensionProvisioner
             sleep($seconds);
         };
         $this->stderr = $stderr ?? STDERR;
+        if ($underTest !== '' && !is_file("{$underTest}/info.xml")) {
+            throw new RuntimeException("the extension under test has no info.xml in {$underTest}");
+        }
     }
 
     /**
@@ -420,13 +425,17 @@ final class ExtensionProvisioner
 
     /**
      * KEY's pin in PIN_DIR's civikitchen.yaml, read through ckconform, its one parser; without a
-     * PIN_DIR, the first mounted extension's that pins KEY.
+     * PIN_DIR, the first mounted extension's that pins KEY. The extension under test's pin precedes both.
      *
      * @return array{source: string, release: list<string>, version: string}
      */
     private function pin(string $pinDir, string $key): array
     {
-        foreach ($pinDir === '' ? $this->mounted : [$pinDir] as $directory) {
+        $directories = $pinDir === '' ? $this->mounted : [$pinDir];
+        if ($this->underTest !== '') {
+            $directories = array_unique([$this->underTest, ...$directories]);
+        }
+        foreach ($directories as $directory) {
             $source = $this->policy($directory, 'extension_source', $key, '@');
             $release = $this->policy($directory, 'extension_release', $key, ' ');
             if ($source !== '' || $release !== '') {

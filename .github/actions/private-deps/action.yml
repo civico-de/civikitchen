@@ -41,7 +41,8 @@ inputs:
     default: ''
   ext_key:
     description: >-
-      This extension's key — the last entry of the enable list. Empty writes
+      This extension's key — the last entry of the enable list, and the
+      extension whose pins precede the siblings'. Empty writes
       no enable list at all: the override then only mounts the siblings, for a
       caller that owns CIVIKITCHEN_ENABLE_EXTENSIONS itself.
     default: ''
@@ -251,6 +252,7 @@ runs:
           if [ -n "$CK_EXT_KEY" ]; then
             echo "    environment:"
             echo "      CIVIKITCHEN_ENABLE_EXTENSIONS: \"$keys,$CK_EXT_KEY\""
+            echo "      CIVIKITCHEN_EXTENSION_UNDER_TEST: \"$CK_EXT_KEY\""
           fi
         } > "$override"
         echo "file=$override" >> "$GITHUB_OUTPUT"

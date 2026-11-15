@@ -196,14 +196,14 @@ final class InternalRuntimeCommand implements Command
     }
 
     /**
-     * `provision-* --ext-dir DIR [--archive-dir DIR] [--mounted DIR]... OPERAND...`, the mounted dirs
-     * in pin precedence; an empty archive dir stages none, and only provision-profile takes `--replaced-state`.
+     * `provision-* --ext-dir DIR [--archive-dir DIR] [--under-test DIR] [--mounted DIR]... OPERAND...`, the
+     * extension under test's pins first, then the mounted dirs in pin precedence; an empty archive dir stages none, and only provision-profile takes `--replaced-state`.
      *
      * @param list<string> $arguments
      */
     private function provision(string $operation, array $arguments): int
     {
-        $options = ['--ext-dir' => [], '--archive-dir' => [], '--mounted' => [], '--replaced-state' => []];
+        $options = ['--ext-dir' => [], '--archive-dir' => [], '--under-test' => [], '--mounted' => [], '--replaced-state' => []];
         while ($arguments !== [] && str_starts_with($arguments[0], '--')) {
             $option = array_shift($arguments);
             if (!isset($options[$option]) || $arguments === []) {
@@ -214,6 +214,7 @@ final class InternalRuntimeCommand implements Command
         [$minimum, $maximum] = self::PROVISION[$operation];
         $profile = $operation === 'provision-profile';
         if (count($options['--ext-dir']) !== 1 || $options['--ext-dir'][0] === '' || count($options['--archive-dir']) > 1
+            || count($options['--under-test']) > 1 || in_array('', $options['--under-test'], true)
             || count($options['--replaced-state']) !== ($profile ? 1 : 0) || in_array('', $options['--replaced-state'], true)
             || count($arguments) < $minimum || count($arguments) > $maximum) {
             return $this->provisionUsage($operation);
@@ -223,6 +224,7 @@ final class InternalRuntimeCommand implements Command
             $options['--ext-dir'][0],
             $options['--archive-dir'][0] ?? '',
             $options['--mounted'],
+            $options['--under-test'][0] ?? '',
             $this->runner,
         );
         try {
@@ -246,7 +248,7 @@ final class InternalRuntimeCommand implements Command
 
     private function provisionUsage(string $operation): int
     {
-        fwrite(STDERR, "usage: ck internal {$operation} --ext-dir DIR [--archive-dir DIR] [--mounted DIR]... " . self::PROVISION[$operation][2] . "\n");
+        fwrite(STDERR, "usage: ck internal {$operation} --ext-dir DIR [--archive-dir DIR] [--under-test DIR] [--mounted DIR]... " . self::PROVISION[$operation][2] . "\n");
         return 2;
     }
 

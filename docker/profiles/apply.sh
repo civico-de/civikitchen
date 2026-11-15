@@ -110,11 +110,14 @@ if [ "${PHASE}" != content ]; then
     "${CK_PROFILE_CLI}" internal profile-skipped "${JSON}" "${UF}"
 
     # Clone, composer, registry download, then the ordered enable; a registry
-    # dependency's <requires> take the pins of the extensions mounted into the site.
+    # dependency's <requires> take the pins of the extension under test, then of those mounted into the site.
     declare -a MOUNTED=()
     while IFS= read -r mounted_dir; do
         [ -z "${mounted_dir}" ] || MOUNTED+=(--mounted "${mounted_dir}")
     done <<<"${CK_SEED_EXTENSION_DIRS:-}"
+    if [ -n "${CIVIKITCHEN_EXTENSION_UNDER_TEST:-}" ]; then
+        MOUNTED+=(--under-test "${EXT_DIR}/${CIVIKITCHEN_EXTENSION_UNDER_TEST}")
+    fi
     "${CK_PROFILE_CLI}" internal provision-profile --ext-dir "${EXT_DIR}" --archive-dir "${CK_DEP_ARCHIVE_DIR:-}" \
         "${MOUNTED[@]}" --replaced-state "${REPLACED_STATE}" "${JSON}" "${UF}"
 fi
