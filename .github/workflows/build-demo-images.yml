@@ -42,6 +42,11 @@ on:
         description: Its minor (resolve-civicrm's `minor`).
         required: true
         type: string
+      no_cache:
+        description: The caller's no_cache dispatch input; the daily run builds uncached anyway.
+        required: false
+        type: boolean
+        default: false
 
 # A called workflow does not inherit `env`; derived again as in merge-manifest.yml.
 env:
@@ -108,7 +113,7 @@ jobs:
             CIVICRM_BUILD_VERSION=${{ inputs.civicrm_build_version }}
           cache-from: type=registry,ref=${{ env.IMAGE_PREFIX }}-buildcache:demo-${{ matrix.variant.name }}-${{ matrix.suffix }}
           cache-to: type=registry,ref=${{ env.IMAGE_PREFIX }}-buildcache:demo-${{ matrix.variant.name }}-${{ matrix.suffix }},mode=max,ignore-error=true
-          no-cache: ${{ github.event_name == 'schedule' }}
+          no-cache: ${{ github.event_name == 'schedule' || inputs.no_cache }}
 
   merge:
     needs: build

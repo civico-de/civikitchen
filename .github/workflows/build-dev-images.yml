@@ -47,6 +47,12 @@ on:
           The phpstan APIv4 catalog's minor is built and promoted either way.
         required: false
         default: ''
+      no_cache:
+        description: >-
+          Build without the layer cache, as the daily run does, so a Debian
+          fix published since the last uncached build lands now.
+        type: boolean
+        default: false
 
 # The images that gate a release: standalone (every listed CiviCRM minor) and
 # standalone-demo. The CMS flavors build in build-cms-images.yml, with their own
@@ -154,7 +160,7 @@ jobs:
           cache-to: type=registry,ref=${{ env.IMAGE_PREFIX }}-buildcache:standalone-${{ matrix.version }}-${{ matrix.arch }},mode=max,ignore-error=true
           # The daily cron rebuilds from scratch: a cached apt layer would keep
           # serving the base image's outdated packages past their security fix.
-          no-cache: ${{ github.event_name == 'schedule' }}
+          no-cache: ${{ github.event_name == 'schedule' || inputs.no_cache == true }}
 
   # The per-arch candidates become one multi-platform tag. Every caller shares
   # one implementation — see .github/workflows/merge-manifest.yml. The matrix here
@@ -455,6 +461,7 @@ jobs:
     uses: ./.github/workflows/build-demo-images.yml
     with:
       variants: '[{"name": "standalone-demo", "site_type": "standalone-demo"}]'
+      no_cache: ${{ inputs.no_cache == true }}
       # The combined-profile leg: a comma list applies in order; shared
       # apiUser names ("readonly") must upsert, not duplicate.
       smoke: >-

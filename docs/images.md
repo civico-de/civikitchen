@@ -337,7 +337,9 @@ CRITICAL findings) never reaches the stable tags. Promotion publishes the
 digest the scan passed; the tests pull the candidate tag, so re-running a
 failed run's jobs after a later run rebuilt the same commit tests that newer
 build. Start a fresh run instead. The daily run
-skips the layer cache, so Debian security updates arrive within a day.
+skips the layer cache, so Debian security updates arrive within a day; a
+dispatch with `no_cache` set does the same at once, e.g. when the scan blocks
+a release on a package Debian has already fixed.
 
 The image builds keep their layer cache in the GHCR package
 `civikitchen-buildcache`, one tag per image and architecture, outside the

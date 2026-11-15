@@ -21,6 +21,12 @@ on:
           promotes them.
         type: string
         default: ''
+      no_cache:
+        description: >-
+          Build without the layer cache, as the daily run does, so a Debian
+          fix published since the last uncached build lands now.
+        type: boolean
+        default: false
 
 # Own group: a push or dispatch of build-dev-images.yml never cancels a CMS
 # build, and vice versa. Last-writer-wins on the moving tags as there.
@@ -127,7 +133,7 @@ jobs:
             CIVICRM_BUILD_VERSION=${{ needs.resolve-civicrm.outputs.minor }}
           cache-from: type=registry,ref=${{ env.IMAGE_PREFIX }}-buildcache:buildkit-${{ matrix.php }}-${{ matrix.suffix }}
           cache-to: type=registry,ref=${{ env.IMAGE_PREFIX }}-buildcache:buildkit-${{ matrix.php }}-${{ matrix.suffix }},mode=max,ignore-error=true
-          no-cache: ${{ github.event_name == 'schedule' }}
+          no-cache: ${{ github.event_name == 'schedule' || inputs.no_cache == true }}
 
   merge-buildkit:
     needs: [resolve-civicrm, build-buildkit]
@@ -335,6 +341,7 @@ jobs:
       smoke: ${{ needs.resolve-civicrm.outputs.demo_smoke }}
       civicrm_version: ${{ needs.resolve-civicrm.outputs.stable }}
       civicrm_build_version: ${{ needs.resolve-civicrm.outputs.minor }}
+      no_cache: ${{ inputs.no_cache == true }}
 
   notify-scheduled-failure:
     # As in build-dev-images.yml: test-then-promote keeps the last good tags,
