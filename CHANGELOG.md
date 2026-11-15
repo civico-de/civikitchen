@@ -30,6 +30,10 @@ except that a break the consumers are adjusted for ships as a minor, marked
   take precedence over a sibling's for a dependency both pin, so a sibling's
   older pin no longer aborts provisioning with "extension version … does not
   satisfy …". A sibling's pin still applies to keys the extension does not pin.
+- Headless tests on CiviCRM before 6.20 no longer abort with "Foreign key
+  constraint is incorrectly formed" (errno 150) when the test database was
+  built by another core version. `ck_headless()` prints both versions and
+  rebuilds the test database. Run `ckinit --update` to pick up the template.
 
 ## [1.61.2] - 2026-11-14
 

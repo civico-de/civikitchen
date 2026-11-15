@@ -50,6 +50,7 @@ namespace Civi {
     public static function dsn($part) { return 'civicrm_test'; }
     public static function asPreInstall($cb) { \CkProbe::$preInstall = TRUE; return $cb(); }
     public static function execute($sql) { \CkProbe::$executed[] = $sql; return TRUE; }
+    public static function pdo(): \CkPdo { return new \CkPdo(); }
   }
 }
 namespace {
@@ -60,6 +61,15 @@ namespace {
     public static bool $rebuilt = FALSE;
     public static array $executed = [];
     public static array $installed = [];
+    // civicrm_domain.version of the scratch database; NULL: no schema yet.
+    public static ?string $dbVersion = '6.19.0';
+  }
+  class CkPdo {
+    public function quote($s) { return "'" . $s . "'"; }
+    public function query($sql) {
+      $v = str_contains($sql, 'information_schema') ? (CkProbe::$dbVersion === NULL ? 0 : 1) : CkProbe::$dbVersion;
+      return new class($v) { public function __construct(public $v) {} public function fetchColumn() { return $this->v; } };
+    }
   }
   class CRM_Utils_System {
     public static string $version = '6.19.0';
@@ -110,6 +120,7 @@ probe='
   require $argv[1];
   require $argv[2];
   CRM_Utils_System::$version = getenv("CK_CORE") ?: "6.19.0";
+  CkProbe::$dbVersion = getenv("CK_DB") === "none" ? NULL : (getenv("CK_DB") ?: "6.19.0");
   $b = ck_headless();
   $last = end($b->steps);
   $b->run();
@@ -144,6 +155,18 @@ out="$(CK_CORE=6.20.beta1 php -r "$probe" "$work/stubs.php" "$work/ext/tests/php
 IFS='|' read -r _ restored _ executed _ _ <<<"$out"
 [[ "$restored" == "no-restore" && "$executed" != *"CORE SCHEMA SQL"* ]] \
   || fail "on 6.20 the core schema SQL must not be replayed; got '$restored' '$executed'"
+
+# A scratch database another core version built rejects the current schema
+# SQL (errno 150): it must be rebuilt, with both versions named.
+out="$(CK_DB=6.17.3 php -r "$probe" "$work/stubs.php" "$work/ext/tests/phpunit/ckHeadless.php" 2>"$work/err")"
+IFS='|' read -r _ _ _ executed _ _ <<<"$out"
+[[ "$executed" == "DROP TABLE IF EXISTS \`civicrm_test\`.civitest_revs;"* && "$executed" != *"CORE SCHEMA SQL"* ]] \
+  || fail "a version mismatch must forget the signature, not replay the SQL; got '$executed'"
+grep -q "built by CiviCRM 6.17.3, running 6.19.0" "$work/err" || fail "the mismatch must name both versions; got '$(cat "$work/err")'"
+# An empty scratch database has no keys to restore.
+out="$(CK_DB=none php -r "$probe" "$work/stubs.php" "$work/ext/tests/phpunit/ckHeadless.php")"
+IFS='|' read -r _ _ _ executed _ _ <<<"$out"
+[[ "$executed" != *"CORE SCHEMA SQL"* && "$executed" != *"DROP TABLE"* ]] || fail "an empty scratch database needs no restore; got '$executed'"
 
 # A rebuild that dies halfway leaves the previous signature in civitest_revs,
 # and the next run trusts a wiped schema. The first step forgets it.
