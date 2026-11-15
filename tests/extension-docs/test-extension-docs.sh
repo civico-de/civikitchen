@@ -69,6 +69,29 @@ grep -q 'extra.de.md' "$work/err" || fail "the orphan translation is not named"
 build "$fixture" "$work/x" en 2>"$work/err" && fail "an unbuilt language builds"
 grep -q 'language de is not built' "$work/err" || fail "the unbuilt language is not named"
 
+# A linked poster of an https video plays in place; its poster path stays relative to the page.
+mkdir -p "$work/video/handbook/images"
+cp "$fixture/info.xml" "$work/video/"
+cp "$fixture/handbook/images/shot.png" "$work/video/handbook/images/poster.png"
+printf '# Greeter\n\nSee [usage](usage.md).\n' > "$work/video/handbook/index.md"
+{
+  printf '# Usage\n\n[![Video: greeting](images/poster.png)](https://media.example.org/greet.mp4)\n\n'
+  printf '[![Wave](images/poster.png)](https://media.example.org/wave.webm?v=2)\n\n'
+  printf '[![Shot](images/poster.png)](https://media.example.org/greet.html)\n\n'
+  printf '[![Host](images/poster.png)](https://media.example.mp4)\n\n'
+  printf '[![](images/poster.png)](https://media.example.org/unnamed.mp4)\n'
+} > "$work/video/handbook/usage.md"
+build "$work/video" "$work/v" en >/dev/null 2>&1 || fail "the video fixture does not build"
+page=$work/v/usage/index.html
+grep -q '<video[^>]* src="https://media.example.org/greet.mp4"' "$page" || fail "a linked video poster is no player"
+grep -q '<video[^>]* poster="../images/poster.png"' "$page" || fail "the poster path is not relative to the page"
+grep -q '<video[^>]* aria-label="Video: greeting"' "$page" || fail "the player has no label"
+grep -q '<video[^>]* src="https://media.example.org/wave.webm?v=2"' "$page" || fail "a webm with a query is no player"
+grep -q '<a href="https://media.example.org/greet.html"' "$page" || fail "a linked image of a page is no link"
+grep -q '<a href="https://media.example.mp4"' "$page" || fail "a host ending in .mp4 is no link"
+grep -q '<a href="https://media.example.org/unnamed.mp4"' "$page" || fail "a poster without text is no link"
+[ "$(grep -c '<video' "$page")" = 2 ] || fail "a link that is no named video became a player"
+
 mkdir -p "$work/lfs/handbook/images"
 cp "$fixture/info.xml" "$work/lfs/"
 printf '# Greeter\n' > "$work/lfs/handbook/index.md"

@@ -28,6 +28,7 @@ LANG_NAMES = {"en": "English", "de": "Deutsch", "fr": "Français", "es": "Españ
 # The theme's indigo accent colours the active navigation link below 4.5:1 in both schemes.
 CONTRAST_CSS = """[data-md-color-scheme="default"] { --md-accent-fg-color: #3949ab; --md-accent-fg-color--transparent: #3949ab1a; }
 [data-md-color-scheme="slate"] { --md-accent-fg-color: #8c9eff; --md-accent-fg-color--transparent: #8c9eff1a; }
+.md-typeset video { max-width: 100%; height: auto; }
 """
 
 
@@ -167,7 +168,7 @@ def main():
                     ],
                 },
                 "markdown_extensions": {"tables": {}, "toc": {"permalink": True, "slugify": Slugify()}, "pymdownx.highlight": {},
-                                        "pymdownx.inlinehilite": {}, "pymdownx.superfences": {}},
+                                        "pymdownx.inlinehilite": {}, "pymdownx.superfences": {}, "video": {}},
             }
             if site_url:
                 config["site_url"] = site_url + prefix
@@ -179,7 +180,7 @@ def main():
                     for i, other in enumerate(languages)]}
             config_file = Path(tmp) / lang / "mkdocs.yml"
             config_file.write_text(yaml.safe_dump(config, allow_unicode=True, sort_keys=False))
-            # Zensical keeps site_dir inside the config's directory; PYTHONPATH lets it import slug.py,
+            # Zensical keeps site_dir inside the config's directory; PYTHONPATH lets it import slug.py and video.py,
             # without leaving a __pycache__ in the action checkout.
             env = {**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parent), "PYTHONDONTWRITEBYTECODE": "1"}
             subprocess.run([sys.executable, "-m", "zensical", "build", "--strict", "-f", str(config_file)], check=True, env=env)

@@ -14,6 +14,11 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- Extension docs: a poster image linked to an https video file (`.mp4`,
+  `.webm`) plays in place, with the poster and the image's text as its label.
+
 ## [1.62.0] - 2026-11-15
 
 ### Added
