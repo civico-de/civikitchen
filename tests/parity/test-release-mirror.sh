@@ -87,21 +87,28 @@ git clone -q --depth 1 "file://$work/origin.git" "$work/shallow"
 if (cd "$work/shallow" && run "$work/demo-1.2.3.zip" 1.2.3 main); then fail "a shallow clone was accepted"; fi
 grep -q 'the source clone is shallow' "$work/out" || fail "wrong message for a shallow clone"
 
-# The token travels as a header for the mirror's URL, never in an argument.
+# Over HTTPS the token comes from a credential helper for the mirror's host:
+# git gets it on request, and no config value or argument holds it.
 cat > "$work/git" <<'WRAP'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$CK_TEST_ARGV"
-[ "${1:-}" = ls-remote ] && env | grep '^GIT_CONFIG_' >> "$CK_TEST_ENV"
+if [ "${1:-}" = ls-remote ]; then
+  env | grep '^GIT_CONFIG_' >> "$CK_TEST_ENV"
+  printf 'protocol=https\nhost=mirror.example\npath=demo.git\n\n' | "$CK_TEST_GIT" credential fill > "$CK_TEST_FILLED"
+fi
 exec "$CK_TEST_GIT" "$@"
 WRAP
 chmod +x "$work/git"
 git checkout -q main
-CK_TEST_GIT="$(command -v git)" CK_TEST_ARGV="$work/argv" CK_TEST_ENV="$work/env" \
-  CK_MIRROR_TOKEN=s3cret PATH="$work:$PATH" CK_MIRROR_URL="$work/mirror.git" \
+printf '[url "%s"]\n\tinsteadOf = https://mirror.example/demo.git\n' "$work/mirror.git" > "$work/gitconfig"
+CK_TEST_GIT="$(command -v git)" CK_TEST_ARGV="$work/argv" CK_TEST_ENV="$work/env" CK_TEST_FILLED="$work/filled" \
+  GIT_CONFIG_GLOBAL="$work/gitconfig" CK_MIRROR_TOKEN=s3cret PATH="$work:$PATH" \
+  CK_MIRROR_URL=https://mirror.example/demo.git \
   bash "$mirror" "$work/demo-1.3.0.zip" 1.3.0 main > "$work/out" 2>&1 || { cat "$work/out" >&2; fail "the run with a token failed"; }
-grep -q "^GIT_CONFIG_KEY_0=http.$work/mirror.git.extraheader\$" "$work/env" || fail "no header for the mirror's URL"
-grep -q "^GIT_CONFIG_VALUE_0=Authorization: Basic $(printf 'oauth2:s3cret' | base64)\$" "$work/env" || fail "the header does not carry the token"
-if grep -q 's3cret\|'"$(printf 'oauth2:s3cret' | base64)" "$work/argv" "$work/out"; then fail "the token reached an argument or the output"; fi
+grep -q '^GIT_CONFIG_KEY_[0-9]*=credential.https://mirror.example.helper$' "$work/env" || fail "no credential helper for the mirror's host"
+grep -qx 'username=oauth2' "$work/filled" || fail "the helper does not name the user"
+grep -qx 'password=s3cret' "$work/filled" || fail "the helper does not hand out the token"
+if grep -q 's3cret' "$work/argv" "$work/env" "$work/out"; then fail "the token reached an argument, a config value or the output"; fi
 
 # A source that tracks media with Git LFS: the mirror gets the objects before
 # the commits that point at them, and the tag carries the image itself.

@@ -129,7 +129,8 @@ on:
 
       mirror_token:
         description: >-
-          Token that may push to mirror_url, sent as an HTTP header. On GitLab
+          Token that may push to mirror_url, handed to git by a credential
+          helper. On GitLab
           a project access token with the write_repository scope.
         required: false
 

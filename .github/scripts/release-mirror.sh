@@ -10,7 +10,8 @@
 # Run in a full clone of the source repository with the released commit
 # checked out. CK_MIRROR_URL names the repository; CK_MIRROR_TOKEN (a token
 # that may write to it) and CK_SOURCE_TOKEN (one that may read the source's
-# LFS objects) are sent as HTTP headers, never placed in a URL or an argument.
+# LFS objects) are handed to git by a credential helper, never placed in a URL,
+# a config value or an argument.
 set -euo pipefail
 
 zip="${1:?usage: release-mirror.sh <archive.zip> <version> <branch>}"
@@ -27,17 +28,27 @@ if [ "$(git rev-parse --is-shallow-repository)" != false ]; then
   exit 1
 fi
 
-headers=()
-basic() { printf 'Authorization: Basic %s' "$(printf '%s' "$1" | base64 | tr -d '\n')"; }
+# A credential helper per host answers git and git-lfs alike; it reads the
+# token from the environment, so no config value or argument carries it.
+config=()
+credentials() { # <url> <user> <name of the variable holding the token>
+  local host
+  [[ "$1" =~ ^(https://[^/]+) ]] || return 0
+  host="${BASH_REMATCH[1]}"
+  config+=("credential.${host}.helper" "")
+  config+=("credential.${host}.helper" "!f() { test \"\$1\" = get && printf 'username=%s\npassword=%s\n' '$2' \"\$$3\"; }; f")
+}
 if [ -n "${CK_MIRROR_TOKEN:-}" ]; then
-  headers+=("http.${url}.extraheader" "$(basic "oauth2:${CK_MIRROR_TOKEN}")")
+  export CK_MIRROR_TOKEN
+  credentials "$url" oauth2 CK_MIRROR_TOKEN
 fi
 if [ -n "${CK_SOURCE_TOKEN:-}" ]; then
-  headers+=("http.$(git remote get-url origin).extraheader" "$(basic "x-access-token:${CK_SOURCE_TOKEN}")")
+  export CK_SOURCE_TOKEN
+  credentials "$(git remote get-url origin)" x-access-token CK_SOURCE_TOKEN
 fi
-export GIT_CONFIG_COUNT=$((${#headers[@]} / 2))
-for ((i = 0; i < ${#headers[@]}; i += 2)); do
-  export "GIT_CONFIG_KEY_$((i / 2))=${headers[i]}" "GIT_CONFIG_VALUE_$((i / 2))=${headers[i + 1]}"
+export GIT_CONFIG_COUNT=$((${#config[@]} / 2))
+for ((i = 0; i < ${#config[@]}; i += 2)); do
+  export "GIT_CONFIG_KEY_$((i / 2))=${config[i]}" "GIT_CONFIG_VALUE_$((i / 2))=${config[i + 1]}"
 done
 export GIT_TERMINAL_PROMPT=0
 

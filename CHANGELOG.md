@@ -14,6 +14,12 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Fixed
+
+- A release to `mirror_url` no longer fails on a repository that tracks files
+  with Git LFS: the workflow hands the token to git through a credential
+  helper instead of an HTTP header, which the mirror's LFS uploads rejected.
+
 ## [1.66.0] - 2026-11-16
 
 ### Added

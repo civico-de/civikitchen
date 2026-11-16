@@ -210,8 +210,8 @@ nothing, one that builds other files fails. Pre-release tags are mirrored
 too. Only the workflow writes to the mirror; a commit made there blocks the
 branch from following and is reported in the run.
 
-`mirror_token` is sent as an HTTP header and never appears in a URL or a
-command line. On GitLab, create a project access token with the
+`mirror_token` reaches git through a credential helper and never appears in a
+URL or a command line. On GitLab, create a project access token with the
 write_repository scope and the Maintainer role, allow that role to create
 tags and to push to the default branch, and store the token as a repository
 secret. The mirror takes one extension per repository; a release with several
