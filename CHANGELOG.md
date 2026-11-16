@@ -14,6 +14,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.66.0] - 2026-11-16
+
 ### Added
 
 - The extension release workflow takes `mirror_url` and the `mirror_token`
@@ -2939,7 +2941,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.65.0...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.66.0...HEAD
+[1.66.0]: https://github.com/civico-de/civikitchen/compare/v1.65.0...v1.66.0
 [1.65.0]: https://github.com/civico-de/civikitchen/compare/v1.64.0...v1.65.0
 [1.64.0]: https://github.com/civico-de/civikitchen/compare/v1.63.0...v1.64.0
 [1.63.0]: https://github.com/civico-de/civikitchen/compare/v1.62.0...v1.63.0
