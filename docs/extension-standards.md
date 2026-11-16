@@ -836,11 +836,22 @@ minor must be on the supported list in
 [images.md](images.md#tags-and-versions). GitLab picks its job image before
 the repository is read, so there CK_IMAGE still names it.
 
-A floor for the CiviCRM versions an extension supports, typically the
-organisation's ESR, is `civicrm_floor: "6.16"`. ckconform's civicrm-floor
-check fails while info.xml's lowest `<compatibility><ver>` is below it; an
-extension that needs a newer core declares a higher floor and passes. It is
-one of the keys an organisation defaults file may set.
+info.xml's lowest `<compatibility><ver>` is CiviCRM's current ESR, which
+ckconform's civicrm-floor check carries. An extension that declares another
+version gives each reason in `civicrm_floor_reasons`, with the version that
+reason needs:
+
+```yaml
+policy:
+  civicrm_floor_reasons:
+    - version: "6.18"
+      reason: needs the scheduled job base class
+```
+
+One entry names the version info.xml declares. The check fails for an entry
+beyond that version and for one the ESR already covers, so a list shrinks as
+the ESR moves up. An extension that supports an older CiviCRM lists its reason
+the same way, under the lower version.
 
 A repo whose production server runs another MariaDB names it as
 `database: mariadb:10.11`. ckinit writes it into the managed

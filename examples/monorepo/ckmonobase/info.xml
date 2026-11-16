@@ -16,7 +16,7 @@
   <version>1.0.0</version>
   <develStage>stable</develStage>
   <compatibility>
-    <ver>6.0</ver>
+    <ver>6.16</ver>
   </compatibility>
   <classloader>
     <psr4 prefix="Civi\" path="Civi"/>

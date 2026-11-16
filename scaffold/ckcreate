@@ -32,7 +32,7 @@ ckcreate — create a new CiviCRM extension with civix scaffold + civikitchen te
   --email <address>       author email
   --license <id>          civix license ID or Proprietary (default: Proprietary)
   --copyright <text>      copyright policy seeded into civikitchen.yaml
-  --compatibility <ver>   minimum CiviCRM version (default: 6.12)
+  --compatibility <ver>   minimum CiviCRM version (default: 6.16, the current ESR)
   --php <ver>             minimum PHP version (default: template floor)
   --keep-stack            leave the throwaway stack running (for debugging)
 
@@ -62,7 +62,7 @@ author="${CKCREATE_AUTHOR:-}"
 email="${CKCREATE_EMAIL:-}"
 license="${CKCREATE_LICENSE:-Proprietary}"
 copyright="${CKCREATE_COPYRIGHT:-}"
-compat="${CKCREATE_COMPATIBILITY:-6.12}"
+compat="${CKCREATE_COMPATIBILITY:-6.16}"
 php_floor="${CKCREATE_PHP_COMPATIBILITY:-}"
 image="${CKCREATE_IMAGE:-ghcr.io/civico-de/civikitchen:v1}"
 

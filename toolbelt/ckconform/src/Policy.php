@@ -52,7 +52,7 @@ final class Policy
         'release' => "ckconform: 'none -- <reason>' for a repo that deliberately cuts no releases",
         'untagged_versions' => 'ckconform: versions the repo moved past that deliberately stay untagged, reason mandatory',
         'max_unreleased_days' => 'ckconform: days of unreleased shipped changes before it is reported',
-        'civicrm_floor' => 'ckconform: the lowest CiviCRM minor info.xml <compatibility> may declare',
+        'civicrm_floor_reasons' => 'ckconform: why info.xml <compatibility> declares another CiviCRM version than the ESR, reason mandatory',
         // read by the ck* tools
         'mutation_min_msi' => 'ckmutate: mutation score floor (--min-msi)',
         'mutation_min_covered_msi' => 'ckmutate: covered-code mutation floor (--min-covered-msi)',
@@ -85,7 +85,7 @@ final class Policy
      *
      * @var list<string>
      */
-    public const REPEATABLE = ['dist_exclude', 'dist_include', 'dist_build_output', 'lifecycle_log_ignore', 'vendored_paths', 'smarty_skip_templates', 'untagged_versions', 'extension_source', 'extension_release', 'extension_version'];
+    public const REPEATABLE = ['dist_exclude', 'dist_include', 'dist_build_output', 'lifecycle_log_ignore', 'vendored_paths', 'smarty_skip_templates', 'untagged_versions', 'civicrm_floor_reasons', 'extension_source', 'extension_release', 'extension_version'];
 
     /** @var list<string> */
     public const PERCENT = ['min_coverage', 'mutation_min_msi', 'mutation_min_covered_msi'];
@@ -106,7 +106,7 @@ final class Policy
      *
      * @var list<string>
      */
-    public const SHARED = ['license', 'npm_license', 'copyright', 'vendor', 'hook_style', 'max_unreleased_days', 'renovate_preset', 'civicrm_floor'];
+    public const SHARED = ['license', 'npm_license', 'copyright', 'vendor', 'hook_style', 'max_unreleased_days', 'renovate_preset'];
 
     /**
      * The defaults file's contents, null when the variable is unset. A variable
@@ -189,7 +189,7 @@ final class Policy
         self::validateDocument($document);
         $policy = $document['policy'] ?? [];
         $out = [];
-        foreach (['license', 'copyright', 'hook_style', 'npm_license', 'max_unreleased_days', 'renovate_preset', 'ci', 'civicrm', 'civicrm_floor', 'database'] as $key) {
+        foreach (['license', 'copyright', 'hook_style', 'npm_license', 'max_unreleased_days', 'renovate_preset', 'ci', 'civicrm', 'database'] as $key) {
             if (array_key_exists($key, $policy)) $out[$key] = [(string) $policy[$key]];
         }
         if (isset($policy['coverage']['minimum'])) $out['min_coverage'] = [(string) $policy['coverage']['minimum']];
@@ -206,6 +206,7 @@ final class Policy
         foreach ($policy['smarty_skip_templates'] ?? [] as $item) $out['smarty_skip_templates'][] = $item['template'] . ' -- ' . $item['reason'];
         if (isset($policy['release'])) $out['release'] = [$policy['release']['mode'] . ' -- ' . $policy['release']['reason']];
         foreach ($policy['untagged_versions'] ?? [] as $item) $out['untagged_versions'][] = $item['version'] . ' -- ' . $item['reason'];
+        foreach ($policy['civicrm_floor_reasons'] ?? [] as $item) $out['civicrm_floor_reasons'][] = $item['version'] . ' -- ' . $item['reason'];
         if (isset($policy['javascript']['type_check'])) $out['javascript_type_check'] = [$policy['javascript']['type_check'] ? 'true' : 'false'];
         if (isset($policy['mutation']['minimum_msi'])) $out['mutation_min_msi'] = [(string) $policy['mutation']['minimum_msi']];
         if (isset($policy['mutation']['minimum_covered_msi'])) $out['mutation_min_covered_msi'] = [(string) $policy['mutation']['minimum_covered_msi']];

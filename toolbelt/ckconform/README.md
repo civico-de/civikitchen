@@ -94,7 +94,7 @@ deviations from the standard live in one place with their reasons attached.
 ### Organisation-wide defaults
 
 Keys every repo of an organisation shares (`license`, `npm_license`,
-`copyright`, `vendor`, `civicrm_floor`) can live once, in a file of the same format that
+`copyright`, `vendor`) can live once, in a file of the same format that
 `CK_DEFAULT_CONFIG` names. Only the keys ckconform and ckinit read
 (`Policy::SHARED`) are taken from it — a key another gate reads would apply in
 one run and not the next, so `PolicyKeyCheck` rejects it there. Its keys apply

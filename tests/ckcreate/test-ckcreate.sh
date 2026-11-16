@@ -67,7 +67,7 @@ php -r '
 ' "$root/packages/civikitchen-scenario-schema/scenario.php" "$proprietary/civikitchen.yaml"
 drift=$("$root/scaffold/ckinit" --check "$proprietary")
 grep -q 'up to date' <<<"$drift"
-grep -q -- '--license MIT --compatibility 6.12' "$FAKE_DOCKER_LOG"
+grep -q -- '--license MIT --compatibility 6.16' "$FAKE_DOCKER_LOG"
 grep -q -- '--enable=no' "$FAKE_DOCKER_LOG"
 grep -q 'down -v --remove-orphans' "$FAKE_DOCKER_LOG"
 # A new repository with one test, and the civix output run through the fixer and the formatter.
