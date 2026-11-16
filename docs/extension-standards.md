@@ -848,8 +848,8 @@ policy:
       reason: needs the scheduled job base class
 ```
 
-One entry names the version info.xml declares. The check fails for an entry
-beyond that version and for one the ESR already covers, so a list shrinks as
+One entry names the version info.xml declares. The check warns about a
+missing reason, an entry beyond that version and one the ESR already covers, so a list shrinks as
 the ESR moves up. An extension that supports an older CiviCRM lists its reason
 the same way, under the lower version.
 

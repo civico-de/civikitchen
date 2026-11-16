@@ -16,12 +16,12 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Changed
 
-- **Breaking:** ckconform's civicrm-floor check runs in every extension and
-  holds info.xml's lowest `<compatibility><ver>` at CiviCRM's current ESR,
-  6.16. An extension that declares another version lists why in
-  `policy.civicrm_floor_reasons` (`version` and `reason` per entry); one entry
-  names the declared version. `policy.civicrm_floor` is gone: remove it, and
-  either declare 6.16 or add the reasons.
+- **Breaking:** `policy.civicrm_floor` is gone; remove it from
+  civikitchen.yaml. ckconform's civicrm-floor check runs in every extension
+  instead and warns while info.xml's lowest `<compatibility><ver>` is another
+  version than CiviCRM's current ESR, 6.16, without a reason. The reasons go
+  into `policy.civicrm_floor_reasons` (`version` and `reason` per entry), and
+  one entry names the declared version.
 - ckcreate scaffolds a new extension with a CiviCRM floor of 6.16, the ESR,
   instead of 6.12.
 

@@ -14,7 +14,7 @@ use CiviKitchen\Ckconform\Reporter;
  * An extension that declares another version says why in
  * `policy.civicrm_floor_reasons`, one entry per reason with the version that
  * reason needs; one entry names the declared version, and none lies on the
- * ESR's side of it or past it.
+ * ESR's side of it or past it. Every finding is a warning.
  */
 final class CivicrmFloorCheck implements Check
 {
@@ -34,7 +34,7 @@ final class CivicrmFloorCheck implements Check
         $esr = self::ESR;
         $declared = $context->compatibilityFloor();
         if ($declared === null) {
-            $reporter->fail("info.xml declares no <compatibility><ver>: declare the ESR, {$esr}, or the version the extension needs");
+            $reporter->warn("info.xml declares no <compatibility><ver>: declare the ESR, {$esr}, or the version the extension needs");
 
             return;
         }
@@ -46,14 +46,14 @@ final class CivicrmFloorCheck implements Check
             $reason = substr($value, strlen($version) + 4);
             $ownSide = version_compare($version, $esr);
             if ($side === 0 || $ownSide !== $side) {
-                $reporter->fail("civikitchen.yaml: civicrm_floor_reasons gives a reason for {$version} that is not needed, the ESR is {$esr} and info.xml declares {$declared} — remove it: \"{$reason}\"");
+                $reporter->warn("civikitchen.yaml: civicrm_floor_reasons gives a reason for {$version} that is not needed, the ESR is {$esr} and info.xml declares {$declared} — remove it: \"{$reason}\"");
             } elseif (version_compare($version, $declared) === $side) {
-                $reporter->fail("civikitchen.yaml: civicrm_floor_reasons gives a reason for {$version}, but info.xml declares {$declared} — name the same version in both: \"{$reason}\"");
+                $reporter->warn("civikitchen.yaml: civicrm_floor_reasons gives a reason for {$version}, but info.xml declares {$declared} — name the same version in both: \"{$reason}\"");
             }
         }
         if ($side !== 0 && !$explained) {
             $where = $side > 0 ? 'above' : 'below';
-            $reporter->fail("info.xml declares CiviCRM {$declared}, {$where} the ESR {$esr}, and civikitchen.yaml gives no reason for {$declared}: declare {$esr}, or add the reason to policy.civicrm_floor_reasons");
+            $reporter->warn("info.xml declares CiviCRM {$declared}, {$where} the ESR {$esr}, and civikitchen.yaml gives no reason for {$declared}: declare {$esr}, or add the reason to policy.civicrm_floor_reasons");
         }
     }
 }
