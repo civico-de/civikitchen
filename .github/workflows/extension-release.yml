@@ -93,6 +93,16 @@ on:
           Required whenever the app secrets are supplied.
         type: string
         default: ''
+      mirror_url:
+        description: >-
+          HTTPS address of a second git repository that receives each release,
+          for an extension directory that builds its download from a tag
+          (https://lab.civicrm.org/extensions/<key>.git). It gets the default
+          branch as released and the archive's contents as a commit tagged
+          with the bare version (1.2.3), so that tag carries vendor/ and build
+          output. Needs the mirror_token secret; one extension per repository.
+        type: string
+        default: ''
       node_version:
         description: >-
           Node the declared release build (policy.dist.build) runs its binaries
@@ -115,6 +125,12 @@ on:
           short-lived token; neither key nor token is ever copied into the
           archive or the smoke container — the container gets the fetched
           bytes, never the credential that fetched them.
+        required: false
+
+      mirror_token:
+        description: >-
+          Token that may push to mirror_url, sent as an HTTP header. On GitLab
+          a project access token with the write_repository scope.
         required: false
 
 permissions:
@@ -738,3 +754,30 @@ jobs:
               --verify-tag --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md" \
               "${args[@]}" "$CK_DIST"/*
           fi
+
+      # After the GitHub release, so a mirror that is down leaves a release to
+      # re-run rather than none. Full history: the mirror receives the branch.
+      - name: Check out the release for the mirror
+        if: ${{ inputs.mirror_url != '' && !inputs.dry_run }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          path: .ckrelease-mirror
+
+      - name: Publish the release to the mirror
+        if: ${{ inputs.mirror_url != '' && !inputs.dry_run }}
+        working-directory: .ckrelease-mirror
+        env:
+          CK_MIRROR_URL: ${{ inputs.mirror_url }}
+          CK_MIRROR_TOKEN: ${{ secrets.mirror_token }}
+          CK_SOURCE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CK_BRANCH: ${{ github.event.repository.default_branch }}
+          CK_DIST: ${{ runner.temp }}/ckrelease-dist
+        run: |
+          set -euo pipefail
+          [ -n "$CK_MIRROR_TOKEN" ] || { echo "mirror_url is set, but the mirror_token secret is empty" >&2; exit 1; }
+          zips=("$CK_DIST"/*.zip)
+          [ "${#zips[@]}" -eq 1 ] \
+            || { echo "mirror_url takes one extension per repository, this release carries ${#zips[@]} archives" >&2; exit 1; }
+          "$GITHUB_WORKSPACE/.civikitchen-ci/.github/scripts/release-mirror.sh" "${zips[0]}" "${GITHUB_REF_NAME#v}" "$CK_BRANCH"

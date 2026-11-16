@@ -14,6 +14,7 @@ on:
       - '.github/workflows/extension-release.yml'
       - '.github/workflows/release-self-test.yml'
       - '.github/scripts/release-publish-flags.sh'
+      - '.github/scripts/release-mirror.sh'
 
 permissions:
   contents: read

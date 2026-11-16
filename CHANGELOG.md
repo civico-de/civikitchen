@@ -14,6 +14,16 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- The extension release workflow takes `mirror_url` and the `mirror_token`
+  secret: each release also goes to a second git repository, as the default
+  branch plus a tag named after the bare version that carries the archive's
+  files, vendor/ and build output included. For an extension directory that
+  builds its download from a tag, such as civicrm.org's with a repository on
+  lab.civicrm.org
+  ([extension releases](docs/extension-releases.md#a-mirror-an-extension-directory-reads)).
+
 ## [1.65.0] - 2026-11-16
 
 ### Changed

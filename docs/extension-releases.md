@@ -107,6 +107,7 @@ extensions releases them together from one caller at its root; see
 | `smoke_test` | `true` | Disable only for an extension whose install cannot be reached this way, and say why in the caller. |
 | `draft` | `false` | Publishes the GitHub release as a draft. |
 | `composer_install` | `false` | Installs the lockfile without dev packages and bundles the vendor tree. |
+| `mirror_url` | empty | HTTPS address of a second git repository that receives each release; see [A mirror an extension directory reads](#a-mirror-an-extension-directory-reads). Needs the `mirror_token` secret. |
 | `composer_app_repositories` | unset | Repository names within the caller's owner, comma- or newline-separated. Required with the App secrets; it is the token allowlist. |
 | `composer_app_id`, `composer_app_private_key` | unset | A GitHub App with contents read, installed on the private dependency repos, for private Composer packages and staged dependency releases. Pass both under secrets; one without the other fails the run. |
 
@@ -177,6 +178,44 @@ can inspect it before pushing. Archives that need composer_install or
 [build output](#build-output-git-does-not-track) are built from a temporary
 tree instead; they carry the build time and match other builds in content but
 not byte for byte.
+
+## A mirror an extension directory reads
+
+An extension directory that builds its download from a git tag, such as
+civicrm.org's, gets a source archive: no vendor/, no build output. With
+`mirror_url` the release also goes to a second repository made for that
+reader, after the GitHub release exists:
+
+```yaml
+# END CIVIKITCHEN MANAGED caller
+    with:
+      mirror_url: https://lab.civicrm.org/extensions/example.git
+    secrets:
+      mirror_token: ${{ secrets.MIRROR_TOKEN }}
+```
+
+The mirror receives:
+
+- the default branch as it is at the release, with its history and its Git LFS
+  objects, so the source is readable there;
+- a tag named after the bare version, 1.3.0 for v1.3.0. It points at one
+  commit on top of the released one whose files are the archive's files, so an
+  archive of that tag is the release archive: vendor/ and build output
+  included, the development layer left out, LFS media as plain files.
+
+The v-prefixed tags stay in the source repository. A release from an older
+line publishes its tag and leaves the mirror's branch alone. A tag the mirror
+already holds never moves: a re-run that builds the same files changes
+nothing, one that builds other files fails. Pre-release tags are mirrored
+too. Only the workflow writes to the mirror; a commit made there blocks the
+branch from following and is reported in the run.
+
+`mirror_token` is sent as an HTTP header and never appears in a URL or a
+command line. On GitLab, create a project access token with the
+write_repository scope and the Maintainer role, allow that role to create
+tags and to push to the default branch, and store the token as a repository
+secret. The mirror takes one extension per repository; a release with several
+archives fails at this step.
 
 ## What the archive contains
 

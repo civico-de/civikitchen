@@ -144,7 +144,7 @@ help: ## Show this help
 
 # --- the fast loop -----------------------------------------------------------
 
-test: test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario test-provision test-core-patches test-ckcoretest test-ck-headless test-ck-headless-phpstan test-phpstan-bootstrap test-ckcommon-git test-missing-tool test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-promote-scanned test-promote-digest test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-sibling-vendor test-sibling-build test-database-matrix test-demo-basic-auth test-release-retag test-release-move-major-tag test-release-publish-flags test-release-steps test-ci-gates-step test-release-script test-release-verify-images test-release-attach-cli test-vendored-paths test-ckeslint test-ckcoverage test-make-phony test-make-downloads test-tool-locks test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-cms-families test-changelog test-extension-docs test-compose-config test-playwright-network test-stack-actions ## Run every fast test suite (no Docker daemon)
+test: test-shared-php-coverage test-ckconform test-phpstan test-mago-ext test-mago-stubs test-rector test-ckinit test-example-template test-ckcreate test-ckcivix test-ckmodernize test-ck test-ckboot test-composer-deps test-profiles test-scenario test-provision test-core-patches test-ckcoretest test-ck-headless test-ck-headless-phpstan test-phpstan-bootstrap test-ckcommon-git test-missing-tool test-compose-isolation test-concurrency-groups test-matrix-legs test-sibling-wiring test-dist-build-wiring test-pre-checkout-workdir test-image-wiring test-promote-scanned test-promote-digest test-composer-auth test-stack-image test-gitlab-mr-jobs test-sibling-checkout test-sibling-vendor test-sibling-build test-database-matrix test-demo-basic-auth test-release-retag test-release-move-major-tag test-release-publish-flags test-release-mirror test-release-steps test-ci-gates-step test-release-script test-release-verify-images test-release-attach-cli test-vendored-paths test-ckeslint test-ckcoverage test-make-phony test-make-downloads test-tool-locks test-shell-portability test-install-trivy test-resolve-civicrm-stable test-resolve-civicrm-git test-cms-families test-changelog test-extension-docs test-compose-config test-playwright-network test-stack-actions ## Run every fast test suite (no Docker daemon)
 
 test-shared-php-coverage: $(PHPUNIT) $(VENDOR_STAMP) ## Shared PHP unit tests and measured line-coverage floor
 	if command -v phpdbg >/dev/null 2>&1; then \
@@ -373,6 +373,9 @@ test-release-move-major-tag: ## Major tag push: App token required, never on dis
 
 test-release-publish-flags: ## Extension releases: pre-release flag, Latest only for the highest plain version
 	bash tests/parity/test-release-publish-flags.sh
+
+test-release-mirror: ## Extension releases: the mirror gets the branch, the archive as a bare-version tag and the LFS objects
+	bash tests/parity/test-release-mirror.sh
 
 test-release-steps: $(VENDOR_STAMP) ## Extension releases: working_directory, same-repository closure, pins and staging steps as written
 	bash tests/parity/test-release-steps.sh
