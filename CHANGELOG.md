@@ -14,6 +14,12 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Fixed
+
+- `ckcoretest` on a release image keeps the tests of a mounted directory. It
+  replaced `ext/*/tests` of an extension mounted from a checkout with the
+  tag's tests, on the host as well, and ran those instead.
+
 ### Changed
 
 - `policy.vendor` in `civikitchen.yaml` takes only

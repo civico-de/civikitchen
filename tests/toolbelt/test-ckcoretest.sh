@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ckcoretest: --e2e runs @group e2e against the dev site without the test-DB gate,
-# headless runs keep it; untagged cores stop before fetching. Fakes record calls.
+# headless runs keep it; untagged cores stop before fetching; mounts keep their tests. Fakes record calls.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -133,6 +133,9 @@ echo '<phpunit bootstrap="tests/phpunit/CiviTest/bootstrap.php"/>' > "$work/tagg
 echo 'of the tag' > "$work/tagged/tests/phpunit/FromTagTest.php"
 echo 'seed' > "$work/tagged/sql/test_data.mysql"
 echo 'second' > "$work/tagged/sql/test_data_second_domain.mysql"
+mkdir -p "$work/tagged/ext/afform/mock/tests" "$work/tagged/ext/search_kit/tests"
+echo 'of the tag' > "$work/tagged/ext/afform/mock/tests/FromTagTest.php"
+echo 'of the tag' > "$work/tagged/ext/search_kit/tests/FromTagTest.php"
 git -C "$work/tagged" add --all
 git -C "$work/tagged" -c user.name=Test -c user.email=test@example.org -c commit.gpgsign=false commit --quiet --message release
 git -C "$work/tagged" tag 6.20.1
@@ -162,5 +165,30 @@ if CK_CORE_DIR="$partial" CK_CORE_REPO="$work/tagged" bash "$root/toolbelt/bin/c
   fail "seed SQL that cannot be written must fail the fetch: $(cat "$work/out")"
 fi
 [[ ! -e "$partial/phpunit.xml.dist" ]] || fail "a fetch that failed on the seed SQL must not leave the config that ends fetching"
+
+# A release image with an extension checkout mounted: the tag's tests fill core and the
+# other extensions, while the mounted extension keeps its own.
+tarball="$work/tarball"
+mkdir -p "$tarball/xml" "$tarball/sql" "$tarball/ext/afform/mock/tests" "$tarball/ext/search_kit"
+echo '<?xml version="1.0"?><version><version_no>6.20.1</version_no></version>' > "$tarball/xml/version.xml"
+echo 'of the checkout' > "$tarball/ext/afform/mock/tests/ReproducerTest.php"
+printf '36 25 0:31 / / rw - overlay overlay rw\n90 36 0:52 /src/afform %s/ext/afform rw - virtiofs mount0 rw\n' "$tarball" > "$work/mountinfo"
+CK_MOUNTINFO="$work/mountinfo" CK_CORE_DIR="$tarball" CK_CORE_REPO="$work/tagged" bash "$root/toolbelt/bin/ckcoretest" --fetch-only >"$work/out" 2>&1 \
+  || fail "a release tree with a mounted extension must fetch: $(cat "$work/out")"
+[[ -e "$tarball/tests/phpunit/FromTagTest.php" && -e "$tarball/ext/search_kit/tests/FromTagTest.php" ]] \
+  || fail "core and unmounted extensions must get the tag's tests: $(cat "$work/out")"
+[[ "$(cat "$tarball/ext/afform/mock/tests/ReproducerTest.php" 2>/dev/null)" == 'of the checkout' \
+  && ! -e "$tarball/ext/afform/mock/tests/FromTagTest.php" ]] || fail "a mounted extension's tests must stay as they are: $(cat "$work/out")"
+
+# A mounted tests/ without tests/phpunit is refused, not emptied.
+emptymount="$work/emptymount"
+mkdir -p "$emptymount/xml" "$emptymount/sql" "$emptymount/tests"
+echo '<?xml version="1.0"?><version><version_no>6.20.1</version_no></version>' > "$emptymount/xml/version.xml"
+echo 'of the checkout' > "$emptymount/tests/README"
+printf '90 36 0:52 /src/tests %s/tests rw - virtiofs mount0 rw\n' "$emptymount" > "$work/mountinfo"
+if CK_MOUNTINFO="$work/mountinfo" CK_CORE_DIR="$emptymount" CK_CORE_REPO="$work/tagged" bash "$root/toolbelt/bin/ckcoretest" --fetch-only >"$work/out" 2>&1; then
+  fail "a mounted tests/ without tests/phpunit must refuse: $(cat "$work/out")"
+fi
+[ "$(cat "$emptymount/tests/README")" = 'of the checkout' ] || fail "a refused fetch must leave the mounted tests/ alone"
 
 echo "ckcoretest: ok"

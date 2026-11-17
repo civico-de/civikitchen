@@ -106,18 +106,38 @@ if [ "${fetch}" != none ]; then
     fi
   done
   if [ "${fetch}" = all ]; then
+    # Bind mounts below the core hold a checkout's files: the tag's tests never replace them.
+    mounts=()
+    while read -r _ _ _ _ point _; do
+      case "${point}/" in "${CK_CORE_DIR}"/*) mounts+=("${point}") ;; esac
+    done < "${CK_MOUNTINFO:-/proc/self/mountinfo}"
+    in_mount() {
+      local m
+      for m in ${mounts[@]+"${mounts[@]}"}; do
+        case "$1/" in "${m}"/*) return 0 ;; esac
+      done
+      return 1
+    }
+    if in_mount "${CK_CORE_DIR}/tests"; then
+      ck_die "${CK_CORE_DIR}/tests is mounted but has no tests/phpunit; mount a checkout's tests/ or none."
+    fi
     rm -rf "${CK_CORE_DIR}/tests"
     mv "${src}/core/tests" "${CK_CORE_DIR}/tests"
+    owned+=("${CK_CORE_DIR}/tests")
     # ext suites can nest (ext/afform/core/tests), so walk rather than glob
     while IFS= read -r d; do
       rel="${d#"${src}/core/"}"
       dest="${CK_CORE_DIR}/${rel}"
       [ -d "$(dirname "${dest}")" ] || continue
+      if in_mount "${dest}"; then
+        echo "[ckcoretest] ${rel} is mounted — keeping its tests"
+        continue
+      fi
       rm -rf "${dest}"
       mv "${d}" "${dest}"
+      owned+=("${dest}")
     done < <(find "${src}/core/ext" -type d -name tests -prune 2>/dev/null)
     echo "${version}" > "${marker}"
-    owned+=("${CK_CORE_DIR}/tests" "${CK_CORE_DIR}"/ext/*/tests)
   fi
   chown -R www-data:www-data ${owned[@]+"${owned[@]}"} 2>/dev/null || true
 fi
