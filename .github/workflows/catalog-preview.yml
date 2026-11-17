@@ -1,12 +1,5 @@
-# Early warning for the generated catalogs: regenerate them against the LATEST
-# CiviCRM release and diff. The drift gates in `make test` only prove the
-# committed catalogs match their PINNED release — core moving on (new hooks,
-# namespaces, API entities, schema) is invisible until someone bumps the pin
-# and gets surprised. This run fails when the latest release would change a
-# catalog beyond its version line, which is the moment to schedule the bump.
-#
-# A newer release that changes NOTHING but the version line is a pass: bumping
-# for it would churn four files for no behavioural difference.
+# Regenerate the catalogs against the latest CiviCRM release and diff; fails
+# when a catalog would change beyond its version line, i.e. a bump is due.
 name: Catalog Preview
 
 on:
@@ -44,10 +37,7 @@ jobs:
         run: .github/scripts/catalog-diff.sh
 
   notify-scheduled-failure:
-    # The cron run fails on purpose when a bump is due — and by accident when
-    # the resolve or regenerate step breaks. Either way nobody opens a job
-    # summary, so the failure gets an issue; push-triggered runs are visible
-    # on the commit already.
+    # A failed cron run (bump due, or a broken step) opens an issue.
     needs: [preview]
     if: github.event_name == 'schedule' && failure()
     runs-on: ubuntu-24.04

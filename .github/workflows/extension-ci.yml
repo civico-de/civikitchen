@@ -1,23 +1,22 @@
-# The one CI definition every civico extension calls, so the pipeline lives in
-# one place instead of drifting between copy-pasted extension workflows:
+# The CI pipeline every extension repo calls:
 #
 #   jobs:
 #     ci:
 #       uses: civico-de/civikitchen/.github/workflows/extension-ci.yml@v1
 #
-# Pin the major (@v1), not @main: workflow, template, ck* tools and images are
-# released as one versioned contract (docs/releases.md).
+# Pin the major, not @main (docs/releases.md). What the inputs are for and
+# which belong in a scheduled caller: docs/extension-standards.md.
 #
-# Everything runs inside the extension's own CiviCRM stack — the standalone
-# image auto-installs, enables the mounted extension and seeds the civicrm_test
-# scratch DB, and cklint / ckconform / phpstan / ckcoverage / cktaint all ship
-# in it. The bare-runner exceptions have nothing to
-# ask a CiviCRM about: template drift, lockfile vulnerabilities and repository
-# secrets.
-#
-# The opt-in extras, which of them belong in a scheduled second caller, and how
-# a repo with private dependencies passes GitHub App credentials: see
-# docs/extension-standards.md. The inputs below document themselves.
+# Conventions for every job:
+# - A concurrency group carries a literal job name, because github.job is the
+#   caller's job id; a newer run cancels only the same job or matrix leg.
+# - A job without `needs: key` first refuses a self-hosted runner on a public
+#   repository, where a fork PR would run its own code.
+# - COMPOSE_PROJECT_NAME is per job: jobs on one self-hosted host would
+#   otherwise tear down each other's stack.
+# - This repo is checked out at job.workflow_sha, because `uses: ./…`
+#   resolves in the caller's checkout.
+# - Inputs reach shell through env, never by expression inside `run:`.
 name: Extension CI
 
 on:
@@ -25,225 +24,174 @@ on:
     inputs:
       key:
         description: >-
-          The extension's directory name under /var/www/html/ext — info.xml
-          <file>, which the `key` job reads itself. Passing it is a cross-check
-          only: a value that differs from info.xml fails the run.
+          Cross-check only: the key is read from info.xml <file>, and a
+          different value here fails the run.
         type: string
         default: ''
       working_directory:
         description: >-
-          The extension's directory inside the repository, for a repository
-          that holds several extensions. Everything is resolved against it:
-          every job's working directory, compose_file, the cache, artifact and
-          scan paths, and the drift check. The default is the repository root,
-          the one-extension layout.
+          The extension's directory in a repository that holds several
+          extensions. Its compose file, cache, scan and artifact paths resolve
+          against it.
         type: string
         default: '.'
       compose_file:
         description: >-
-          Compose file that brings up the CiviCRM stack, relative to
-          working_directory
+          Compose file of the CiviCRM stack, relative to working_directory.
         type: string
         default: '.docker/docker-compose.ci.yml'
       check_template:
-        description: 'Fail when template-managed files drift from civikitchen (ckinit --check)'
+        description: >-
+          Fail when template-managed files drift from civikitchen (ckinit
+          --check).
         type: boolean
         default: true
       image:
         description: >-
-          Override the compose stack's CiviKitchen image. Empty (the default)
-          takes the :standalone-<minor> image of the repo's policy.civicrm,
-          else the compose file's own ${CIVIKITCHEN_IMAGE:-...} default. Lets
-          a caller float the image without editing the template-managed CI
-          compose file — how the canary repo tracks :standalone while the
-          fleet is on :v1. Setting both this and policy.civicrm is an error.
+          Image for the compose stack. Empty takes :standalone-<minor> of the
+          repo's policy.civicrm, else the compose file's default. Setting both
+          this and policy.civicrm is an error.
         type: string
         default: ''
       matrix_images:
         description: >-
-          Compatibility matrix: comma-separated image tags, each listed once.
-          Every tag gets a job that boots the stack and runs PHPUnit there,
-          plus the lifecycle gate with `lifecycle`, and with matrix_playwright
-          a browser leg of its own. Typically oldest claimed minor plus
-          newest. Empty adds no jobs. Weekly caller, not the push run.
+          Comma-separated image tags, each listed once. Each gets a job that
+          boots the stack and runs PHPUnit, plus the lifecycle gate with
+          `lifecycle`.
         type: string
         default: ''
       lifecycle:
         description: >-
-          After the suite, exercise the extension lifecycle in the running
-          stack: disable → re-enable → uninstall → install. Catches the half
-          of the upgrader that inspection and green tests never reach.
+          After the suite, run cklifecycle: disable, re-enable, uninstall,
+          install.
         type: boolean
         default: false
       upgrade_from_last_release:
         description: >-
-          Install the newest reachable git tag first, then swap the working
-          tree to this commit and run the extension DB upgrade — the path
-          every existing site takes, which a fresh install never exercises.
-          Needs at least one reachable tag and a compose file that already
-          existed at that tag; both are checked and reported, not skipped.
+          Install the newest reachable git tag, move to this commit and run
+          the extension upgrade. Fails without a tag, or when the compose file
+          is missing at that tag.
         type: boolean
         default: false
       schema_parity:
         description: >-
-          Schema-parity job: install the last release and upgrade it to HEAD,
-          then install HEAD fresh, and diff the two schemas over the
-          extension's OWN tables. Answers what the upgrade job cannot — the
-          upgrader ran, but did it ARRIVE where install() does. Two stack boots
-          on one runner; scheduled caller, not the push run. Skips itself with
-          a log line when the extension declares no tables or nothing has been
-          released yet.
+          Diff the extension's own tables between the last release upgraded to
+          HEAD and a fresh install of HEAD. Skips itself without declared
+          tables or without a release.
         type: boolean
         default: false
       core_upgrade_from:
         description: >-
-          Core-upgrade persistence job: install on THIS image, seed, move the
-          same DB to the run's normal image, `cv upgrade:db`. Must be the OLDER
-          version — the job fails when both resolve to the same core. Optional
-          fixtures tests/upgrade/seed.php|assert.php via `cv scr`. Empty skips
-          the job. Slowest check: scheduled caller only. See
-          docs/extension-standards.md.
+          Image of an older CiviCRM: install and seed there, move the database
+          to the run's image, run `cv upgrade:db`. Fails when both are the
+          same core. Optional fixtures tests/upgrade/seed.php and assert.php.
         type: string
         default: ''
       matrix_core_upgrade:
         description: >-
-          With `core_upgrade_from`, run the upgrade to every matrix_images
-          entry too, each leg on its own stack — for an upgrade path that has
-          to hold for the release candidate and master as well. Fails without
-          `core_upgrade_from` or with empty matrix_images.
+          With core_upgrade_from, upgrade to every matrix_images entry as
+          well. Fails without core_upgrade_from or with empty matrix_images.
         type: boolean
         default: false
       npm_ci:
         description: >-
-          `npm ci --ignore-scripts` on the runner before the stack boots, so
-          the bind-mounted checkout has node_modules/. Needs the committed
-          package-lock.json; dependency install scripts stay off on purpose.
+          `npm ci --ignore-scripts` on the runner before the stack boots.
+          Needs a committed package-lock.json.
         type: boolean
         default: false
       js_tests:
         description: >-
           Run `npm test` (implies npm_ci). Fails when package.json declares no
-          test script — an opt-in that silently tests nothing is worse.
+          test script.
         type: boolean
         default: false
       bun:
         description: >-
-          Drive all frontend steps with Bun (`bun install --frozen-lockfile`,
-          `bun run test` / `test:e2e`) instead of npm — whole pipeline or
-          none. Needs a committed bun.lock and a `packageManager` pin
-          ("bun@x.y.z") in package.json, which is the Bun the jobs use.
-          node_version still applies to the ci job: the installed binaries
-          run on Node.
-          See docs/extension-standards.md.
+          Drive all frontend steps with Bun instead of npm. Needs a committed
+          bun.lock and a `packageManager` pin ("bun@x.y.z") in package.json.
+          node_version still applies.
         type: boolean
         default: false
       mutation:
         description: >-
-          Mutation testing (infection via `ckmutate`) as its own job: does the
-          suite ASSERT on what it covers. Slow and its score moves with
-          unrelated refactors, so it is a SCHEDULED signal, never a push gate.
-          A no-op unless the repo sets policy.mutation.minimum_msi in civikitchen.yaml.
+          Mutation testing (ckmutate) as its own job. A no-op unless
+          civikitchen.yaml sets policy.mutation.minimum_msi.
         type: boolean
         default: false
       playwright:
         description: >-
-          Browser tests as their own job: stack with demo login, then
-          `npm run test:e2e` (`bun run` under `bun`) in the repo's Playwright
-          image (`ck playwright`), on `image` (matrix_playwright adds the
-          matrix_images). Slow — scheduled caller only.
+          Browser tests as their own job: `npm run test:e2e` (`bun run` under
+          `bun`) in the repo's Playwright image, against a stack with a demo
+          login.
         type: boolean
         default: false
       matrix_playwright:
         description: >-
-          With `playwright`, run the browser suite on every matrix_images
-          entry too, each leg on its own stack, side by side — for
-          UI that changes between CiviCRM versions. Fails without
-          `playwright` or with empty matrix_images.
+          With playwright, run the browser suite on every matrix_images entry
+          as well. Fails without playwright or with empty matrix_images.
         type: boolean
         default: false
       e2e:
         description: >-
           Shell suites relative to working_directory, separated by spaces or
-          newlines, e.g. tests/e2e/run.sh. They run in turn on the runner, in
-          their own job, against the CI stack plus maildev, with the site and
-          maildev on free localhost ports that the managed tests/e2e/lib.sh
-          picks up. Empty runs nothing.
+          newlines, e.g. tests/e2e/run.sh. They run on the runner against the
+          CI stack plus maildev.
         type: string
         default: ''
       e2e_compose:
         description: >-
           Compose files relative to working_directory, separated by spaces or
-          newlines, merged over the e2e stack in order — services a suite
-          needs beyond the site and maildev, e.g. a second mail sink. Publish
-          their ports as 127.0.0.1::<port> so the host picks a free one.
+          newlines, merged over the e2e stack in order. Publish their ports as
+          127.0.0.1::<port>.
         type: string
         default: ''
       extra_phpunit_config:
         description: >-
-          Run one additional PHPUnit suite with this repository-relative XML
-          configuration after the normal headless coverage suite. Useful for
-          database-free or differently bootstrapped tests that still need the
-          materialized vendor directory or sibling extension. Empty skips it.
+          Repository-relative PHPUnit XML configuration of one more suite, run
+          after the headless coverage suite.
         type: string
         default: ''
       runs_on:
         description: >-
-          Runner label for all jobs. Resolution: this input, else the caller's
-          CK_RUNS_ON repo/org variable, else 'ubuntu-latest' — one variable
-          flips a whole fleet. NEVER attach self-hosted runners to a public
-          repo (fork PRs run arbitrary code). The host tools a self-hosted
-          runner needs are listed in docs/reusable-workflows.md.
+          Runner label for all jobs. Empty takes the caller's CK_RUNS_ON
+          variable (CK_RUNS_ON_SMALL first, for the jobs that boot no stack),
+          else ubuntu-latest. Never a self-hosted runner on a public
+          repository.
         type: string
         default: ''
       node_version:
         description: >-
-          Node version for every frontend step above; the Playwright job runs
-          on the Node of its Playwright image. Only read when one of them is
-          switched on, and still read under `bun`: Bun replaces the package
-          manager, not the Node toolchain the installed binaries run on.
-          Tracks the Node the dev images ship (docker/*/Dockerfile).
+          Node version for the frontend steps, also under `bun`. The
+          Playwright job runs on the Node of its Playwright image.
         type: string
         default: '24'
       composer_install:
         description: >-
           `composer install` on the runner with a read token, for private
-          packages. Public ones need no input: every stack boot first installs
-          vendor/ as the runner user. The token never enters a container.
+          packages. Public packages need no input.
         type: boolean
         default: false
       policy_defaults:
         description: >-
-          Repo (`owner/repo`) whose root `civikitchen.yaml` holds the organisation's
-          default policy — the keys every repo shares (license, copyright,
-          vendor, ...). Checked out to .civikitchen-siblings/policy and read
-          by ckconform under the repo's own file, which overrides per key. A
-          private repo needs the composer_app_* secrets. Empty falls back to
-          the CK_POLICY_DEFAULTS organisation variable — set once, no caller
-          input in any repo; empty both ways means no defaults.
+          Repo (`owner/repo`) whose root civikitchen.yaml holds the
+          organisation's default policy; the repo's own file overrides per
+          key. Empty takes the CK_POLICY_DEFAULTS variable. A private repo
+          needs the composer_app_* secrets.
         type: string
         default: ''
       sibling_repo:
         description: >-
-          Comma- or newline-separated extension repos (`owner/repo`, or
-          `owner/repo@ref` to pin a tag, branch or full commit — a tag keeps
-          old runs reproducible and a sibling's main from reddening every
-          consumer), each checked out to .civikitchen-siblings/ and mounted
-          read-only beside this one under the key from ITS info.xml — for
-          extensions implementing a sibling's interfaces. Enabled LEFT TO
-          RIGHT in list order before this extension, so a sibling another
-          sibling requires comes first. This extension's extension_sources
-          pins take precedence over a sibling's for a key both pin. A sibling whose composer.lock carries
-          runtime packages gets `composer install --no-dev` first, and one
-          declaring policy.dist.build its build (on node_version); a private
-          sibling or package needs the composer_app_* secrets. Empty mounts nothing.
+          Comma- or newline-separated extension repos (`owner/repo` or
+          `owner/repo@ref`), mounted read-only beside this one and enabled
+          left to right before it. A private sibling needs the composer_app_*
+          secrets.
         type: string
         default: ''
       composer_app_repositories:
         description: >-
           Comma- or newline-separated repository names within the caller's
           owner that the GitHub App token may read. Required whenever the app
-          secrets are supplied for private Composer packages or a private
-          sibling; list only the repositories actually needed by this run.
+          secrets are supplied.
         type: string
         default: ''
 
@@ -251,28 +199,21 @@ on:
       composer_app_id:
         description: >-
           App ID of a GitHub App with `contents: read`, installed on the
-          private dependency repos (composer packages, sibling). Optional —
-          without it composer resolves what is public and the sibling checkout
-          uses the caller-scoped token (404 for private).
+          private dependency repos.
         required: false
       composer_app_private_key:
         description: >-
-          Private key (PEM) of that app. Used once on the runner to mint a
-          short-lived installation token; never enters a container.
+          Private key (PEM) of that app. Mints a short-lived token on the
+          runner; never enters a container.
         required: false
 
 permissions:
   contents: read
 
 jobs:
-  # The extension's directory name — info.xml <file>, the same value ckinit
-  # stamps into the compose mount and CIVIKITCHEN_ENABLE_EXTENSIONS. Read once
-  # here so the caller has nothing to restate; every stack job consumes the
-  # output. Parsed as XML by the toolbelt's ck_xml_field reader, not with a
-  # tag-shaped regex.
+  # Reads the extension key from info.xml <file> and derives the paths and the
+  # image every stack job uses.
   key:
-    # Cancelled only by this job in a newer run of the same caller workflow,
-    # ref, directory and image. Literal name: github.job is the caller's job id.
     concurrency:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-key
       cancel-in-progress: true
@@ -280,9 +221,8 @@ jobs:
     # Every job stops at 120 minutes, about twice the longest measured healthy job;
     # the default of 6 hours lets a hung job hold its runner.
     timeout-minutes: 120
-    # No defaults.run.working-directory here, unlike every other job: a
-    # working_directory that does not exist has to produce the message below
-    # rather than a runner error about a missing directory.
+    # No defaults.run.working-directory: a missing working_directory has to
+    # reach the message below, not a runner error.
     outputs:
       key: ${{ steps.key.outputs.key }}
       key_slug: ${{ steps.key.outputs.key_slug }}
@@ -295,8 +235,6 @@ jobs:
       CK_EXT_KEY_INPUT: ${{ inputs.key }}
       CK_WORKING_DIRECTORY: ${{ inputs.working_directory }}
     steps:
-      # Fork PRs run their own code in these jobs. A public caller resolving
-      # runs_on or CK_RUNS_ON to a self-hosted runner stops here, before checkout.
       - name: Refuse a self-hosted runner for a public repository
         if: runner.environment == 'self-hosted' && github.event.repository.visibility == 'public'
         working-directory: .
@@ -332,12 +270,8 @@ jobs:
             echo "the key input ($CK_EXT_KEY_INPUT) does not match info.xml <file> ($key) — drop the input or fix info.xml" >&2
             exit 1
           fi
-          # The two container paths every stack job works from, derived once.
-          # ext/<file> is what provisioning enabled and what <requires> was
-          # resolved against, so everything that boots CiviCRM runs there. The
-          # git-reading tools need the checkout, which for an extension below
-          # the root is the second mount, /civikitchen-repo — the same host
-          # directory, so their writes land in the right place.
+          # ext/<file> is where CiviCRM has the extension enabled. The git-reading
+          # tools need the checkout: /civikitchen-repo for an extension below the root.
           ext_path="/var/www/html/ext/$key"
           if [ "$wd" = . ]; then
             repo_path="$ext_path"
@@ -402,15 +336,9 @@ jobs:
           echo "stack image: ${image:-default of the compose file}"
           echo "image=$image" >> "$GITHUB_OUTPUT"
 
-  # Template drift: the tooling files civikitchen owns (CI caller, test
-  # bootstraps, CI compose stack) must match the template, or
-  # eleven repos quietly diverge again — the exact state the shared workflow
-  # exists to end. Deliberate deviations are declared in the repo's civikitchen.yaml
-  # (template_custom=<file> -- <reason>); the fix for everything else is one
-  # `scaffold/ckinit.php --update` away.
+  # Template-managed files must match the template (ckinit --check);
+  # deliberate deviations are declared in the repo's civikitchen.yaml.
   template:
-    # Cancelled only by this job in a newer run of the same caller workflow,
-    # ref, directory and image. Literal name: github.job is the caller's job id.
     concurrency:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-template
       cancel-in-progress: true
@@ -421,8 +349,6 @@ jobs:
       run:
         working-directory: ${{ inputs.working_directory }}
     steps:
-      # Fork PRs run their own code in these jobs. A public caller resolving
-      # runs_on or CK_RUNS_ON to a self-hosted runner stops here, before checkout.
       - name: Refuse a self-hosted runner for a public repository
         if: runner.environment == 'self-hosted' && github.event.repository.visibility == 'public'
         working-directory: .
@@ -432,20 +358,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Pinned to the SHA this very workflow was resolved from, so the template
-      # under comparison is the one belonging to the pipeline that is running —
-      # an unpinned second checkout could race a push to main in between.
-      # job.workflow_sha (not github.workflow_sha, which is the CALLER's file)
-      # is the official way for a reusable workflow to reach its own repo.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           repository: civico-de/civikitchen
           ref: ${{ job.workflow_sha }}
           path: .civikitchen-ci
-      # ckinit stamps renovate.json from the organisation's renovate_preset,
-      # so the check needs the same defaults file the ci job's ckconform sees
-      # — otherwise a correctly generated file reads as drift.
+      # ckinit stamps renovate.json from the organisation's renovate_preset, so
+      # the check needs the defaults file the ci job's ckconform reads.
       - name: Decide whether the policy checkout needs a token
         id: need-token
         if: ${{ (inputs.policy_defaults || vars.CK_POLICY_DEFAULTS) != '' }}
@@ -498,11 +418,8 @@ jobs:
             export CK_DEFAULT_CONFIG="$GITHUB_WORKSPACE/.civikitchen-siblings/policy/civikitchen.yaml"
           fi
           php "$GITHUB_WORKSPACE/.civikitchen-ci/scaffold/ckinit.php" --check .
-          # The root-managed files (the caller workflow, renovate.json) belong to
-          # the repository, and ckinit manages a root whose DIRECT subdirectories
-          # are the extensions. Every extension's job checks them: the check is
-          # cheap and idempotent, and callers are independent jobs with no first
-          # one to single out.
+          # The repository root holds the caller workflow and renovate.json; every
+          # extension directly below it checks them as well.
           wd=${CK_WORKING_DIRECTORY#./}
           wd=${wd%/}
           case "${wd:-.}" in
@@ -510,25 +427,9 @@ jobs:
             *) php "$GITHUB_WORKSPACE/.civikitchen-ci/scaffold/ckinit.php" --check "$GITHUB_WORKSPACE" ;;
           esac
 
-  # Known vulnerabilities in the dependencies the repo actually ships. Read from
-  # the committed lockfiles, not from the ranges in composer.json/package.json:
-  # a range says what *could* be installed, the lock says what CI resolved and
-  # what every install got — and the lockfile rule in
-  # docs/extension-standards.md is what makes that file exist to be scanned.
-  #
-  # Its own job, and one that boots no CiviCRM stack: it has nothing to do with
-  # the extension's code, so it should not queue behind a container, and a fresh
-  # advisory must not hide a red PHPUnit. Same reasoning as the independent
-  # gates inside `ci`.
-  #
-  # Deliberately not an opt-in input. An advisory published overnight can turn
-  # the whole fleet red without a single commit, which is uncomfortable and also
-  # the entire point; the escape hatch is per finding (osv-scanner.toml, see the
-  # scan step), not per repo — a switch that turns the gate off is one nobody
-  # ever turns back on.
+  # Known vulnerabilities in the committed lockfiles, on a bare runner. Not
+  # optional: an exception is a single finding in osv-scanner.toml.
   osv:
-    # Cancelled only by this job in a newer run of the same caller workflow,
-    # ref, directory and image. Literal name: github.job is the caller's job id.
     concurrency:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-osv
       cancel-in-progress: true
@@ -538,8 +439,6 @@ jobs:
       run:
         working-directory: ${{ inputs.working_directory }}
     steps:
-      # Fork PRs run their own code in these jobs. A public caller resolving
-      # runs_on or CK_RUNS_ON to a self-hosted runner stops here, before checkout.
       - name: Refuse a self-hosted runner for a public repository
         if: runner.environment == 'self-hosted' && github.event.repository.visibility == 'public'
         working-directory: .
@@ -550,14 +449,8 @@ jobs:
         with:
           persist-credentials: false
 
-      # Pinned version AND pinned checksum. Pinning the version alone still
-      # trusts whatever that release tag serves on the day the job runs, and
-      # this step executes on every push in eleven repos. The hashes are the
-      # release's own osv-scanner_SHA256SUMS entries; a version bump moves both.
-      #
-      # Both Linux architectures, because runs_on can point at a self-hosted
-      # arm64 host. Anything else is named and fails rather than quietly
-      # scanning nothing.
+      # Version and checksum are pinned; the hashes are the release's
+      # osv-scanner_SHA256SUMS entries. Both Linux architectures, for arm64 runners.
       - name: Install osv-scanner
         env:
           CK_OSV_VERSION: v2.4.0
@@ -583,26 +476,9 @@ jobs:
           chmod +x "$RUNNER_TEMP/osv-scanner"
           "$RUNNER_TEMP/osv-scanner" --version
 
-      # Named lockfiles in the extension directory, one -L each, instead of letting
-      # the scanner walk the tree: a directory scan also finds the lockfiles
-      # inside vendor/ and node_modules/ once a previous step has materialized
-      # them, and a dependency's own lockfile is not what this repo ships.
-      #
-      # A repo with none of the three is a normal, common state (a PHP-only
-      # extension with no real composer dependencies), so it passes — but it
-      # says so in one line. `osv-scanner scan source` on a tree with no
-      # package source exits 128 unless told otherwise, which is why the empty
-      # case is answered here rather than by --allow-no-lockfiles: a step that
-      # prints what it did NOT scan is the difference between an honest pass
-      # and a green tick over nothing.
-      #
-      # Exceptions live in an osv-scanner.toml beside those lockfiles, which the
-      # scanner picks up on its own because it sits beside the lockfiles — no
-      # flag, no input here. It excuses a single advisory
-      # ([[IgnoredVulns]] with id/reason and an ignoreUntil date that makes the
-      # excuse expire) or a whole package ([[PackageOverrides]]), prints the
-      # reason on every run, and reports ignores that no longer match anything.
-      # docs/extension-standards.md has the shape.
+      # One -L per lockfile: a directory scan would also read the lockfiles inside
+      # vendor/ and node_modules/. No lockfile passes with a log line. Exceptions sit
+      # in osv-scanner.toml beside the lockfiles (docs/extension-standards.md).
       - name: Scan lockfiles for known vulnerabilities (osv-scanner)
         run: |
           set -euo pipefail
@@ -627,14 +503,9 @@ jobs:
           fi
           exit "$rc"
 
-  # Credentials accidentally committed to an extension are independent of its
-  # dependency CVEs and runtime behavior, so scan them in their own bare-runner
-  # job. This is deliberately not optional: a repo-wide off switch would become
-  # permanent, while a false positive can be scoped to its rule and path in an
-  # expiring .trivyignore.yaml entry.
+  # Committed credentials, on a bare runner. Not optional: a false positive
+  # gets an expiring .trivyignore.yaml entry scoped to its rule and path.
   security:
-    # Cancelled only by this job in a newer run of the same caller workflow,
-    # ref, directory and image. Literal name: github.job is the caller's job id.
     concurrency:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-security
       cancel-in-progress: true
@@ -644,8 +515,6 @@ jobs:
       run:
         working-directory: ${{ inputs.working_directory }}
     steps:
-      # Fork PRs run their own code in these jobs. A public caller resolving
-      # runs_on or CK_RUNS_ON to a self-hosted runner stops here, before checkout.
       - name: Refuse a self-hosted runner for a public repository
         if: runner.environment == 'self-hosted' && github.event.repository.visibility == 'public'
         working-directory: .
@@ -656,10 +525,6 @@ jobs:
         with:
           persist-credentials: false
 
-      # Use the installer belonging to this resolved reusable workflow, not a
-      # floating main checkout. The helper checkout itself is excluded from the
-      # scan below: callers are responsible for their tree, CiviKitchen scans
-      # its own source in its own pipeline.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -669,10 +534,8 @@ jobs:
       - name: Install trivy
         run: '"$GITHUB_WORKSPACE/.civikitchen-ci/.github/scripts/install-trivy.sh"'
 
-      # Scan repository-owned source, including tests and fixtures. Materialized
-      # dependency trees and CiviKitchen's helper checkout are separate trust
-      # boundaries and notorious for upstream fake-key fixtures, so exclude them
-      # by role rather than teaching every extension to ignore their contents.
+      # Dependency trees and the helper checkouts are not the repository's source
+      # and hold upstream fake-key fixtures.
       - name: Scan repository source for secrets (trivy)
         run: |
           set -euo pipefail
@@ -694,16 +557,12 @@ jobs:
             .
 
   ci:
-    # Cancelled only by this job in a newer run of the same caller workflow,
-    # ref, directory and image. Literal name: github.job is the caller's job id.
     concurrency:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-ci
       cancel-in-progress: true
     needs: key
     runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 120
-    # Inputs enter shell commands through the environment, never by expression
-    # interpolation inside `run:` — an interpolated input IS the script text.
     env:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
@@ -715,13 +574,6 @@ jobs:
       # Read by the compose file's ${CIVIKITCHEN_IMAGE:-<default>}; `:-` treats
       # empty as unset, so with neither `image` nor policy.civicrm nothing changes.
       CIVIKITCHEN_IMAGE: ${{ needs.key.outputs.image }}
-      # One compose project PER JOB. The extension's compose file names its
-      # project after the extension, so two jobs of the same run booting the
-      # same stack share it — and the second one's `down -v --remove-orphans`
-      # SIGKILLs the first one's containers (exit 137). Invisible on
-      # ubuntu-latest, where every job gets its own VM; a self-hosted runner
-      # with several job slots on one host hits it. The env var outranks the
-      # file's `name:`, so consuming repos need no change.
       COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.key.outputs.key_slug }}-ci
     defaults:
       run:
@@ -743,10 +595,8 @@ jobs:
         run: |
           [[ "$CK_EXT_KEY" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]] \
             || { echo "invalid extension key: $CK_EXT_KEY" >&2; exit 1; }
-          # Empty is the default and means "no sibling"; every entry of the
-          # list has to be owner/repo, optionally @ref — it becomes a clone
-          # target and a path. Same expression as the private-deps action's
-          # checkout-siblings.sh, which is where the value becomes a command.
+          # Each entry becomes a clone target and a path. Same expression as
+          # checkout-siblings.sh in the private-deps action.
           for repo in ${CK_SIBLING_REPO//,/ }; do
             [[ "$repo" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*(@[A-Za-z0-9][A-Za-z0-9._/-]*)?$ ]] \
               || { echo "invalid sibling_repo entry (expected owner/repo or owner/repo@ref): $repo" >&2; exit 1; }
@@ -760,8 +610,7 @@ jobs:
                "$CK_EXTRA_PHPUNIT_CONFIG" != ../* ) ]] \
             || { echo "invalid extra_phpunit_config: $CK_EXTRA_PHPUNIT_CONFIG" >&2; exit 1; }
 
-      # `uses: ./…` resolves in the caller's checkout, so the stack actions come from
-      # this workflow's SHA under .civikitchen-siblings/, which the scanner and cklint skip.
+      # Under .civikitchen-siblings/, which the scanner and cklint skip.
       - name: Check out civikitchen for the shared steps
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -778,17 +627,8 @@ jobs:
             packages
           path: .civikitchen-siblings/ci
 
-      # --- Frontend steps (opt-in via npm_ci / js_tests / bun) --------------
-      #
-      # js_tests implies npm_ci, and bun implies the install too: `npm test`
-      # without an install is a red run about nothing, and a package manager
-      # that installs nothing is not a choice worth making. Any of the three
-      # switches these steps on. They sit BEFORE the stack boot on purpose:
-      #   * the container reads node_modules/ through the bind mount, and the
-      #     entrypoint enables the extension while booting — an asset bundle
-      #     read during install has to find its files already there;
-      #   * unit tests need no CiviCRM, so a red JS suite should cost a
-      #     30-second install, not a stack boot first.
+      # Frontend steps come before the boot: the entrypoint enables the extension
+      # and reads node_modules/ through the bind mount.
       - name: JS dependencies
         if: ${{ inputs.npm_ci || inputs.js_tests || inputs.bun }}
         uses: ./.civikitchen-siblings/ci/.github/actions/js-deps
@@ -817,13 +657,8 @@ jobs:
         if: ${{ needs.key.outputs.dist_build_tool == 'bun' }}
         run: bun run build
 
-      # --- Private dependencies (opt-in via composer_install / sibling_repo) --
-      #
-      # Both live BEFORE the stack boot for the same reason the frontend steps
-      # do: the container sees the checkout through the bind mount, and the
-      # entrypoint enables the extension *while booting*. Whatever enabling the
-      # extension needs — its autoloader, a sibling it declares a requirement
-      # on — has to be in the tree by then, not a step later.
+      # Before the boot as well: enabling the extension needs its autoloader and
+      # the siblings it requires.
       - name: Private dependencies
         id: deps
         if: ${{ inputs.composer_install || inputs.sibling_repo != '' || (inputs.policy_defaults || vars.CK_POLICY_DEFAULTS) != '' }}
@@ -839,9 +674,8 @@ jobs:
           ext_key: ${{ needs.key.outputs.key }}
           working_directory: ${{ inputs.working_directory }}
 
-      # Seed snapshots (docs/seed-snapshots.md): a profile with a `snapshot`
-      # block generates its data on the first run and restores it from this
-      # cache on later ones. No `snapshot` block, nothing stored: a no-op.
+      # Seed snapshots (docs/seed-snapshots.md), restored from this cache. A
+      # no-op for a profile without a `snapshot` block.
       - name: Restore seed snapshots
         id: seed-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -911,7 +745,6 @@ jobs:
           "${compose[@]}" app cat "$summary" >> "$GITHUB_STEP_SUMMARY" \
             || echo "::warning::ck ci wrote no summary table"
           exit "$rc"
-      # Every gate above is one local command away, and most findings one more.
       - name: How to fix findings locally
         if: ${{ failure() && steps.gates.outcome == 'failure' }}
         run: |
@@ -921,11 +754,8 @@ jobs:
           fi
           echo "::notice::docker compose -f .docker/docker-compose.yml exec -u www-data -w $CK_EXT_PATH$tool app ck ci runs these same gates in the dev stack; cklint --fix and ckfmt auto-fix most lint and formatting findings; ckcivix --update brings the civix scaffold forward."
 
-      # Same lifecycle block as the compat job below. The substance lives in
-      # `cklifecycle` in the image, which is why this is two lines instead of
-      # twenty: the sequence is only the setup, and the checks it exists for
-      # (post-uninstall DB invariants, and a log scan so a swallowed SQL error
-      # cannot stay green) need a booted site anyway.
+      # Disable, re-enable, uninstall, install; then the post-uninstall database
+      # invariants and a log scan.
       - name: Lifecycle smoke + gate (cklifecycle)
         id: lifecycle
         if: ${{ inputs.lifecycle }}
@@ -934,9 +764,7 @@ jobs:
           docker compose -f "$CK_COMPOSE_FILE" exec -T -u www-data app bash -c \
             "cd \"$CK_EXT_PATH\" && cklifecycle" 2>&1 | tee "$RUNNER_TEMP/cklifecycle.md"
 
-      # The report is the point of the step, so it is published whether the
-      # gate passed or failed — a leftover table named in a job summary gets
-      # fixed, one buried 300 lines into a red step log does not.
+      # Published on failure too.
       - name: Lifecycle summary
         if: ${{ !cancelled() && steps.lifecycle.outcome != 'skipped' }}
         run: |
@@ -949,19 +777,9 @@ jobs:
         with:
           logs: ${{ job.status == 'failure' }}
 
-  # --- Upgrade from the last release (opt-in via upgrade_from_last_release) --
-  #
-  # A fresh install runs install(); an existing site runs upgrade_NNNN(). CI
-  # has always tested the first and never the second, so an upgrader step that
-  # references a column its own install() already creates looks fine forever.
-  #
-  # The trick that keeps this cheap: the stack bind-mounts the checkout, so
-  # "install the old version" is a `git checkout` before `docker compose up`,
-  # and "move to HEAD" is a second `git checkout` afterwards. No second stack,
-  # no image build, no artifact shuffling.
+  # Installs the newest release tag, moves the bind-mounted checkout to this
+  # commit and runs the extension upgrade.
   upgrade:
-    # Cancelled only by this job in a newer run of the same caller workflow,
-    # ref, directory and image. Literal name: github.job is the caller's job id.
     concurrency:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-upgrade
       cancel-in-progress: true
@@ -972,10 +790,8 @@ jobs:
     env:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
-      # Where CiviCRM has the extension enabled — derived by `key`.
       CK_EXT_PATH: ${{ needs.key.outputs.ext_path }}
       CIVIKITCHEN_IMAGE: ${{ needs.key.outputs.image }}
-      # One compose project per job — see the note in `ci`.
       COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.key.outputs.key_slug }}-upgrade
     defaults:
       run:
@@ -992,14 +808,12 @@ jobs:
           [[ "$CK_EXT_KEY" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]] \
             || { echo "invalid extension key: $CK_EXT_KEY" >&2; exit 1; }
 
-      # The shared steps — see the note on the same checkout in `ci`.
       - name: Check out civikitchen for the shared private-dependency steps
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           repository: civico-de/civikitchen
           ref: ${{ job.workflow_sha }}
-          # toolbelt/ and packages/ hold the reader of the siblings' policy.dist.build.
           sparse-checkout: |
             .github/actions
             toolbelt/bin
@@ -1023,11 +837,8 @@ jobs:
           ext_key: ${{ needs.key.outputs.key }}
           working_directory: ${{ inputs.working_directory }}
 
-      # Newest tag reachable from this commit — on a PR that is the merge
-      # commit, so it is the release the change would be shipped on top of.
-      # Both failure modes get named instead of quietly skipping the job: a
-      # repo with nothing to upgrade from should turn this input off, not
-      # collect green runs that tested nothing.
+      # Newest tag reachable from this commit. No tag, or a tag without the
+      # compose file, fails the job instead of skipping it.
       - name: Resolve the previous release
         id: prev
         run: |
@@ -1040,8 +851,7 @@ jobs:
           echo "previous release: $prev"
           {
             echo "prev=$prev"
-            # What actions/checkout actually put in the tree (on a PR: the
-            # merge commit) — the thing to come back to, resolved before
+            # The checked-out commit (on a PR the merge commit), resolved before
             # anything moves HEAD.
             echo "head=$(git rev-parse HEAD)"
           } >> "$GITHUB_OUTPUT"
@@ -1058,9 +868,8 @@ jobs:
         if: ${{ inputs.composer_install }}
         run: composer install --no-interaction --no-progress
 
-      # Boots and installs the OLD version — including its own CI compose file
-      # and therefore the image that release was tested with, unless the
-      # caller pins `image` or policy.civicrm.
+      # Boots the old release with its own CI compose file and image, unless
+      # `image` or policy.civicrm pins one.
       - name: Start CiviCRM stack on the previous release
         uses: ./.civikitchen-siblings/ci/.github/actions/stack-up
         with:
@@ -1104,40 +913,15 @@ jobs:
           [ "$status" = installed ] \
             || { echo "upgrade: extension ended up '$status', expected 'installed'" >&2; exit 1; }
 
-      # The checkout holding the action is missing only when the job failed before any boot.
       - name: Stack logs and teardown
         if: ${{ always() && hashFiles('.civikitchen-siblings/ci/.github/actions/stack-down/action.yml') != '' }}
         uses: ./.civikitchen-siblings/ci/.github/actions/stack-down
         with:
           logs: ${{ job.status == 'failure' }}
 
-  # --- Schema parity (opt-in via schema_parity) -----------------------------
-  #
-  # The question the `upgrade` job leaves open. That one proves the upgrader
-  # RUNS and leaves nothing pending. It cannot tell you whether it ARRIVES
-  # where install() does — and install() and the upgrade_NNNN() chain are two
-  # independent descriptions of the same schema with nothing keeping them in
-  # step. NOT NULL in one and nullable in the other, an index the installer
-  # creates and the upgrader forgets: every fresh install is fine, every
-  # upgraded site is quietly different, and no later upgrader reconciles them.
-  #
-  # Two databases in one stack, in this order:
-  #   B: install the last release, move the mount to HEAD, `cv upgrade:db` —
-  #      literally the `upgrade` job, whose result is the upgraded schema;
-  #   A: `down -v` and boot again on HEAD — a fresh install of this commit.
-  # Then diff A against B over the extension's OWN tables. Core's tables are
-  # not this extension's business and would drown the signal.
-  #
-  # mysqldump + a normalised text diff rather than Atlas — the reasoning is in
-  # toolbelt/bin/ckschemadiff, short version: the CI stack publishes no database
-  # port, so any tool has to run in the app container, and that container
-  # already ships a mysql client.
-  #
-  # Two boots on one runner, so: scheduled caller, like every other opt-in job
-  # here.
+  # Diffs the extension's own tables between the last release upgraded to HEAD
+  # (B) and a fresh install of HEAD (A), with ckschemadiff. Two boots.
   schema-parity:
-    # Cancelled only by this job in a newer run of the same caller workflow,
-    # ref, directory and image. Literal name: github.job is the caller's job id.
     concurrency:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-schema-parity
       cancel-in-progress: true
@@ -1148,10 +932,8 @@ jobs:
     env:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
-      # Where CiviCRM has the extension enabled — derived by `key`.
       CK_EXT_PATH: ${{ needs.key.outputs.ext_path }}
       CIVIKITCHEN_IMAGE: ${{ needs.key.outputs.image }}
-      # One compose project per job — see the note in `ci`.
       COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.key.outputs.key_slug }}-schema-parity
     defaults:
       run:
@@ -1168,14 +950,12 @@ jobs:
           [[ "$CK_EXT_KEY" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]] \
             || { echo "invalid extension key: $CK_EXT_KEY" >&2; exit 1; }
 
-      # The shared steps — see the note on the same checkout in `ci`.
       - name: Check out civikitchen for the shared private-dependency steps
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           repository: civico-de/civikitchen
           ref: ${{ job.workflow_sha }}
-          # toolbelt/ and packages/ hold the reader of the siblings' policy.dist.build.
           sparse-checkout: |
             .github/actions
             toolbelt/bin
@@ -1199,19 +979,8 @@ jobs:
           ext_key: ${{ needs.key.outputs.key }}
           working_directory: ${{ inputs.working_directory }}
 
-      # Two cheap questions before anything boots, because the expensive part of
-      # this job is two CiviCRM installs and neither is worth paying for if the
-      # answer is already known. Both are SKIPS with a log line, not failures:
-      # unlike `upgrade`, where a repo with no tag has switched on a check it
-      # cannot satisfy, this job's preconditions are ordinary states for a
-      # perfectly healthy extension — plenty of them own no tables at all, and
-      # every repo has a first commit before its first release.
-      #
-      # The table question is answered from the repo's schema DECLARATIONS
-      # (schema/*.entityType.php, xml/schema/**), which is also what the diff
-      # later scopes itself to. Done in a plain grep here rather than by running
-      # ckschemadiff: no container exists yet, and this only has to be right
-      # about "any" versus "none".
+      # No declared tables, no release tag or a tag without the compose file:
+      # skip with a log line, before any boot.
       - name: Decide whether there is anything to compare
         id: gate
         run: |
@@ -1286,14 +1055,8 @@ jobs:
           docker compose -f "$CK_COMPOSE_FILE" run --rm --no-deps -T -u "$(id -u):$(id -g)" -e HOME=/tmp
           --entrypoint sh app -c 'exec ck internal composer-install /var/www/html/ext/*/'
 
-      # `cv flush` first for the same reason the upgrade job does it: the boot
-      # cached the OLD release's class and container maps, and the upgrader
-      # about to run belongs to the new code.
-      #
-      # The dump has to leave the container before the next step destroys it,
-      # and it leaves via `docker compose cp` rather than by being written into
-      # the bind mount: the workspace belongs to the runner user, and this
-      # command runs as www-data, which cannot write there.
+      # cv flush: the boot cached the old release's class and container maps. The
+      # dump leaves by `docker compose cp`; www-data cannot write to the workspace.
       - name: Upgrade the extension schema and dump it
         if: ${{ steps.gate.outputs.run == 'true' }}
         run: |
@@ -1307,12 +1070,7 @@ jobs:
           docker compose -f "$CK_COMPOSE_FILE" cp \
             app:/tmp/ck-schema-upgraded.sql "$RUNNER_TEMP/ck-schema-upgraded.sql"
 
-      # --- A: a fresh install of HEAD --------------------------------------
-      #
-      # `down -v` and not just `down`: the whole point is a database that has
-      # never seen the old release. The CI stack gives mariadb an anonymous
-      # volume, and -v is what guarantees it goes rather than being reattached.
-      # The working tree is already at HEAD, so the boot installs this commit.
+      # --- A: a fresh install of HEAD; stack-up starts with `down -v` ------------
       - name: Reinstall from scratch on this commit
         if: ${{ steps.gate.outputs.run == 'true' }}
         uses: ./.civikitchen-siblings/ci/.github/actions/stack-up
@@ -1320,10 +1078,7 @@ jobs:
           working_directory: ${{ inputs.working_directory }}
           overrides: ${{ steps.deps.outputs.sibling_override }}
 
-      # The upgraded dump goes back INTO the new container rather than the diff
-      # being run on the runner: `ckschemadiff diff` is where the explanation of
-      # what a difference means lives, and duplicating that text into the
-      # workflow is how the two versions of it start disagreeing.
+      # The diff runs in the container: ckschemadiff explains each difference.
       - name: Dump the freshly installed schema and compare
         if: ${{ steps.gate.outputs.run == 'true' }}
         run: |
@@ -1336,32 +1091,15 @@ jobs:
              ckschemadiff dump \"\${CIVICRM_DB_NAME:-civicrm}\" /tmp/ck-schema-fresh.sql
              ckschemadiff diff /tmp/ck-schema-fresh.sql /tmp/ck-schema-upgraded.sql"
 
-      # The checkout holding the action is missing only when the job failed before any boot.
       - name: Stack logs and teardown
         if: ${{ always() && hashFiles('.civikitchen-siblings/ci/.github/actions/stack-down/action.yml') != '' }}
         uses: ./.civikitchen-siblings/ci/.github/actions/stack-down
         with:
           logs: ${{ job.status == 'failure' }}
 
-  # --- Mutation testing (opt-in via mutation) -------------------------------
-  #
-  # ckcoverage asks whether a line ran; this asks whether anything would have
-  # noticed if the line were WRONG. Infection rewrites the code under the suite
-  # and counts the mutants no test killed.
-  #
-  # Its own job, and off by default, for two reasons: a mutation run is a suite
-  # run per mutant batch, and the score drifts with refactors that changed no
-  # behaviour. As a push gate that is a slow, flappy build; as a scheduled one
-  # it is a weekly reading. Belongs in the compat caller — see
-  # docs/extension-standards.md.
-  #
-  # The floor is the repo's own (civikitchen.yaml: policy.mutation.minimum_msi), so there is
-  # nothing to configure here. Without that key ckmutate exits 0 with a line
-  # saying so, which is what makes switching the input on safe before the
-  # number is known.
+  # Mutation testing with ckmutate. A no-op unless civikitchen.yaml sets
+  # policy.mutation.minimum_msi.
   mutation:
-    # Cancelled only by this job in a newer run of the same caller workflow,
-    # ref, directory and image. Literal name: github.job is the caller's job id.
     concurrency:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-mutation
       cancel-in-progress: true
@@ -1372,12 +1110,9 @@ jobs:
     env:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
-      # Where CiviCRM has the extension enabled, and the checkout's root in the
-      # container that git has to trust — derived by `key`.
       CK_EXT_PATH: ${{ needs.key.outputs.ext_path }}
       CK_REPO_PATH: ${{ needs.key.outputs.repo_path }}
       CIVIKITCHEN_IMAGE: ${{ needs.key.outputs.image }}
-      # One compose project per job — see the note in `ci`.
       COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.key.outputs.key_slug }}-mutation
     defaults:
       run:
@@ -1395,14 +1130,12 @@ jobs:
           [[ "$CK_EXT_KEY" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]] \
             || { echo "invalid extension key: $CK_EXT_KEY" >&2; exit 1; }
 
-      # The shared steps — see the note on the same checkout in `ci`.
       - name: Check out civikitchen for the shared steps
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           repository: civico-de/civikitchen
           ref: ${{ job.workflow_sha }}
-          # toolbelt/ and packages/ hold the reader of the siblings' policy.dist.build.
           sparse-checkout: |
             .github/actions
             toolbelt/bin
@@ -1441,11 +1174,9 @@ jobs:
           working_directory: ${{ inputs.working_directory }}
           overrides: ${{ steps.deps.outputs.sibling_override }}
 
-      # safe.directory first: the mount belongs to the runner user, and the
-      # changed-lines mode (no policy.mutation.paths) shells out to git as www-data.
-      # Infection runs the suite, so this stays on the CiviCRM path — where an
-      # extension below the repository root has no .git of its own, and the
-      # changed-lines mode needs policy.mutation.paths in civikitchen.yaml instead.
+      # safe.directory: the mount belongs to the runner user, and the changed-lines
+      # mode runs git as www-data. An extension below the repository root has no
+      # .git and needs policy.mutation.paths.
       - name: Mutation testing (ckmutate)
         if: ${{ !cancelled() && steps.stack.outcome == 'success' }}
         run: |
@@ -1453,33 +1184,16 @@ jobs:
             "git config --global --add safe.directory $CK_REPO_PATH
              cd \"$CK_EXT_PATH\" && ckmutate"
 
-      # The checkout holding the action is missing only when the job failed before any boot.
       - name: Stack logs and teardown
         if: ${{ always() && hashFiles('.civikitchen-siblings/ci/.github/actions/stack-down/action.yml') != '' }}
         uses: ./.civikitchen-siblings/ci/.github/actions/stack-down
         with:
           logs: ${{ job.status == 'failure' }}
 
-  # --- Core upgrade persistence (opt-in via core_upgrade_from) --------------
-  #
-  # The job above, one axis over: that one moves the EXTENSION across a fixed
-  # core, the compat matrix below moves the CORE but installs from scratch every
-  # time. What neither reaches is the state every existing site is in — records
-  # and configuration created on core N, and then the core underneath them
-  # moves to N+1. That is where a managed entity reconciles differently after a
-  # schema change, where a saved search's stored API params stop being valid,
-  # where a custom field's column survives a core migration in name only.
-  #
-  # Same cheapness trick as the extension-upgrade job, one level up: the stack
-  # takes its image from ${CIVIKITCHEN_IMAGE:-...}, so "swap the core" is one
-  # environment variable and a second `up`. No second stack, no image build.
-  #
-  # Skipped entirely when the input is empty — the matrix_images deal: a caller
-  # that never sets it pays nothing. One leg, to `image`; matrix_core_upgrade
-  # adds one per matrix_images entry, from the list compat-images computes.
+  # Installs on core_upgrade_from, swaps the image under the same database and
+  # runs cv upgrade:db. One leg to `image`; matrix_core_upgrade adds one per
+  # matrix_images entry.
   core-upgrade:
-    # Cancelled only by the same leg in a newer run of the same caller workflow,
-    # ref, directory and image. Literal name: github.job is the caller's job id.
     concurrency:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-${{ matrix.image }}-core-upgrade
       cancel-in-progress: true
@@ -1495,15 +1209,10 @@ jobs:
     env:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
-      # Where CiviCRM has the extension enabled — derived by `key`.
       CK_EXT_PATH: ${{ needs.key.outputs.ext_path }}
       CK_CORE_FROM: ${{ inputs.core_upgrade_from }}
-      # The job-level image is the upgrade TARGET: the leg's image, which on
-      # the first leg is the run's normal one, or empty for the compose file's
-      # own default. Only the first boot overrides it, at the step, so everything
-      # after the swap runs against the target.
+      # The upgrade target. Only the first boot overrides it, at its step.
       CIVIKITCHEN_IMAGE: ${{ matrix.image }}
-      # One compose project per job — see the note in `ci`.
       COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.key.outputs.key_slug }}-core-upgrade-${{ strategy.job-index }}
     defaults:
       run:
@@ -1517,20 +1226,16 @@ jobs:
         run: |
           [[ "$CK_EXT_KEY" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]] \
             || { echo "invalid extension key: $CK_EXT_KEY" >&2; exit 1; }
-          # Same expression compat-images validates its CSV entries with: a
-          # value that is not an image reference at all is a caller mistake
-          # worth naming in seconds instead of ten minutes later in a pull error.
+          # Same expression as compat-images.
           [[ "$CK_CORE_FROM" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*(:[A-Za-z0-9._-]+)?(@sha256:[a-f0-9]{64})?$ ]] \
             || { echo "core_upgrade_from is not an image reference: $CK_CORE_FROM" >&2; exit 1; }
 
-      # The shared steps — see the note on the same checkout in `ci`.
       - name: Check out civikitchen for the shared private-dependency steps
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           repository: civico-de/civikitchen
           ref: ${{ job.workflow_sha }}
-          # toolbelt/ and packages/ hold the reader of the siblings' policy.dist.build.
           sparse-checkout: |
             .github/actions
             toolbelt/bin
@@ -1554,35 +1259,10 @@ jobs:
           ext_key: ${{ needs.key.outputs.key }}
           working_directory: ${{ inputs.working_directory }}
 
-      # The one thing that stops a naive image swap from being an upgrade.
-      #
-      # The entrypoint decides "is this site installed?" by looking for
-      # /var/www/html/private/civicrm.settings.php, and that path lives in the
-      # CONTAINER's own filesystem. Recreate the container on another image and
-      # the settings file is gone, so with CIVICRM_AUTO_INSTALL=1 the entrypoint
-      # runs `cv core:install -K` against a fully populated database instead of
-      # upgrading it — a mess, not an upgrade.
-      #
-      # A named volume on that directory fixes it, and carries more than the
-      # settings file: both provisioning markers (.civikitchen-configured,
-      # .civikitchen-provisioned) live there too, so the new container also skips
-      # the first-boot config and provisioning bundles, which would re-run their
-      # cv calls against a database the new core has not upgraded yet.
-      #
-      # The DATABASE needs a named volume of its own, and that is not optional
-      # here: the template CI stack gives mariadb no volume at all, so its data
-      # lives in an ANONYMOUS volume tied to the container. `docker compose down`
-      # removes the container even without -v, the next `up` creates a fresh one
-      # with a fresh anonymous volume — and the "old database" this whole job is
-      # about would be an empty one. Naming it states the contract instead: the
-      # containers go, the two volumes stay.
-      #
-      # Written here rather than into the template compose file, which is
-      # template-managed (ckinit checks it): no repo should take drift, or a
-      # persistent volume, for a job it may never switch on.
-      #
-      # Both merges only ever ADD, and there are no host paths, so compose
-      # resolving relative paths against the first -f file does not matter.
+      # Named volumes carry the site across the image swap. private/ holds
+      # civicrm.settings.php and the provisioning markers; without them the new
+      # container reinstalls over the database. The CI stack's database has no named
+      # volume. An override, so the template-managed compose file stays as it is.
       - name: Compose override — carry the site and the database across the swap
         run: |
           set -euo pipefail
@@ -1604,9 +1284,7 @@ jobs:
           YAML
           echo "CK_UPGRADE_OVERRIDE=$override" >> "$GITHUB_ENV"
 
-      # Booting IS the install on the old core: the entrypoint installs CiviCRM
-      # and enables the mounted extension, on the version the site is meant to
-      # have been living on.
+      # The boot installs CiviCRM and enables the extension on the old core.
       - name: Start the CiviCRM stack on the old core
         id: stack
         env:
@@ -1621,18 +1299,9 @@ jobs:
           # the site ends on the leg's image, whose PHP vendor/ has to fit.
           vendor_image: ${{ matrix.image }}
 
-      # `cv scr`, not a PHPUnit class, and deliberately so: these assertions have
-      # to run against the LIVE site database, while the headless harness points
-      # CIVICRM_DSN at the isolated civicrm_test scratch DB. A phpunit-based
-      # fixture would pass while testing a database the upgrade never touched.
-      #
-      # Both files are OPTIONAL. Without them this job still answers a real
-      # question — does a site installed on the old core boot on the new one and
-      # upgrade cleanly with this extension enabled — so refusing to run would
-      # cost that answer for every repo that has not written fixtures yet. What
-      # it cannot answer without them is what the extension's OWN data does,
-      # which is why the skip says so in as many words rather than passing
-      # quietly.
+      # cv scr, not PHPUnit: the fixtures must see the live site database, not the
+      # civicrm_test scratch DB. Both files are optional; without them the run
+      # tests the upgrade but not the extension's own records.
       - name: Seed the site on the old core (tests/upgrade/seed.php)
         run: |
           set -euo pipefail
@@ -1651,20 +1320,8 @@ jobs:
             echo "Add tests/upgrade/seed.php + tests/upgrade/assert.php to test what your data does across the upgrade."
           fi
 
-      # `down` without -v: the containers go, the two named volumes stay. That is
-      # the deliberate spelling of what a second `up` would do on its own
-      # (compose recreates `app` because its image changed) — written out, so the
-      # scenario rests on the volumes rather than on compose's recreate
-      # heuristics, and the database container genuinely restarts on the data it
-      # already had.
-      #
-      # `--wait` is weaker on this boot than it looks: the image's health probe
-      # is the `.civikitchen-provisioned` marker plus an answering Apache, and
-      # the volume has just carried that marker across, so the container reports
-      # healthy as soon as Apache listens rather than when the entrypoint has
-      # finished. It costs nothing here — every step below talks to the stack
-      # through `docker compose exec`, and the second boot's entrypoint only
-      # skips through its marker-gated bundles.
+      # `down` without -v keeps the two named volumes. --wait returns as soon as
+      # Apache listens, because the volume carries the provisioned marker.
       - name: Swap the core underneath the site
         env:
           COMPOSE_FILE: ${{ steps.stack.outputs.compose_file }}
@@ -1673,27 +1330,9 @@ jobs:
           docker compose down
           docker compose up -d --wait --quiet-pull
 
-      # `cv upgrade:db` straight away, with no `cv flush` in front of it: a
-      # normal cv bootstrap against a database the code has not upgraded yet is
-      # the thing to avoid here, and upgrade:db is the one command written for
-      # exactly that state (it boots with CIVICRM_UPGRADE_ACTIVE). It runs core
-      # and extension upgrades in one go, which is also what a real site's
-      # upgrade does.
-      #
-      # Then four separate questions, because only asking all of them makes a
-      # green run mean anything:
-      #   * the database is at the code's version — the upgrade finished rather
-      #     than stopping halfway with a zero exit;
-      #   * that version is not the one the site was installed on — otherwise
-      #     the caller pointed core_upgrade_from at the image the run already
-      #     uses, and this job would be a slow way to test nothing;
-      #   * no extension upgrade stayed pending — the same check the
-      #     extension-upgrade job makes, and a core upgrade is a common way for
-      #     one to appear;
-      #   * the extension is still installed. Cheap, and it is what carries a
-      #     run with no fixtures: a core upgrade that disables the extension
-      #     (an unmet requirement on the new version, a failed upgrader) would
-      #     otherwise leave every other check here perfectly green.
+      # No cv flush first: only upgrade:db boots against a database the code has
+      # not upgraded yet. Then four checks: database at the code's version, core
+      # actually moved, no extension upgrade pending, extension still installed.
       - name: Upgrade the site database (cv upgrade:db)
         run: |
           set -euo pipefail
@@ -1722,9 +1361,7 @@ jobs:
           [ "$status" = installed ] \
             || { echo "core upgrade: extension ended up '$status', expected 'installed'" >&2; exit 1; }
 
-      # Any exception or non-zero exit fails the job — that is the whole
-      # contract, so an assertion is a `throw` and nothing has to be registered
-      # anywhere.
+      # An exception or a non-zero exit of the script fails the job.
       - name: Assert the seeded state survived (tests/upgrade/assert.php)
         run: |
           set -euo pipefail
@@ -1737,27 +1374,15 @@ jobs:
             echo "no tests/upgrade/assert.php: the upgrade itself passed, but nothing checked what became of the extension's own records."
           fi
 
-      # The checkout holding the action is missing only when the job failed before any boot.
       - name: Stack logs and teardown
         if: ${{ always() && hashFiles('.civikitchen-siblings/ci/.github/actions/stack-down/action.yml') != '' }}
         uses: ./.civikitchen-siblings/ci/.github/actions/stack-down
         with:
           logs: ${{ job.status == 'failure' }}
 
-  # --- Compatibility matrix (opt-in via matrix_images) ----------------------
-  #
-  # Runs when matrix_images, playwright, matrix_playwright, core_upgrade_from
-  # or matrix_core_upgrade is set, skipped otherwise: a skipped job costs no
-  # runner minutes, so callers that set none of them keep today's run.
-  #
-  # A matrix needs a JSON array, and workflow expressions have no split(), so
-  # the CSV is parsed here and handed on as `images` (the compat legs),
-  # `playwright_images` (the browser legs) and `core_upgrade_images` (the
-  # targets of the core upgrade). Same shape as build-dev-images.yml's
-  # resolve-civicrm job.
+  # Parses matrix_images into the JSON lists the compat, browser and core
+  # upgrade matrices need; workflow expressions have no split().
   compat-images:
-    # Cancelled only by this job in a newer run of the same caller workflow,
-    # ref, directory and image. Literal name: github.job is the caller's job id.
     concurrency:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-compat-images
       cancel-in-progress: true
@@ -1783,9 +1408,7 @@ jobs:
           set -euo pipefail
           images=$(jq -Rc 'split(",") | map(sub("^ +";"") | sub(" +$";"")) | map(select(length > 0))' \
             <<< "$CK_MATRIX_IMAGES")
-          # Image refs go into `docker compose` through the environment, but a
-          # value that is not an image reference at all is a caller mistake
-          # worth naming here instead of ten minutes later in a pull error.
+          # Names a value that is no image reference here, not in a later pull error.
           jq -e 'all(test("^[A-Za-z0-9][A-Za-z0-9._/-]*(:[A-Za-z0-9._-]+)?(@sha256:[a-f0-9]{64})?$"))' \
             <<< "$images" > /dev/null \
             || { echo "matrix_images contains something that is not an image reference: $images" >&2; exit 1; }
@@ -1821,15 +1444,9 @@ jobs:
           echo "browser legs: $playwright_images"
           echo "core upgrade targets: $core_upgrade_images"
 
-  # One boot + suite per extra image. Deliberately NOT the full `ci` pass:
-  # cklint, ckconform, phpstan and the coverage floor are enforced by the ck*
-  # tools that ship *in the image*, so re-running them on a pinned older image
-  # grades that image's tooling, not the extension. What is genuinely
-  # version-dependent is whether the extension installs into that CiviCRM and
-  # whether its tests pass there.
+  # One boot and PHPUnit run per extra image. No gates: the ck tools ship in
+  # the image, so they would grade the older image's tooling.
   compat:
-    # Cancelled only by the same leg in a newer run of the same caller workflow,
-    # ref, directory and image. Literal name: github.job is the caller's job id.
     concurrency:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-${{ matrix.image }}-compat
       cancel-in-progress: true
@@ -1846,10 +1463,8 @@ jobs:
     env:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
-      # Where CiviCRM has the extension enabled — derived by `key`.
       CK_EXT_PATH: ${{ needs.key.outputs.ext_path }}
       CIVIKITCHEN_IMAGE: ${{ matrix.image }}
-      # One compose project per job — see the note in `ci`.
       COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.key.outputs.key_slug }}-compat-${{ strategy.job-index }}
     defaults:
       run:
@@ -1859,14 +1474,12 @@ jobs:
         with:
           persist-credentials: false
 
-      # The shared steps — see the note on the same checkout in `ci`.
       - name: Check out civikitchen for the shared steps
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           repository: civico-de/civikitchen
           ref: ${{ job.workflow_sha }}
-          # toolbelt/ and packages/ hold the reader of the siblings' policy.dist.build.
           sparse-checkout: |
             .github/actions
             toolbelt/bin
@@ -1903,9 +1516,7 @@ jobs:
           [[ "$CK_EXT_KEY" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]] \
             || { echo "invalid extension key: $CK_EXT_KEY" >&2; exit 1; }
 
-      # Booting is itself the fresh-install test: the entrypoint installs
-      # CiviCRM and enables the mounted extension, so an installer that fails
-      # on this version never gets to the suite.
+      # The boot is the fresh-install test on this version.
       - name: Start CiviCRM stack
         uses: ./.civikitchen-siblings/ci/.github/actions/stack-up
         with:
@@ -1925,38 +1536,22 @@ jobs:
           docker compose -f "$CK_COMPOSE_FILE" exec -T -u www-data app bash -c \
             "cd \"$CK_EXT_PATH\" && cklifecycle" 2>&1 | tee "$RUNNER_TEMP/cklifecycle.md"
 
-      # The report is the point of the step, so it is published whether the
-      # gate passed or failed — a leftover table named in a job summary gets
-      # fixed, one buried 300 lines into a red step log does not.
+      # Published on failure too.
       - name: Lifecycle summary
         if: ${{ !cancelled() && steps.lifecycle.outcome != 'skipped' }}
         run: |
           sed -n '/^### Lifecycle gate/,$p' "$RUNNER_TEMP/cklifecycle.md" >> "$GITHUB_STEP_SUMMARY" || true
 
-      # The checkout holding the action is missing only when the job failed before any boot.
       - name: Stack logs and teardown
         if: ${{ always() && hashFiles('.civikitchen-siblings/ci/.github/actions/stack-down/action.yml') != '' }}
         uses: ./.civikitchen-siblings/ci/.github/actions/stack-down
         with:
           logs: ${{ job.status == 'failure' }}
 
-  # --- Browser tests (opt-in via playwright) --------------------------------
-  #
-  # examples/extension-with-playwright, promoted from a copy-paste starter to a
-  # job: CiviCRM in Docker, the suite and its browser in the repo's Playwright
-  # image (`ck playwright`) inside the app container's network namespace, where
-  # the site is http://localhost. Skipped entirely when the input is off, so
-  # callers that never set it keep exactly the run they have — same deal as the
-  # compat matrix.
-  #
-  # Its own job rather than more steps in `ci`: browsers and an npm tree on
-  # every push run is the opposite of what the standards ask of ci.yml, and a
-  # browser failure that also hides the PHPUnit result is a bad trade. One leg
-  # on `image`; matrix_playwright adds one per matrix_images entry, from the
-  # list compat-images computes — see docs/extension-standards.md.
+  # Browser suite in the repo's Playwright image (`ck playwright`), inside the
+  # app container's network namespace. One leg on `image`; matrix_playwright
+  # adds one per matrix_images entry.
   playwright:
-    # Cancelled only by the same leg in a newer run of the same caller workflow,
-    # ref, directory and image. Literal name: github.job is the caller's job id.
     concurrency:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-${{ matrix.image }}-playwright
       cancel-in-progress: true
@@ -1975,7 +1570,6 @@ jobs:
       CK_COMPOSE_FILE: ${{ inputs.compose_file }}
       CK_EXT_KEY: ${{ needs.key.outputs.key }}
       CIVIKITCHEN_IMAGE: ${{ matrix.image }}
-      # One compose project per job — see the note in `ci`.
       COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.key.outputs.key_slug }}-playwright-${{ strategy.job-index }}
       CK: ${{ github.workspace }}/.civikitchen-siblings/ci/toolbelt/bin/ck
     defaults:
@@ -1991,7 +1585,6 @@ jobs:
           [[ "$CK_EXT_KEY" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]] \
             || { echo "invalid extension key: $CK_EXT_KEY" >&2; exit 1; }
 
-      # The shared steps — see the note on the same checkout in `ci`.
       # The checkout also carries `ck playwright` and its Dockerfile.
       - name: Check out civikitchen for ck playwright and the private-dependency steps
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1999,7 +1592,6 @@ jobs:
           persist-credentials: false
           repository: civico-de/civikitchen
           ref: ${{ job.workflow_sha }}
-          # toolbelt/ and packages/ hold the reader of the siblings' policy.dist.build.
           sparse-checkout: |
             .github/actions
             toolbelt/bin
@@ -2024,12 +1616,9 @@ jobs:
           ext_key: ${{ needs.key.outputs.key }}
           working_directory: ${{ inputs.working_directory }}
 
-      # A login user, which the CI stack deliberately lacks: CIVIKITCHEN_DEMO_USER
-      # is opt-in in the image, and the template-managed compose file should not
-      # carry one for a job a repo may never switch on. The suite runs in the app
-      # container's network namespace, so the site is http://localhost and nothing
-      # is published: jobs on one self-hosted host share its ports. CiviCRM bakes
-      # CIVIKITCHEN_SITE_URL into every asset and redirect URL.
+      # Adds the demo login the CI stack lacks and publishes no port: the suite
+      # reaches the site as http://localhost in the app container's network
+      # namespace, and CiviCRM bakes CIVIKITCHEN_SITE_URL into every URL.
       - name: Compose override — no published port, create the demo user
         run: |
           set -euo pipefail
@@ -2051,9 +1640,6 @@ jobs:
             echo "BASE_URL=http://localhost"
           } >> "$GITHUB_ENV"
 
-      # Seed snapshots (docs/seed-snapshots.md): a profile with a `snapshot`
-      # block generates its data on the first run and restores it from this
-      # cache on later ones. No `snapshot` block, nothing stored: a no-op.
       - name: Restore seed snapshots
         id: seed-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -2094,10 +1680,8 @@ jobs:
           path: ${{ runner.temp }}/ck-seed-store
           key: ck-seed-playwright-${{ inputs.working_directory }}-${{ matrix.image }}-${{ steps.seed-key.outputs.key }}-${{ github.run_id }}
 
-      # The repo's Playwright image holds its tree, installed as the ci job installs
-      # it, and the browsers of the Playwright version that tree resolves. The app
-      # container serves the checkout, so pages that load from node_modules/ need
-      # the same tree there.
+      # The app container serves the checkout, so pages loading from node_modules/
+      # need the tree the Playwright image holds.
       - name: Copy the JS dependencies into the checkout
         run: |
           set -euo pipefail
@@ -2110,11 +1694,9 @@ jobs:
         if: ${{ needs.key.outputs.dist_build_tool == 'bun' }}
         run: php "$CK" playwright bun run build
 
-      # Chromium aborts in-flight requests with ERR_NETWORK_CHANGED whenever an
-      # interface appears in its netns, and other jobs on the same Docker host
-      # add and remove bridges and veths in the host's all the time. The app
-      # container's netns holds only its own; `docker compose` calls from the
-      # suite reach this job's stack through the socket ck playwright mounts.
+      # In the app container's netns: Chromium aborts requests with
+      # ERR_NETWORK_CHANGED when an interface appears, and other jobs on the host
+      # add bridges and veths all the time.
       - name: Playwright (npm run test:e2e / bun run test:e2e)
         env:
           # CIVICRM_BASE_URL comes from the override step.
@@ -2130,9 +1712,7 @@ jobs:
           app=$(docker compose -f "$CK_COMPOSE_FILE" ps -q app)
           php "$CK" playwright --network "container:$app" "$manager" run test:e2e
 
-      # A browser failure without its trace is a screenshot of nothing. Both
-      # directories are Playwright defaults; `ignore` keeps a config that
-      # writes elsewhere from turning a red suite into a red upload too.
+      # `ignore`: a config that writes its report elsewhere must not fail the upload.
       - name: Playwright report + traces on failure
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -2146,19 +1726,15 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      # The checkout holding the action is missing only when the job failed before any boot.
       - name: Stack logs and teardown
         if: ${{ always() && hashFiles('.civikitchen-siblings/ci/.github/actions/stack-down/action.yml') != '' }}
         uses: ./.civikitchen-siblings/ci/.github/actions/stack-down
         with:
           logs: ${{ job.status == 'failure' }}
 
-  # --- Shell e2e suite (opt-in via e2e) -------------------------------------
-  # tests/e2e/ suites run on the runner against the CI stack plus maildev, via
-  # COMPOSE_FILE and BASE_URL; their own job, so a red suite hides no PHPUnit result.
+  # Shell suites on the runner against the CI stack plus maildev, via
+  # COMPOSE_FILE and BASE_URL.
   e2e:
-    # Cancelled only by this job in a newer run of the same caller workflow,
-    # ref, directory and image. Literal name: github.job is the caller's job id.
     concurrency:
       group: ck-${{ github.repository }}-${{ github.ref }}-${{ inputs.working_directory }}-${{ github.workflow }}-${{ inputs.image }}-e2e
       cancel-in-progress: true
@@ -2173,7 +1749,6 @@ jobs:
       CK_E2E_COMPOSE: ${{ inputs.e2e_compose }}
       CK_WORKDIR: ${{ inputs.working_directory }}
       CIVIKITCHEN_IMAGE: ${{ needs.key.outputs.image }}
-      # One compose project per job — see the note in `ci`.
       COMPOSE_PROJECT_NAME: ck-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.key.outputs.key_slug }}-e2e
     defaults:
       run:
@@ -2207,14 +1782,12 @@ jobs:
           done
           echo "CK_COMPOSE" >> "$GITHUB_OUTPUT"
 
-      # The shared steps — see the note on the same checkout in `ci`.
       - name: Check out civikitchen for the shared steps
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           repository: civico-de/civikitchen
           ref: ${{ job.workflow_sha }}
-          # toolbelt/ and packages/ hold the reader of the siblings' policy.dist.build.
           sparse-checkout: |
             .github/actions
             toolbelt/bin
@@ -2318,7 +1891,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      # The checkout holding the action is missing only when the job failed before any boot.
       - name: Stack logs and teardown
         if: ${{ always() && hashFiles('.civikitchen-siblings/ci/.github/actions/stack-down/action.yml') != '' }}
         uses: ./.civikitchen-siblings/ci/.github/actions/stack-down

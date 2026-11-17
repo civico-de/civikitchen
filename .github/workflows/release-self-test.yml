@@ -1,9 +1,6 @@
-# extension-release.yml in its single-extension shape: one `stage: release`
-# job that builds, smoke-tests and publishes, here as a dry run. The publish job
-# derives the version from the archive and computes the release flags, then stops.
-#
-# Its own workflow rather than a job in Monorepo Self-Test: artifact names are
-# unique per run, and both would upload this extension's archive.
+# extension-release.yml in its single-extension shape, as a dry run. Its own
+# workflow: artifact names are unique per run, and Monorepo Self-Test uploads
+# the same archive.
 name: Release Self-Test
 
 on:

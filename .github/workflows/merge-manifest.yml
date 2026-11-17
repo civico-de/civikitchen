@@ -1,21 +1,6 @@
-# Merge this run's per-arch candidate images into one multi-platform manifest.
-#
-# The build jobs push `<tag>-<sha>-amd64` and `<tag>-<sha>-arm64` separately —
-# one runner per architecture, no emulation — and this joins them under
-# `<tag>-<sha>`, which is what the smoke, e2e and promote jobs then refer to.
-#
-# It exists as a called workflow because the operation was written out three
-# times (standalone, buildkit, demo) and differed only in which tags to iterate:
-# three copies of the same `imagetools create`, and three copies of the pinned
-# GHCR login next to them. What is left at each call site is configuration —
-# which jobs it waits for, which tags, what the token may do — and that is
-# genuinely per-caller, not a copy.
-#
-# `./.github/workflows/...` resolves in THIS repository at the commit being
-# run, which is why this works where a composite action would not: a composite
-# action referenced by path from a REUSABLE workflow (extension-ci.yml) would
-# resolve against the calling extension repo instead. This file is only ever
-# called from workflows that run here.
+# Join this run's `<tag>-<sha>-amd64` and `-arm64` candidates under
+# `<tag>-<sha>`, the name the smoke, e2e and promote jobs refer to.
+# Called only from workflows of this repository.
 name: Merge candidate manifest
 
 on:
@@ -40,9 +25,7 @@ on:
         type: string
         default: civikitchen
 
-# Derived from the run's own repository, exactly as in the calling workflow: a
-# called workflow does not inherit `env`, and deriving it again is better than
-# passing a value that could be passed wrongly.
+# A called workflow does not inherit `env`, so it is derived again.
 env:
   IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/${{ inputs.package }}
 
@@ -53,8 +36,7 @@ permissions:
 jobs:
   merge:
     runs-on: ubuntu-24.04
-    # Capped by the caller's own permissions block, which has to grant
-    # packages: write for this to be able to push the manifest.
+    # Capped by the caller, which has to grant packages: write.
     permissions:
       contents: read
       packages: write
@@ -71,12 +53,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Through env, not interpolated into the run block: `prefix` is a
-      # workflow_call input, so its value comes from the caller and expands
-      # into shell if written inline. The three jobs this replaced took the
-      # matrix values inline and were covered by zizmor's template-injection
-      # exemption for build-dev-images.yml; that exemption is for values
-      # resolve-civicrm validates, and it does not extend to an input.
+      # Through env: `prefix` is a caller's input and would expand into shell inline.
       - name: Create multi-platform candidate manifest
         env:
           CK_TAG: ${{ inputs.prefix }}${{ matrix.tag }}

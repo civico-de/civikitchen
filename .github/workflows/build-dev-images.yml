@@ -29,11 +29,8 @@ on:
       # Changes the scan verdict directly, so it must re-run the scan jobs.
       - 'trivyignore.yaml'
   schedule:
-    # Daily (04:00 UTC, an hour before the GHCR cleanup cron): Debian security
-    # updates arrive daily and the cron build runs uncached, so a fixed package
-    # is in the images a day later. resolve-civicrm picks up the current
-    # upstream stable each run; test-then-promote keeps the stable tags on the
-    # last good image when a build or its gates fail.
+    # Daily, uncached, an hour before the GHCR cleanup: picks up Debian security
+    # fixes and the current upstream stable.
     - cron: '0 4 * * *'
   workflow_dispatch:
     inputs:
@@ -54,16 +51,10 @@ on:
         type: boolean
         default: false
 
-# The images that gate a release: standalone (every listed CiviCRM minor) and
-# standalone-demo. The CMS flavors build in build-cms-images.yml, with their own
-# concurrency group, so neither pipeline cancels or fails the other.
+# The images that gate a release: standalone (every listed minor) and
+# standalone-demo. The CMS flavors build in build-cms-images.yml.
 #
-# The moving tags (:standalone, :standalone-demo, …) are last-writer-wins, and
-# the writer is whichever run finishes promote last — not whichever commit is
-# newer. Two pushes in quick succession therefore leave the live images built
-# from the OLDER commit, and the next release refuses with "image drift".
-# A newer push or dispatch cancels the running one, so the last commit wins. A
-# run cancelled mid-promote leaves split tags until the next run.
+# Moving tags are last-writer-wins, so a newer push cancels the running one.
 # A daily run cancels nothing, so it never discards a release candidate.
 concurrency:
   group: build-dev-images
@@ -78,10 +69,7 @@ env:
 
 jobs:
   resolve-civicrm:
-    # Single source of truth for the CiviCRM version every image bakes.
-    # latest.civicrm.org/stable.php returns the current stable (e.g. 6.15.1);
-    # every image pins an exact version — standalone installs the matching
-    # release tarball, the demo civibuilds it.
+    # The exact CiviCRM version every image bakes.
     runs-on: ubuntu-24.04
     outputs:
       stable: ${{ steps.resolve.outputs.stable }}
@@ -136,10 +124,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Test-then-promote: builds push only sha-suffixed candidate tags. The
-      # stable tags (:standalone, :standalone-latest, ...) are created by
-      # promote-standalone AFTER the smoke + e2e tests pass, so a broken image
-      # never goes live under a stable tag.
+      # Builds push only sha-suffixed candidates; promote-standalone moves the
+      # stable tags after the tests pass.
       - name: Build and push standalone candidate image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -158,13 +144,11 @@ jobs:
           # The image is pushed before the cache export, so a failed export
           # (`error writing layer blob: not_found`) must not fail the job.
           cache-to: type=registry,ref=${{ env.IMAGE_PREFIX }}-buildcache:standalone-${{ matrix.version }}-${{ matrix.arch }},mode=max,ignore-error=true
-          # The daily cron rebuilds from scratch: a cached apt layer would keep
-          # serving the base image's outdated packages past their security fix.
+          # The daily cron rebuilds from scratch so apt layers pick up security fixes.
           no-cache: ${{ github.event_name == 'schedule' || inputs.no_cache == true }}
 
-  # The per-arch candidates become one multi-platform tag. Every caller shares
-  # one implementation — see .github/workflows/merge-manifest.yml. The matrix here
-  # carries bare CiviCRM versions, hence the prefix.
+  # The per-arch candidates become one multi-platform tag; the matrix carries
+  # bare CiviCRM versions, hence the prefix.
   merge-standalone:
     needs: [resolve-civicrm, build-standalone]
     permissions:
@@ -217,9 +201,7 @@ jobs:
         run: bash tests/images/boot-test-standalone.sh "$IMG"
 
   e2e-test-standalone:
-    # Runs the example compose stack and exercises the auto-installed site
-    # with Playwright (real Chromium). Catches install/Apache/SITE_URL bugs
-    # the in-image functional test can't see.
+    # The example compose stack in Chromium: install, Apache and SITE_URL bugs.
     needs: [resolve-civicrm, smoke-test-standalone]
     runs-on: ubuntu-24.04
     permissions:
@@ -239,21 +221,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # The example compose uses `image: ${IMAGE:-…default}` so we point it
-      # at this run's candidate tag (stable tags don't exist yet at this point).
+      # The example compose reads `${IMAGE}`: this run's candidate tag.
       - name: Boot the example stack
         env:
           IMAGE: ${{ env.IMAGE_PREFIX }}:standalone-${{ needs.resolve-civicrm.outputs.stable }}-${{ github.sha }}
-          # Exercise the CIVIKITCHEN_EXTRA_EXTENSIONS entrypoint hook with both
-          # supported syntaxes:
-          # - bare key (mjwshared): pulled from the public registry, exercises
-          #   ext:download's network + cache refresh path.
-          # - bare key whose core-bundled requirement is uninstalled (org.project60.sepa →
-          #   legacycustomsearches): core refuses the download until it is installed.
-          # - key@URL (de.systopia.xcm): exercises the explicit-URL path. This
-          #   one previously regressed because cv ext:download auto-installs
-          #   and bombed with "Cannot install or enable extension"; the
-          #   entrypoint now splits download (--no-install) + enable.
+          # A registry key, one whose core-bundled requirement must be installed
+          # first (sepa → legacycustomsearches), and the key@URL form.
           CIVIKITCHEN_EXTRA_EXTENSIONS: "mjwshared,org.project60.sepa,de.systopia.xcm@https://github.com/systopia/de.systopia.xcm/releases/download/1.13.0/de.systopia.xcm-1.13.0.zip"
         run: |
           docker compose -f examples/standalone/docker-compose.yml up -d --pull always
@@ -294,9 +267,8 @@ jobs:
         run: docker compose -f examples/standalone/docker-compose.yml down -v
 
   database-compat-standalone:
-    # One current-stable amd64 candidate: install, provisioning, locale
-    # rendering and the isolated headless DB. Every image policy.database
-    # offers gates promotion (tests/parity/database-policy.php holds the two equal).
+    # Every database policy.database offers gates promotion
+    # (tests/parity/database-policy.php holds the two equal).
     needs: [resolve-civicrm, smoke-test-standalone]
     runs-on: ubuntu-24.04
     permissions:
@@ -412,9 +384,7 @@ jobs:
           bash tests/ckcreate/e2e-ckcreate.sh "$IMG"
 
   promote-standalone:
-    # Stable tags only move once the candidate passed the tests and the scan,
-    # and onto the digest the scan passed. `imagetools create` from a manifest
-    # list copies it intact, so the promoted tag stays multi-arch.
+    # Stable tags move only after the tests and the scan, onto the scanned digest.
     needs: [resolve-civicrm, smoke-test-standalone, e2e-test-standalone, database-compat-standalone, scenario-test-standalone, scaffold-test-standalone, scan-standalone]
     runs-on: ubuntu-24.04
     permissions:
@@ -438,9 +408,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # The consumer contract is the MINOR tag (:standalone-6.17); the exact
-      # tag (:standalone-6.17.0) is new with the tarball-based image and
-      # freezes a patch release for whoever needs that.
+      # Consumers pin the minor tag (:standalone-6.17); the exact tag freezes a patch.
       - name: Promote the scanned candidate to stable tags
         env:
           VERSION: ${{ matrix.version }}
@@ -596,16 +564,8 @@ jobs:
         run: .github/scripts/promote-digest.sh latest
 
   notify-scheduled-failure:
-    # The daily cron rebuild fails SILENTLY otherwise: test-then-promote
-    # keeps serving the last good stable tags, so nothing user-visible breaks
-    # and a broken pipeline can go unnoticed for weeks. Open (or bump) an
-    # issue so the failure has a place to be seen. failure() is transitive
-    # over the needs chain, so any failed job anywhere in the pipeline
-    # triggers this — push-triggered runs are excluded (those failures are
-    # visible on the commit/PR already).
-    # The scans are listed although promote already waits for them: the daily
-    # cron is the run that finds a base-image CVE nobody pushed a commit for,
-    # and the edge makes that finding open an issue.
+    # A failed daily run otherwise goes unseen: promote keeps the last good tags.
+    # failure() is transitive over needs; the scans are listed for base-image CVEs.
     needs: [promote-standalone, database-compat-extended, standalone-demo, scan-standalone, monorepo-self-test, scan-cli, promote-cli]
     if: github.event_name == 'schedule' && failure()
     runs-on: ubuntu-24.04

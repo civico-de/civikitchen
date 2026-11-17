@@ -1,13 +1,6 @@
-# Cut a release: the workflow, the template, the ck* tools and the images ship
-# as ONE versioned contract (docs/releases.md).
-#
-# Trigger: pushing a v<major>.<minor>.<patch> tag. Nothing is built here — the
-# release attaches its tags to the image digests the moving tags (:standalone,
-# :drupal10, …) already point at, i.e. to artifacts that have been through
-# test-then-promote. In exchange it insists that those artifacts actually
-# belong to the release commit: a promoted digest still carries its
-# `…-<sha>` candidate tag, so the build commit is recoverable, and its
-# `docker/` + `toolbelt/` trees must match the ones being released.
+# Cut a release on a vX.Y.Z tag push (docs/releases.md). Nothing is built: the
+# release tags go onto the digests the moving tags point at, whose build commit's
+# image trees must match the release commit.
 name: Release
 
 on:
@@ -120,9 +113,7 @@ jobs:
       contents: write
 
     steps:
-      # The run's own token cannot move a tag onto a commit whose workflow
-      # files differ from the old target; a GitHub App token with workflows
-      # write can.
+      # Only an App token with workflows write can move a tag across workflow changes.
       - name: Require the release App credentials
         env:
           CLIENT_ID: ${{ vars.RELEASE_APP_CLIENT_ID }}

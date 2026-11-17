@@ -1,21 +1,7 @@
-# extension-ci.yml and extension-release.yml against a repository that holds
-# two extensions, one requiring the other: the self-test for
-# `working_directory`. One static job per extension, the shape ckinit stamps
-# into a monorepo's root callers. The release jobs are dry runs: both archives
-# are built, verified and smoke-tested, the addon's with the base's archive from
-# this run, and the publish job lists what it would attach.
-#
-# `uses: ./…` resolves against the CALLING repository, which here is this one,
-# so the workflow under test is the one in the branch that triggered the run.
-#
-# Not on every push: each job boots its own CiviCRM stack. The ck* tools come
-# from the image, so Build Dev Images calls this after promoting :standalone;
-# the push paths are what the image lacks.
-# A newer promote landing first means the run tests newer tools, never older.
-#
-# The ROOT pass of the template drift check is not exercised here: the example
-# tree sits below examples/, while ckinit manages a root whose direct
-# subdirectories are the extensions. tests/ckinit/test-ckinit.sh covers it.
+# extension-ci.yml and extension-release.yml (dry run) against a repository of
+# two extensions, one requiring the other: the self-test for `working_directory`.
+# Build Dev Images calls it after promoting :standalone, whose ck* tools it uses.
+# The root template drift pass is covered by tests/ckinit/test-ckinit.sh.
 name: Monorepo Self-Test
 
 on:

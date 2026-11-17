@@ -1,13 +1,8 @@
 # Static checks and the fast test suites: everything that needs no built image.
 # Runs on pushes to main and on pull requests.
 #
-# The steps are `make` calls on purpose. What they run — which trees shellcheck
-# sweeps, which CiviCRM release the catalog drift gates test against, which
-# phpunit phar and which checksum — is defined once, in the Makefile and
-# versions.env, and scaffold/ck runs it in the same toolchain container here and
-# on a laptop. Before that split these suites could be run in exactly one
-# place: this file. Anything that belongs to "how a check runs" goes in the
-# Makefile; what stays here is when it runs and with what permissions.
+# How a check runs belongs in the Makefile (scaffold/ck runs it the same way
+# locally); this file only says when and with what permissions.
 name: Lint
 
 on:
@@ -34,9 +29,7 @@ jobs:
       - name: Static checks
         run: scaffold/ck make lint
 
-      # ckconform's fixtures, the phpstan extension's rule tests, and ckinit's
-      # integration checks. `make test` fetches the CiviCRM source tree the
-      # catalog drift gates need — without it those gates SKIP, and the suites
-      # would go green while the thing they guard never ran.
+      # `make test` fetches the CiviCRM source the catalog drift gates need;
+      # without it they skip.
       - name: Test suites
         run: scaffold/ck make test

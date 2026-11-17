@@ -1,6 +1,5 @@
-# The one release definition every conforming extension repo calls, so a
-# release is the same act everywhere: check the version, build the installable
-# zip, install it into a real CiviCRM, publish.
+# Reusable release for extension repos: check the version, build the zip,
+# install it into a real CiviCRM, publish.
 #
 #   name: Release
 #   on:
@@ -14,20 +13,12 @@
 #         contents: write        # the called workflow can only narrow this
 #       uses: civico-de/civikitchen/.github/workflows/extension-release.yml@v1
 #
-# Pin the major (@v1), not @main — same versioned contract as extension-ci.yml
-# (docs/releases.md). A vX.Y.Z-<pre> tag publishes a pre-release, which never
-# takes Latest; a plain tag takes Latest only as the highest plain version.
+# Pin the major (@v1). A vX.Y.Z-<pre> tag publishes a pre-release; a plain tag
+# takes Latest only as the highest plain version.
 #
-# A repository of several extensions releases them in lockstep: one tag, one
-# GitHub release carrying every archive. Its caller has one `stage: build` job
-# per extension (`working_directory: <dir>`, `needs:` on the jobs of the
-# same-repository extensions it requires, whose archives its smoke test
-# installs) and one `stage: publish` job that `needs:` all of them. ckinit
-# stamps that caller at the repository root.
-#
-# NOT a version bumper: the bump is a commit an author writes and reviews, the
-# tag is the statement that it is ready (docs/adr/0002-*). What the archive
-# contents promise: docs/extension-releases.md, and `ck release --help`.
+# Several extensions in one repo release in lockstep: one `stage: build` job
+# per extension (`needs:` its required siblings) and one `stage: publish` job.
+# The version bump is a reviewed commit, not this workflow (docs/adr/0002-*).
 name: Extension Release
 
 on:
@@ -35,39 +26,37 @@ on:
     inputs:
       working_directory:
         description: >-
-          The extension's directory inside the repository, for a repository
-          that holds several extensions. The build, the archive and the smoke
-          test are resolved against it. The default is the repository root.
+          The extension's directory in a repository that holds several
+          extensions. The build, the archive and the smoke test resolve
+          against it.
         type: string
         default: '.'
       stage:
         description: >-
-          `release` builds this extension and publishes its release. `build`
-          builds, verifies and smoke-tests the archive and uploads it for a
-          later `publish` job; `publish` builds nothing and publishes one
-          release carrying every archive this run's `build` jobs uploaded.
+          `release` builds and publishes. `build` builds, verifies and
+          smoke-tests the archive and uploads it for a later `publish` job;
+          `publish` publishes one release with every archive this run's
+          `build` jobs uploaded.
         type: string
         default: 'release'
       dry_run:
         description: >-
           Build and verify the version info.xml carries, without a tag, and
-          publish nothing: the publish job computes the release it would make
-          and lists the archives it would attach.
+          publish nothing; the publish job lists the release and archives it
+          would make.
         type: boolean
         default: false
       image:
         description: >-
-          CiviKitchen image the install smoke test runs in. Empty (the
-          default): the :standalone-<minor> image of the repo's policy.civicrm,
-          else the released contract image the CI compose stack pins. Setting
-          both this and policy.civicrm is an error.
+          Image the install smoke test runs in. Empty takes
+          :standalone-<minor> of the repo's policy.civicrm, else the image the
+          CI compose stack pins. Setting both this and policy.civicrm is an
+          error.
         type: string
         default: ''
       smoke_test:
         description: >-
           Install the built archive into a fresh CiviCRM before publishing.
-          Turn off only for an extension whose install cannot be reached this
-          way (and say so in the caller).
         type: boolean
         default: true
       draft:
@@ -80,34 +69,31 @@ on:
         default: ''
       composer_install:
         description: >-
-          Install locked production dependencies and include the generated
-          vendor/ tree in the archive. Use when vendor/ is not committed but
-          the extension requires vendor/autoload.php at runtime.
+          Install the locked production dependencies and include vendor/ in
+          the archive, for an extension that needs vendor/autoload.php and
+          does not commit it.
         type: boolean
         default: false
       composer_app_repositories:
         description: >-
           Comma- or newline-separated repository names within the caller's
-          owner that the GitHub App token may read: private Composer packages,
-          and the repositories a `policy.extension_sources` release pin names.
+          owner that the GitHub App token may read: private Composer packages
+          and the repositories a policy.extension_sources release pin names.
           Required whenever the app secrets are supplied.
         type: string
         default: ''
       mirror_url:
         description: >-
-          HTTPS address of a second git repository that receives each release,
-          for an extension directory that builds its download from a tag
-          (https://lab.civicrm.org/extensions/<key>.git). It gets the default
-          branch as released and the archive's contents as a commit tagged
-          with the bare version (1.2.3), so that tag carries vendor/ and build
-          output. Needs the mirror_token secret; one extension per repository.
+          HTTPS address of a second git repository that receives each release:
+          the default branch as released, and the archive's contents as a
+          commit tagged with the bare version (1.2.3). Needs the mirror_token
+          secret; one extension per repository.
         type: string
         default: ''
       node_version:
         description: >-
-          Node the declared release build (policy.dist.build) runs its binaries
-          on: Bun replaces the package manager, not Node. Same default as the
-          extension CI's node_version, so CI tests what the release builds.
+          Node the declared release build (policy.dist.build) runs on, also
+          under Bun. Same default as the extension CI's node_version.
         type: string
         default: '24'
 
@@ -115,23 +101,19 @@ on:
       composer_app_id:
         description: >-
           App ID of a GitHub App with `contents: read`, installed on the
-          private dependency repos — Composer packages, and any repository a
-          release pin downloads a dependency archive from. Optional — without
-          it only what is public resolves.
+          private dependency repos. Without it only public dependencies
+          resolve.
         required: false
       composer_app_private_key:
         description: >-
-          Private key (PEM) of that app. Used on the runner only to mint a
-          short-lived token; neither key nor token is ever copied into the
-          archive or the smoke container — the container gets the fetched
-          bytes, never the credential that fetched them.
+          Private key (PEM) of that app. Mints a short-lived token on the
+          runner; neither enters the archive or the smoke container.
         required: false
 
       mirror_token:
         description: >-
-          Token that may push to mirror_url, handed to git by a credential
-          helper. On GitLab
-          a project access token with the write_repository scope.
+          Token that may push to mirror_url. On GitLab a project access token
+          with the write_repository scope.
         required: false
 
 permissions:
@@ -145,8 +127,7 @@ jobs:
       run:
         working-directory: ${{ inputs.working_directory }}
     env:
-      # Inputs reach the shell through the environment, never through expression
-      # interpolation inside `run:` — an interpolated input IS the script text.
+      # Inputs reach the shell through the environment, never `run:` interpolation.
       CK_RELEASE_REF: HEAD
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -156,9 +137,7 @@ jobs:
           # fetched; ckrelease refuses pointer files.
           lfs: true
 
-      # Pinned to the SHA this workflow was resolved from, so the ckrelease that
-      # builds the artifact is the one belonging to the pinned contract — same
-      # mechanism the drift job in extension-ci.yml uses.
+      # This workflow's own SHA, so ckrelease belongs to the pinned contract.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -175,9 +154,8 @@ jobs:
           composer install --no-dev --no-interaction --no-progress --classmap-authoritative \
             --working-dir=.civikitchen-ci
 
-      # From the checkout root, so a working_directory that does not exist gets
-      # this message rather than a runner error. A tag that is no release
-      # version fails here, before any build work.
+      # From the checkout root, so a missing working_directory gets this message
+      # rather than a runner error.
       - name: Validate the inputs and read the extension key
         id: key
         working-directory: .
@@ -265,9 +243,7 @@ jobs:
             echo "any=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Read once, here, so the token gate, the staging step and the smoke
-      # stack all agree on whether this release has a dependency that only a
-      # credential can reach. ckconform is the one parser for civikitchen.yaml.
+      # Read once, so the token gate, staging step and smoke stack agree.
       - name: Read the staged-release dependency pins
         id: pins
         run: |
@@ -339,8 +315,7 @@ jobs:
           bun install --frozen-lockfile
           bun run build
 
-      # Branching on the secret in bash — the `secrets` context is not
-      # available in `if:`. No app means every required package is public.
+      # In bash: the `secrets` context is not available in `if:`.
       - name: Decide whether a private-dependency token is needed
         id: need-token
         if: ${{ inputs.composer_install || steps.pins.outputs.any == 'true' }}
@@ -357,8 +332,6 @@ jobs:
             fi
             echo "app=true" >> "$GITHUB_OUTPUT"
           elif [ -n "${CK_COMPOSER_APP_ID:-}" ] || [ -n "${CK_COMPOSER_APP_PRIVATE_KEY:-}" ]; then
-            # Half a credential is a configuration mistake, and it would
-            # surface much later as an unexplained 404 on a private read.
             echo "composer_app_id and composer_app_private_key go together — one without the other is not an app" >&2
             exit 1
           else
@@ -374,16 +347,10 @@ jobs:
           private-key: ${{ secrets.composer_app_private_key }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ inputs.composer_app_repositories }}
-          # The token only ever reads: composer's private packages and the
-          # pinned dependency releases. Nothing here writes with it.
           permission-contents: read
 
-      # The credential stays on the runner. The smoke container is handed the
-      # verified bytes and never the token that fetched them — the same rule
-      # the sibling checkout follows in extension-ci.yml. Resolving by tag and
-      # asset name rather than by asset id matters: `gh release upload
-      # --clobber` in the publish job replaces an asset, and a replaced asset
-      # has a new id while tag, name and digest are unchanged.
+      # The token stays on the runner; the smoke container gets only verified bytes.
+      # By tag and asset name: `upload --clobber` gives a replaced asset a new id.
       - name: Stage the pinned dependency releases
         if: ${{ steps.pins.outputs.any == 'true' }}
         env:
@@ -404,25 +371,18 @@ jobs:
       - name: Bundle locked production dependencies
         if: ${{ inputs.composer_install }}
         env:
-          # The app token for private packages, else the run's own token: an
-          # unauthenticated runner hits GitHub's API rate limit on dist
-          # downloads and composer silently falls back to source clones.
+          # Unauthenticated, the rate limit makes composer fall back to source clones.
           CK_COMPOSER_TOKEN: ${{ steps.app.outputs.token || github.token }}
         run: |
           set -euo pipefail
-          # Private packages are declared by https://github.com/... URL; the
-          # token goes in as Composer's github-oauth credential.
           composer config -g github-oauth.github.com "$CK_COMPOSER_TOKEN"
 
-          # The lockfile is the dependency input; do not update it and do not
-          # bypass its PHP requirements. Repositories whose runtime PHP is newer
-          # than the runner declare config.platform.php, as in extension CI.
+          # The lockfile is the input: no update, no ignored platform requirements.
           composer install --no-dev --no-interaction --no-progress
           test -f vendor/autoload.php \
             || { echo 'composer_install produced no vendor/autoload.php' >&2; exit 1; }
 
-          # Apply ckrelease's one authoritative exclusion policy to development
-          # directories and config files nested inside Composer packages.
+          # ckrelease's exclusion list, applied inside the Composer packages.
           while IFS=' ' read -r kind relpath; do
             case "$kind" in
               dir)
@@ -434,29 +394,22 @@ jobs:
             esac
           done < <(php "$GITHUB_WORKSPACE"/.civikitchen-ci/toolbelt/bin/ckconform --dist-paths)
 
-          # A package composer installed from source carries its own .git;
-          # `git add` would record that as a gitlink (an empty entry in the
-          # archive) instead of the package's files. Strip them first.
+          # A nested .git would make `git add` record a gitlink, not the files.
           find vendor -name .git -prune -exec rm -rf -- {} +
 
-          # ckrelease archives Git objects, never a mutable working tree. Add
-          # vendor/ only to the disposable Actions index and archive that tree;
-          # the pushed tag itself remains untouched.
+          # ckrelease archives Git objects: vendor/ goes into the runner's index only.
           git add -f vendor
           echo "CK_RELEASE_REF=$(git write-tree)" >> "$GITHUB_ENV"
 
       - name: Build the distribution archive
         env:
-          # Outside the checkout on purpose: an extension repo may well track its
-          # own dist/ (a committed frontend build), and the release artifact must
-          # not land in the tree the archive is built from.
+          # Outside the checkout: a repo may track its own dist/.
           CK_DIST: ${{ runner.temp }}/ckrelease
           CK_RELEASE_VERSION: ${{ steps.key.outputs.version }}
           CK_DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
-          # dist refuses to build without its consistency check. A dry run builds
-          # the info.xml version and holds the changelog to the grammar only.
+          # A dry run builds the info.xml version and checks only the changelog grammar.
           args=()
           if [ "$CK_DRY_RUN" = true ]; then
             args+=(--dry-run)
@@ -494,9 +447,7 @@ jobs:
             echo "staged $key from this run"
           done < "$RUNNER_TEMP/release-siblings.txt"
 
-      # A release archive that has never been installed is a guess. This is the
-      # same stack extension-ci.yml runs in, minus the source mount: the site
-      # only ever sees the zip, which is what a user gets.
+      # The extension-ci stack without the source mount: the site sees only the zip.
       - name: Install smoke test
         if: ${{ inputs.smoke_test }}
         env:
@@ -509,16 +460,10 @@ jobs:
           CK_CIVIKITCHEN: ${{ github.workspace }}/.civikitchen-ci
         run: |
           set -euo pipefail
-          # Always directories, even with nothing staged: compose interpolates
-          # the paths on every call, and an unset variable is an invalid mount.
+          # Always created: compose interpolates the paths on every call.
           mkdir -p "$CK_DEPS" "$CK_SIBLINGS"
-          # The archive carries no civikitchen.yaml (a dev file, excluded by the
-          # central list), but the <requires> resolver reads extension_source
-          # pins from it. Its own directory, not $CK_DIST: that one is uploaded
-          # as the release artifact. A directory mount is fine when the file
-          # does not exist; a file mount would silently create a directory.
-          # One directory per extension key, the siblings' included: their
-          # <requires> are resolved from their own pins.
+          # The archive omits civikitchen.yaml, but the <requires> resolver reads its
+          # pins. Mounted per key as a directory: a missing file mount becomes a dir.
           mkdir -p "$CK_POLICY_DIR"
           sibling_keys=()
           while read -r key dir _; do
@@ -587,13 +532,8 @@ jobs:
             done
             chown -R www-data:www-data "${CK_EXT_DIR:-/var/www/html/ext}"'
 
-          # Rescan the container so the new directory is known, resolve the
-          # info.xml <requires> the way the entrypoint does for a mounted
-          # extension (registry download, or the extension_source pin), then
-          # install for real — this is where a missing <requires>, a broken
-          # upgrader or a PHP file the exclude list swallowed by mistake
-          # actually shows up. The same-repository extensions first: enabling
-          # this one installs them, and by then their own requires are in place.
+          # Rescan, resolve <requires> as the entrypoint does, then install for real.
+          # Same-repository extensions first, so their own requires are in place.
           docker compose -f smoke-compose.yml exec -T -u www-data -e CK_CLI=/ck-civikitchen/toolbelt/bin/ck \
             -e "CK_EXT_KEY=$CK_EXT_KEY" -e "CK_SIBLING_KEYS=${sibling_keys[*]}" app bash -c '
             set -eu
@@ -603,9 +543,7 @@ jobs:
             done
             cv ext:enable "$CK_EXT_KEY"'
 
-          # Same status assertion the lifecycle smoke in extension-ci.yml uses:
-          # `cv ext:enable` can succeed on a site where the extension still ends
-          # up something other than installed.
+          # `cv ext:enable` can succeed while the extension ends up not installed.
           status=$(docker compose -f smoke-compose.yml exec -T -u www-data \
             -e "CK_EXT_KEY=$CK_EXT_KEY" app bash -c \
             'cv ev "echo CRM_Extension_System::singleton()->getManager()->getStatus(getenv(\"CK_EXT_KEY\"));"' \
@@ -613,17 +551,14 @@ jobs:
           [ "$status" = installed ] \
             || { echo "smoke: extension ended up [$status], expected [installed]" >&2; exit 1; }
 
-      # A failed stack is a stack trace of nothing without its logs.
       - name: App logs on failure
         if: ${{ failure() && inputs.smoke_test }}
         run: |
           [ -f smoke-compose.yml ] || exit 0
           docker compose -f smoke-compose.yml logs app | tail -200
 
-      # On a self-hosted runner the stack outlives the job otherwise — with its
-      # database — and the next job on that host inherits the memory pressure.
-      # By label rather than `compose down`: the compose file may not exist yet
-      # when an earlier step failed.
+      # A self-hosted runner keeps the stack otherwise. By label: the compose
+      # file may not exist when an earlier step failed.
       - name: Tear down the smoke stack
         if: ${{ always() && inputs.smoke_test }}
         run: |
@@ -633,8 +568,7 @@ jobs:
           docker network ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker network rm
           docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | xargs -r docker volume rm
 
-      # Named by extension key: every build job of a run uploads one, and the
-      # publish job collects them all by the prefix.
+      # Per extension key; the publish job collects them by prefix.
       - name: Upload the archive
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -648,7 +582,6 @@ jobs:
     needs: dist
     if: ${{ !cancelled() && inputs.stage != 'build' && (needs.dist.result == 'success' || (inputs.stage == 'publish' && needs.dist.result == 'skipped')) }}
     runs-on: ${{ inputs.runs_on || vars.CK_RUNS_ON || 'ubuntu-latest' }}
-    # The only job that writes anything, and the only one with a token that can.
     permissions:
       contents: write
     steps:
@@ -687,10 +620,8 @@ jobs:
           fi
           (cd "$CK_DIST" && sha256sum --check --strict ./*.sha256)
 
-      # The notes are the version's CHANGELOG.md section, which dist already
-      # checked; a release that exists is re-runnable (upload --clobber).
-      # The checkout is shallow without tags; the API lists them. Left to gh, a
-      # late release of an older version or a pre-release takes Latest by date.
+      # Notes are the version's CHANGELOG.md section. Latest is computed from the
+      # API's tag list: left to gh, a late older release takes Latest by date.
       - name: Publish the GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -756,8 +687,7 @@ jobs:
               "${args[@]}" "$CK_DIST"/*
           fi
 
-      # After the GitHub release, so a mirror that is down leaves a release to
-      # re-run rather than none. Full history: the mirror receives the branch.
+      # After the GitHub release, so a mirror outage leaves a release to re-run.
       - name: Check out the release for the mirror
         if: ${{ inputs.mirror_url != '' && !inputs.dry_run }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

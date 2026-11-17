@@ -1,22 +1,9 @@
-# Build, test and promote single-container demo images (embedded MariaDB,
-# baked demo data) from the docker/buildkit/Dockerfile `demo` target, then scan
-# them. Called by build-dev-images.yml for standalone-demo and by
-# build-cms-images.yml for the CMS demo flavors, so the two pipelines share one
-# definition and cannot cancel each other.
+# Build, test, scan and promote single-container demo images (embedded MariaDB,
+# baked demo data) from the docker/buildkit/Dockerfile `demo` target. Called by
+# build-dev-images.yml (standalone-demo) and build-cms-images.yml (CMS flavors).
 #
-# Profiles (e.g. common) are not baked into a separate image — they apply at
-# first boot via CIVIKITCHEN_PROFILE, so there is exactly one demo image per
-# flavor. joomla-demo has the same profile support as the others: the bake
-# finishes civibuild's deliberately-incomplete joomla-demo install (it leaves
-# the Joomla component registration as a commented-out "#fixme" and enables
-# only civi_contribute) by registering CiviCRM's Joomla plugins and enabling
-# the standard component extensions. authx's password/basic-auth flow does not
-# work on Joomla, so its profile boot test exercises the api_key credential only.
-#
-# drupal11-demo uses a site type civibuild doesn't ship: CiviKitchen vendors it
-# in docker/buildkit/site-types/drupal11-demo/ (drupal10-demo's recipe with the
-# Drupal 11.4 adaptations documented there); bake.sh installs it into the
-# buildkit clone before `civibuild create`.
+# Profiles apply at first boot via CIVIKITCHEN_PROFILE: one demo image per flavor.
+# On Joomla authx basic auth does not work, so its profile test uses api_key only.
 name: Build demo images
 
 on:
@@ -124,9 +111,7 @@ jobs:
     with:
       tags: ${{ toJSON(fromJSON(inputs.variants).*.name) }}
 
-  # The profile legs exercise the runtime profile path on every flavor: first
-  # boot installs the profile extensions, seeds demo data, and creates API
-  # users (via each CMS's native PHP APIs — no drush/wp-cli).
+  # The profile legs boot every flavor with a profile: extensions, demo data, API users.
   smoke-test:
     needs: merge
     runs-on: ${{ matrix.runner }}

@@ -1,22 +1,6 @@
 # Trivy scan of this run's candidate images, one job per image and platform.
-#
-# What is IN the images, as opposed to what the extension workflow's
-# osv-scanner job covers (an extension's own lockfiles): the Debian base, the
-# PHP packages, CiviCRM's vendored composer tree, the node bits the dev tools
-# bring. Nobody writes those into a lockfile in this repo, so nothing else
-# here would ever notice a base-image CVE — and these images are what eleven
-# repos boot their CI on and what developers run locally.
-#
-# A promotion gate: every promote job needs the scan of its own family, so no
-# moving tag points at a digest whose gate scan did not pass. It runs beside
-# the tests, right after the merge. A fixable HIGH/CRITICAL finding keeps the
-# last good image live until trivyignore.yaml or an upstream rebuild clears it.
-#
-# `resolve` reads each candidate tag's digest once; the scan legs scan exactly
-# those digests, and the `digests` output is what promote publishes. A
-# candidate tag overwritten later (another run on the same commit) cannot slip
-# an unscanned digest into a moving tag. Called per image family after its
-# merge, so an image that was never built is never scanned.
+# A promotion gate: promote publishes exactly the `digests` resolved and
+# scanned here, never a re-read tag.
 name: Scan candidate images
 
 on:
@@ -85,11 +69,8 @@ jobs:
       packages: read
 
     strategy:
-      # One flavor's CVE must not hide the report for the others. Platform
-      # is a real dimension, not a formality: the published manifests carry
-      # amd64 AND arm64, whose base/OS layers resolve packages independently —
-      # scanning one arch says nothing about a CVE that only ships in the
-      # other's build of the same library.
+      # One flavor's CVE must not hide the others' reports. Each arch resolves
+      # its packages independently, so both are scanned.
       fail-fast: false
       matrix:
         tag: ${{ fromJSON(inputs.tags) }}
@@ -108,47 +89,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Version, architecture selection and the release checksums live in the
-      # shared installer — the image and extension security jobs execute the
-      # same verified binary contract instead of carrying independent pins.
       - name: Install trivy
         run: .github/scripts/install-trivy.sh
 
-      # The scan target is the DIGEST `resolve` pinned, never the tag: a tag
-      # re-resolves at scan time, and only the digest is what promote publishes.
-      #
-      # The gate, and the only run whose exit code matters:
-      #   --ignore-unfixed  nothing upstream has patched yet is not something a
-      #                     rebuild here can fix; a gate that cannot be met
-      #                     teaches people to ignore it.
-      #   --severity HIGH,CRITICAL  the rest belongs in the report below.
-      #   --scanners vuln   this job is about CVEs. Trivy's secret scanner is on
-      #                     by default and would block on findings
-      #                     --ignore-unfixed cannot apply to; secret scanning is
-      #                     a separate concern with a separate answer
-      #                     (docs/extension-standards.md).
-      # --image-src remote: the image is in the registry, not in this runner's
-      # docker daemon, and the default source order would try three local
-      # backends first.
-      #
-      # Central exceptions go in trivyignore.yaml in the repository root, named
-      # explicitly because trivy auto-loads only the plain .trivyignore — the
-      # YAML format is still flagged experimental upstream. It buys per-entry
-      # `paths` scoping and a real `expired_at` (an expired entry is pruned, so
-      # the finding comes back and the gate goes red). See the file itself.
+      # The gate scans the digest `resolve` pinned. --scanners vuln: the secret
+      # scanner would block on findings --ignore-unfixed cannot apply to.
+      # trivyignore.yaml is named explicitly: trivy auto-loads only .trivyignore.
       - name: Scan the published image (gate)
         env:
           IMAGE_REF: ${{ env.IMAGE_PREFIX }}@${{ fromJSON(needs.resolve.outputs.digests)[matrix.tag] }}
           PLATFORM: ${{ matrix.platform }}
         run: .github/scripts/trivy-scan-gate.sh
 
-      # The same image without any of the filters, exit code 0, into the job
-      # summary. The gate above answers "is there anything to do?"; this answers
-      # "what is actually in there" — including the unfixed and the low-severity
-      # findings a policy deliberately does not block on, which is the part you
-      # want when triaging one that starts to matter. Runs even when the gate
-      # went red (that is when it is most useful), and skips the database
-      # download the gate just did.
+      # Unfiltered, exit code 0, into the job summary; runs when the gate is red too.
       - name: Full report into the job summary
         if: ${{ !cancelled() }}
         env:

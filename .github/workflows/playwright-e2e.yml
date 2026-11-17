@@ -63,26 +63,18 @@ on:
         default: ''
       sibling_repo:
         description: >-
-          Second extension repo (`owner/repo`, or `owner/repo@ref` to pin a
-          tag, branch or full commit — a tag keeps old runs reproducible and a
-          sibling's main from reddening every consumer) checked out to
-          .civikitchen-siblings/ and mounted read-only beside this one, under
-          the key from ITS info.xml — for extensions implementing a sibling's
-          interfaces. The prepare/test/cleanup commands address it through
-          CK_SIBLING_DIR (absolute path), CK_SIBLING_KEY (that extension key)
-          and CK_SIBLING_OVERRIDE (a compose override file that bind-mounts it
-          read-only). A sibling whose composer.lock carries runtime packages
-          gets `composer install --no-dev` first, and one declaring
-          policy.dist.build its build (on node_version); a private sibling or
-          package needs the composer_app_* secrets. Empty mounts nothing.
+          Second extension repo (`owner/repo` or `owner/repo@ref`), checked
+          out to .civikitchen-siblings/ and mounted read-only beside this one.
+          The commands reach it through CK_SIBLING_DIR, CK_SIBLING_KEY and
+          CK_SIBLING_OVERRIDE (a compose override file). A private sibling
+          needs the composer_app_* secrets.
         type: string
         default: ''
       composer_app_repositories:
         description: >-
           Comma- or newline-separated repository names within the caller's
           owner that the GitHub App token may read. Required whenever the app
-          secrets are supplied for private Composer packages or a private
-          sibling; list only the repositories actually needed by this run.
+          secrets are supplied.
         type: string
         default: ''
 
@@ -90,14 +82,12 @@ on:
       composer_app_id:
         description: >-
           App ID of a GitHub App with `contents: read`, installed on the
-          private dependency repos (composer packages, sibling). Optional —
-          without it composer resolves what is public and the sibling checkout
-          uses the caller-scoped token (404 for private).
+          private dependency repos.
         required: false
       composer_app_private_key:
         description: >-
-          Private key (PEM) of that app. Used once on the runner to mint a
-          short-lived installation token; never enters a container.
+          Private key (PEM) of that app. Mints a short-lived token on the
+          runner; never enters a container.
         required: false
 
 permissions:
@@ -119,11 +109,8 @@ jobs:
         with:
           persist-credentials: false
 
-      # One compose project per CALL, not per run: a caller that runs this
-      # workflow twice in one run (two identity providers, say) lands both
-      # copies on the same Docker host of a multi-slot self-hosted runner, and
-      # with one shared name the first `down` kills the other job's stack.
-      # The test command is what differs between the calls.
+      # One compose project per call, keyed by the test command: two calls in one
+      # run may share a Docker host, and a shared name's `down` kills both stacks.
       - name: Compose project name
         env:
           CK_COMMAND: ${{ inputs.test_command }}
@@ -139,12 +126,8 @@ jobs:
           [[ "$CK_SIBLING_REPO" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*(@[A-Za-z0-9][A-Za-z0-9._/-]*)?$ ]] \
             || { echo "invalid sibling_repo (expected owner/repo or owner/repo@ref): $CK_SIBLING_REPO" >&2; exit 1; }
 
-      # The private-dependency steps are shared with the extension CI jobs, so
-      # they live in this repository as a composite action — and a reusable
-      # workflow reaches its own repository only by checking it out at the SHA
-      # it was resolved from. `uses: ./…` alone would resolve against the
-      # CALLING repository. Under .civikitchen-siblings/, the one directory the
-      # extension scanner skips and cklint ignores. It also carries `ck playwright`.
+      # `uses: ./…` resolves against the calling repo, so this repo is checked out
+      # at the workflow SHA, under the dot directory the extension scanner skips.
       - name: Check out civikitchen for ck playwright and the private-dependency steps
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -241,11 +224,8 @@ jobs:
           CK_COMMAND: ${{ inputs.cleanup_command }}
         run: bash -euo pipefail -c "$CK_COMMAND"
 
-      # Tests that run inside Docker leave root-owned reports and bind-mount
-      # directories behind. On a self-hosted runner the next actions/checkout
-      # cannot delete those and the whole job fails before it starts — hand
-      # the workspace back to the runner user, with the same Docker that
-      # created the files (no sudo needed).
+      # Docker leaves root-owned files that the next checkout on a self-hosted
+      # runner cannot delete; hand the workspace back without sudo.
       - name: Restore workspace ownership
         if: ${{ always() }}
         run: |

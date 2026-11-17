@@ -1,7 +1,5 @@
 # Publish packages/civicrm-profile-schema to GitHub Packages (@civico-de scope).
-# Trigger by pushing a tag like `civicrm-profile-schema-v0.1.0`. Keep the tag
-# version in sync with the package.json version. Uses the built-in GITHUB_TOKEN
-# (packages: write) — no extra secret.
+# Triggered by a tag like `civicrm-profile-schema-v0.1.0`, matching package.json.
 name: publish-schema
 
 on:

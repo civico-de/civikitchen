@@ -1,10 +1,6 @@
 # The CMS flavors: drupal10, drupal11, wordpress, joomla, backdrop and their -demo
-# images. They do not gate a release (docs/releases.md): build-dev-images.yml
-# builds the standalone images a release needs, and a release attaches a CMS
-# flavor's tags only once this workflow has promoted a matching image.
-#
-# Daily and on dispatch, no push trigger: a broken COPY or Dockerfile is caught
-# on the pull request by image-build-gate.yml.
+# images. They do not gate a release (docs/releases.md). No push trigger:
+# image-build-gate.yml catches a broken Dockerfile on the pull request.
 name: Build CMS Images
 
 on:
@@ -76,9 +72,7 @@ jobs:
       contents: read
       packages: write
 
-    # Buildkit-backed CMS dev images. They all share docker/buildkit; the only
-    # difference is DEFAULT_SITE_TYPE, which sets the civibuild site type the
-    # entrypoint creates on first run.
+    # All share docker/buildkit; DEFAULT_SITE_TYPE picks the civibuild site type.
     strategy:
       matrix:
         variant: ${{ fromJSON(needs.resolve-civicrm.outputs.buildkit) }}
@@ -110,9 +104,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Test-then-promote: only sha-suffixed candidate tags here; the stable
-      # tags (:drupal10, :drupal11, :wordpress, :joomla, :backdrop, :*-php8.3) are
-      # created by promote-buildkit after the smoke tests pass.
+      # Only sha-suffixed candidates; promote-buildkit moves the stable tags.
       - name: Build and push ${{ matrix.variant.name }} candidate image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -187,9 +179,7 @@ jobs:
         run: .github/scripts/buildkit-boot-test.sh
 
   e2e-test-buildkit:
-    # Runs each CMS example compose stack with the candidate image and exercises
-    # it in real Chromium. This complements boot-test.sh's cv/API assertions by
-    # catching browser-visible Apache/SITE_URL/asset failures.
+    # Each CMS example stack in Chromium: Apache, SITE_URL and asset failures.
     needs: [resolve-civicrm, smoke-test-buildkit]
     runs-on: ubuntu-24.04
     permissions:

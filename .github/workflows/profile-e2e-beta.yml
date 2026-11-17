@@ -1,7 +1,5 @@
-# Weekly: the bundled extension stacks on :standalone-beta, the head of core's
-# newest release branch, through the profile browser suites, so an upcoming
-# CiviCRM release that breaks them shows up before it ships. Reports only: a
-# failure opens an issue and holds back no image.
+# Weekly: the profile browser suites on :standalone-beta (core's newest release
+# branch). Reports only: a failure opens an issue and holds back no image.
 name: Profile E2E (beta)
 
 on:
