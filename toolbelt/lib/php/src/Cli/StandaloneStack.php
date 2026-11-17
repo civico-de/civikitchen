@@ -32,10 +32,11 @@ final class StandaloneStack
         return trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower($tag)), '-');
     }
 
+    /** A bind mount as compose takes it; :ro keeps the container from writing to the host path. */
     public static function mount(string $value): string
     {
-        if (preg_match('#^/[^:]*:/[^:]+$#', $value) !== 1) {
-            throw new RuntimeException("--mount takes <absolute host path>:<container path>, not {$value}");
+        if (preg_match('#^/[^:]*:/[^:]+(:ro)?$#', $value) !== 1) {
+            throw new RuntimeException("--mount takes <absolute host path>:<container path>[:ro], not {$value}");
         }
         return $value;
     }

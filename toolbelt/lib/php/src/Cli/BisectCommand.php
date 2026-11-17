@@ -30,7 +30,8 @@ ck bisect — find the civicrm-core commit at which a check starts to fail
   --bad <rev>          a commit on which it fails
   --dir <name>         a directory of the checkout to mount over the image's copy
                        (repeatable), e.g. --dir CRM --dir Civi --dir ext/afform
-  --mount <src>:<dst>  mount a host path outside the checkout into the app container
+  --mount <src>:<dst>[:ro]
+                       mount a host path outside the checkout into the app container
                        (repeatable), e.g. the extension whose test is the check
   --locales <list>     install these core language files, e.g. it_IT,fr_FR
   --name <project>     compose project name (default: ck-bisect-<tag>)

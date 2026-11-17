@@ -142,8 +142,13 @@ ck run standalone-6.16 --name bug-1234 --keep -- cv api4 Contact.get
 The image is a civikitchen tag or a full image name. `--mount` puts a host
 path into the app container, such as a directory of a civicrm-core checkout
 over the image's copy; the path must lie under `$HOME`, the civikitchen
-checkout or the current git work tree. The command runs as www-data from
-`/var/www/html`, and its exit status is the status of `ck run`.
+checkout or the current git work tree. A trailing `:ro` mounts it read-only.
+The command runs as www-data from `/var/www/html`, and its exit status is the
+status of `ck run`.
+
+On a release image, `ckcoretest` fetches the tag's `tests/` and the suites
+under `ext/*/tests`. A mounted directory keeps its own tests: an extension
+mounted from a checkout runs the tests of that checkout.
 
 The images carry no core language files, so CiviCRM offers only en_US.
 `--locales de_DE,es_MX,fr_CA,fr_FR,it_IT,nl_NL` installs those at boot, as
@@ -172,8 +177,18 @@ Each side is an image reference or a civikitchen tag
 ([Tags and versions](images.md#tags-and-versions)). The command runs in each
 app container as `www-data`, from `/var/www/html`. `--mount <src>:<dst>` puts
 a host path into both containers; Docker must share it, so keep it under
-`$HOME` on colima and Docker Desktop. `--locales` installs core language files
-in both, as with `ck run`.
+`$HOME` on colima and Docker Desktop. `--mount-a` and `--mount-b` mount into
+one side only; with them both sides may be the same image, for example a
+release image with the base and the fixed work tree of a branch that has no
+image of its own:
+
+```bash
+ck ab standalone standalone --mount "$HOME/fix/tests:/var/www/html/core/tests:ro" \
+  --mount-a "$HOME/base/CRM:/var/www/html/core/CRM:ro" --mount-b "$HOME/fix/CRM:/var/www/html/core/CRM:ro" \
+  -- ckcoretest --log-junit /tmp/ck-ab.xml tests/phpunit/CRM/Core/FooTest.php
+```
+
+`--locales` installs core language files in both, as with `ck run`.
 
 When the command writes a JUnit report to `/tmp/ck-ab.xml`, `ck ab` compares
 per test and lists four groups: pass on A and fail on B, fail on A and pass on

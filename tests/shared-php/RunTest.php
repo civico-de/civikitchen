@@ -15,12 +15,12 @@ final class RunTest extends TestCase
         $runner = new RunRunner();
         $runner->status = 3;
 
-        [$status, $output] = $this->runCommand($runner, ['standalone-master', '--mount', '/src/core/tests:/var/www/html/core/tests', '--', 'ckcoretest', 'tests/phpunit/api/v4/Query']);
+        [$status, $output] = $this->runCommand($runner, ['standalone-master', '--mount', '/src/core/tests:/var/www/html/core/tests', '--mount', '/src/core/CRM:/var/www/html/core/CRM:ro', '--', 'ckcoretest', 'tests/phpunit/api/v4/Query']);
 
         self::assertSame(3, $status);
         self::assertSame('ck-run-standalone-master', $runner->config['name']);
         self::assertSame(self::IMAGE . 'standalone-master', $runner->config['services']['app']['image']);
-        self::assertSame(['/src/core/tests:/var/www/html/core/tests'], $runner->config['services']['app']['volumes']);
+        self::assertSame(['/src/core/tests:/var/www/html/core/tests', '/src/core/CRM:/var/www/html/core/CRM:ro'], $runner->config['services']['app']['volumes']);
         self::assertArrayNotHasKey('CIVIKITCHEN_LOCALES', $runner->config['services']['app']['environment']);
         self::assertSame(['exec', '-T', '-u', 'www-data', '-w', '/var/www/html', 'app', 'ckcoretest', 'tests/phpunit/api/v4/Query'], $runner->ran);
         self::assertStringContainsString('standalone-master (CiviCRM 6.18.alpha1, civicrm-core master abc1234): ckcoretest', $output);

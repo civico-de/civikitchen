@@ -17,7 +17,8 @@ ck run — run a command in a fresh Standalone stack of one CiviCRM version
 
   <image>              a Standalone image, or a civikitchen tag such as standalone-6.16,
                        standalone, standalone-beta or standalone-master
-  --mount <src>:<dst>  mount a host path into the app container (repeatable), e.g. a
+  --mount <src>:<dst>[:ro]
+                       mount a host path into the app container (repeatable), e.g. a
                        directory of a civicrm-core checkout over /var/www/html/core/<dir>
   --locales <list>     install these core language files, e.g. it_IT,fr_FR
                        (sets CIVIKITCHEN_LOCALES; default: en_US only)

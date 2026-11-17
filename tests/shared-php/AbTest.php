@@ -142,12 +142,29 @@ final class AbTest extends TestCase
         $this->ab($runner, ['standalone', 'standalone-master', '--out', $this->out, '--', 'true']);
     }
 
+    public function testMountsPerSideCompareTwoTreesOnOneImage(): void
+    {
+        $runner = new AbRunner();
+        $runner->status = ['a' => 0, 'b' => 1];
+
+        [$status] = $this->ab($runner, ['standalone', 'standalone', '--mount', '/src/tests:/var/www/html/core/tests:ro',
+            '--mount-a', '/src/base/CRM:/var/www/html/core/CRM:ro', '--mount-b', '/src/fix/CRM:/var/www/html/core/CRM:ro', '--out', $this->out, '--', 'true']);
+
+        self::assertSame(1, $status);
+        self::assertSame(['/src/tests:/var/www/html/core/tests:ro', '/src/base/CRM:/var/www/html/core/CRM:ro'],
+            $runner->configs['ck-ab-standalone-vs-standalone-a']['services']['app']['volumes']);
+        self::assertSame(['/src/tests:/var/www/html/core/tests:ro', '/src/fix/CRM:/var/www/html/core/CRM:ro'],
+            $runner->configs['ck-ab-standalone-vs-standalone-b']['services']['app']['volumes']);
+    }
+
     public function testRejectsWhatItCannotCompare(): void
     {
         $cases = [
             [['standalone', 'standalone-beta'], 'which check?'],
             [['standalone', '--', 'true'], 'two images, got 1'],
             [['standalone', 'standalone', '--', 'true'], 'nothing to compare'],
+            [['standalone', 'standalone', '--mount-a', '/a:/b', '--mount-b', '/a:/b', '--', 'true'], 'same mounts; nothing to compare'],
+            [['standalone', 'standalone-beta', '--mount', '/a:/b:rw', '--', 'true'], '--mount takes'],
             [['standalone', 'standalone-beta', '--mount', 'ext:/var/www', '--', 'true'], '--mount takes'],
             [['standalone', 'standalone-beta', '--locales', 'it', '--', 'true'], '--locales takes'],
             [['standalone', 'standalone-beta', '--cms', 'all', '--', 'true'], 'unknown option --cms'],

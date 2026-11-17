@@ -14,6 +14,12 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- `ck run`, `ck ab` and `ck bisect` take `:ro` at the end of a `--mount`.
+- `ck ab --mount-a` and `--mount-b` mount into one side only; with them both
+  sides may be the same image, to compare two work trees of a branch.
+
 ### Fixed
 
 - `ckcoretest` on a release image keeps the tests of a mounted directory. It
