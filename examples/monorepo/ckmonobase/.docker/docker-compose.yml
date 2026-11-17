@@ -95,7 +95,7 @@ services:
   # app's network so MinkBase reaches it at localhost:9222.
   browser:
     profiles: [browser]
-    image: chromedp/headless-shell:152.0.7939.3
+    image: chromedp/headless-shell:158.0.8127.18
     network_mode: service:app
     # With the default 64 MB /dev/shm Chrome drops script loads
     # (net::ERR_INSUFFICIENT_RESOURCES).
