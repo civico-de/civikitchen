@@ -16,7 +16,7 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Changed
 
-- **Breaking**: `policy.vendor` in `civikitchen.yaml` takes only
+- `policy.vendor` in `civikitchen.yaml` takes only
   `{mode: committed, reason: …}`. A plain string no longer validates:
   `vendor: committed` carried no reason, and any other string had no effect.
 
