@@ -35,8 +35,8 @@ files, CI and release workflows, phpstan and phpunit config, and a first test.
 For an existing civix extension, `scaffold/ckinit <dir>` adds the same files.
 
 ckup starts CiviCRM Standalone with MariaDB and Maildev and enables the
-extension; phpMyAdmin is opt-in (`COMPOSE_PROFILES=pma` in `.docker/.env`). ckx runs a command in the stack, in the extension's
-directory. The image carries cv, civix, composer, node, phpunit, phpstan, mago,
+extension; phpMyAdmin is opt-in (`COMPOSE_PROFILES=pma` in `.docker/.env`).
+ckx runs a command in the stack, in the extension's directory. The image carries cv, civix, composer, node, phpunit, phpstan, mago,
 xdebug and the ck tools. Browser suites run in Docker as well:
 `../civikitchen/scaffold/ck playwright npm run test:e2e` builds an image
 with the browsers and the repository's npm or Bun tree, so the host needs
@@ -157,6 +157,7 @@ after their tests pass. Extensions pin the v1 release tags.
 |----------|----------|
 | [Images](docs/images.md) | Flavors, demo images, profiles, tags, database compatibility, custom versions |
 | [Configuration](docs/configuration.md) | Environment variables the images read |
+| [Known upstream bugs](docs/upstream-bugs.md) | Core and extension bugs the image tests mark until the fix ships |
 | [Core development](docs/core-development.md) | ckcoretest, unreleased core branches, mounting a core checkout, comparing versions, bisecting, before/after recordings |
 | [Extension development](docs/extension-development.md) | Dev stack, tests, civix, analysis, Playwright, debugging |
 | [Extension standards](docs/extension-standards.md) | What the gates enforce and why |
@@ -165,7 +166,7 @@ after their tests pass. Extensions pin the v1 release tags.
 | [Seed snapshots](docs/seed-snapshots.md) | Seeding once, restoring the dump on every fresh boot, the date shift |
 | [Releasing an extension](docs/extension-releases.md) | ckrelease and the release workflow |
 | [Releases](docs/releases.md) | How civikitchen itself is versioned |
-| [Building locally](docs/building.md) | The test and lint loop, build arguments, tool pins, image tests |
+| [Building locally](docs/building.md) | The test and lint loop, build arguments, tool pins, image tests, the CLI image |
 | [Architecture](docs/implementation-architecture.md), [ADRs](docs/adr/) | Design decisions; [mago](docs/mago-consolidation.md) and [core types](docs/core-types.md) background |
 | [Changelog](CHANGELOG.md) | Changes per release |
 

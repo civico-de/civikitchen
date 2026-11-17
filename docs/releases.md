@@ -1,16 +1,27 @@
 # Releases: one versioned contract
 
-This page covers how this repo is versioned. For how an extension repo cuts
-its own release, see [Releasing an extension](extension-releases.md).
+This page covers how civikitchen itself is versioned and released. For how an
+extension repo cuts its own release, see
+[Releasing an extension](extension-releases.md).
 
 Extension repos depend on four things from this repo that only work as a set:
 the reusable workflow `.github/workflows/extension-ci.yml`, the extension
 template in `scaffold/template/extension/`, the ckinit script that stamps it,
-and the images that hold cklint, ckconform, ckcoverage, PHPStan and CiviCRM.
-Versioned separately, a repo could run last week's workflow against this
-week's template. So they are released together, and a consumer pins one
-version. [ADR-0001](adr/0001-one-versioned-contract-pinned-at-v1.md) explains
-why the contract has a moving v1 tag and what that costs.
+and the images that hold the ck tools, the analysers and CiviCRM. They are
+released together, and a consumer pins one version.
+[ADR-0001](adr/0001-one-versioned-contract-pinned-at-v1.md) explains the
+moving v1 tag and what it costs.
+
+| Section | Covers |
+|---|---|
+| [What a version names](#what-a-version-names) | The git and image tags a release creates |
+| [What a consumer pins](#what-a-consumer-pins) | The two pins in a templated extension |
+| [Images are retagged, not rebuilt](#images-are-retagged-not-rebuilt) | Which image builds gate a release and how they are checked |
+| [Cutting a release](#cutting-a-release) | Changelog, `scripts/release.sh`, what the tag push does |
+| [Catching up a CMS flavor](#catching-up-a-cms-flavor) | Re-running a release for a flavor it left out |
+| [Versioning rules](#versioning-rules) | Patch, minor, major |
+| [The canary](#the-canary) | The one repo on the moving edge |
+| [Bootstrapping order (once)](#bootstrapping-order-once) | The first release, and the GitHub App that moves the major tag |
 
 ## What a version names
 
@@ -23,15 +34,16 @@ A release is a git tag on this repo plus the image tags that go with it.
 | `:v1.4.2`, `:v1` | image | the standalone dev image, which the template's compose stacks use |
 | `:standalone-v1.4.2`, `:standalone-v1` | image | the same digest, spelled with its flavor |
 | `:drupal10-v1`, `:wordpress-v1`, `:joomla-demo-v1`, … | image | every other published flavor, with and without the patch level, once it has [caught up](#catching-up-a-cms-flavor) |
-| `:standalone`, `:drupal10`, `:*-demo`, … | image | the **moving edge**: whatever last passed test-then-promote |
+| `civikitchen-cli:v1.4.2`, `civikitchen-cli:v1` | image | the [CLI image](building.md#ck-without-a-checkout) of the release |
+| `:standalone`, `:drupal10`, `:*-demo`, `civikitchen-cli:latest`, … | image | the **moving edge**: whatever last passed test-then-promote |
 
-The moving tags stay as they are and follow the daily rebuild. The
+A release leaves the moving tags alone; they follow the daily rebuild. The
 standalone-master and standalone-beta images from *Build Git Images* get no
 release tags.
 
 ## What a consumer pins
 
-The template sets both pins for you. In `.github/workflows/ci.yml`:
+The template sets both pins. In `.github/workflows/ci.yml`:
 
 ```yaml
 jobs:
@@ -53,35 +65,34 @@ pinned: v1, main or a SHA.
 
 A release builds nothing. The release workflow attaches the release tags to
 the digest each moving tag points at, so a released image has already passed
-its tests and vulnerability scan before promotion.
+its tests and vulnerability scan before promotion. A release can therefore
+only ship image content that is already live.
 
-It follows that a release can only ship image content that is already live.
-Only standalone and standalone-demo gate a release. *Build Dev Images* builds
-them on every push to the image paths, daily and on dispatch:
+| Images | Built by | In a release |
+|---|---|---|
+| standalone, standalone-demo, civikitchen-cli | *Build Dev Images*: on every push to the image paths, daily and on dispatch | Gate it: a mismatch fails the release |
+| drupal10, drupal11, wordpress, joomla, backdrop and their demos | *Build CMS Images*: daily and on dispatch, in their own concurrency group | Never block it: a mismatch or a missing live image gives a warning and no release tags; they [catch up](#catching-up-a-cms-flavor) later |
+
+To build the gating images now:
 
 ```bash
 gh workflow run build-dev-images.yml
 ```
 
-A new push or dispatch cancels the run in progress, so the last commit wins. A
-run cancelled while promoting leaves some tags on the older commit until the
-next run.
+A new push or dispatch cancels the *Build Dev Images* run in progress, so the
+last commit wins. A run cancelled while promoting leaves some tags on the
+older commit until the next run.
 
-The CMS flavors (drupal10, drupal11, wordpress, joomla, backdrop and their demos) build
-in *Build CMS Images*, daily and on dispatch, in their own concurrency group.
-They never block a release: their tags catch up later.
-
-The release workflow compares the docker/, toolbelt/ and packages/ trees of
-the commit each live image was built from with the release commit's. A build
-commit it cannot determine counts as a mismatch. A mismatch on standalone or
-standalone-demo fails the release. A CMS flavor with a mismatch or without a
-live image gets a warning and no release tags. If the
-difference cannot affect the image, such as a comment-only change, re-run the
-release from the Actions tab with **allow_image_drift**.
+For each image, the release workflow compares the trees the image is built
+from with the release commit's: `docker/`, `toolbelt/` and `packages/` for the
+CiviCRM images, the sources the `cli` stage of `docker/cli/Dockerfile` copies
+for civikitchen-cli. A build commit it cannot determine counts as a mismatch.
+If the difference cannot affect the image, such as a comment-only change,
+re-run the release from the Actions tab with **allow_image_drift**.
 
 Between releases, :v1 keeps the CiviCRM the last release blessed while
-:standalone moves on. A CiviCRM refresh reaches the fleet only through a patch
-release, which costs one tag push, so cut them liberally.
+:standalone moves on. A CiviCRM refresh reaches consumers only through a patch
+release, which costs one tag push.
 
 Published vX.Y.Z image tags never move to a different digest. A re-run leaves
 every flavor this release already tagged as it is, so it is idempotent; a
@@ -98,11 +109,16 @@ bottom ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format). The
 release fails if the version has no section or Unreleased still has bullets.
 That section becomes the GitHub release body.
 
-The release script runs the gates the tag push would hit, before the tag
-exists: you are on a clean main in sync with origin, the tag is free locally
-and on origin, the changelog and ckinit tests pass, and the newest *Build Dev
-Images* run at or after the newest commit touching the image paths succeeded.
-The run the push started counts. Without APPLY it only reports.
+`scripts/release.sh` runs the gates the tag push would hit, before the tag
+exists:
+
+- you are on a clean main in sync with origin;
+- the tag is free locally and on origin;
+- the changelog and ckinit tests pass;
+- the newest *Build Dev Images* run at or after the newest commit touching
+  the image paths succeeded. The run the push started counts.
+
+Without `--apply` it only reports.
 
 ```bash
 git switch main && git pull
@@ -114,8 +130,8 @@ The tag push then
 
 1. verifies the live image digests as described above,
 2. attaches the release tags (v1.0.1 and the per-flavor spellings, and v1 if
-   v1.0.1 is the newest v1.x.y) to standalone, standalone-demo and every CMS
-   flavor whose live image matches,
+   v1.0.1 is the newest v1.x.y) to standalone, standalone-demo,
+   civikitchen-cli and every CMS flavor whose live image matches,
 3. moves the git v1 tag, but only if v1.0.1 is the newest v1.x.y,
 4. creates the GitHub release from the changelog section.
 
@@ -139,9 +155,11 @@ release: Actions, *Release*, Run workflow, with the tag `vX.Y.Z`. The run
 attaches the caught-up flavor's tags and leaves the flavors already tagged,
 the git tag and the GitHub release as they are. If main has changed those
 trees since the tag, no new image matches, and the flavor catches up with the
-next release instead. The flavor's `-v1` tag moves only if the release is the
-newest v1.x.y, like the git v1 tag. A re-run of an older release attaches only
-the patch tag. Release runs queue rather than overlap, and each reads origin's tags right
+next release instead.
+
+The flavor's `-v1` tag moves only if the release is the newest v1.x.y, like
+the git v1 tag. A re-run of an older release attaches only the patch tag.
+Release runs queue rather than overlap, and each reads origin's tags right
 before it decides which release is the newest.
 
 All CMS families build in one run, so one failing family holds back the
@@ -151,20 +169,18 @@ rest, and catch the skipped family up once its host is back.
 
 ### Versioning rules
 
-- **patch**: an image content refresh, a bug fix in a tool or the workflow,
-  doc changes.
-- **minor**: a new workflow input, template file, ckconform check or tool. A
-  change conforming repos must react to is also minor if every affected
-  consumer is adjusted before the tag; the changelog marks it **Breaking**.
-- **major**: a change consumers cannot absorb before the tag, such as a
-  dropped flavor or tag, or a contract that must run beside the old one.
+| Bump | For |
+|---|---|
+| patch | An image content refresh, a bug fix in a tool or the workflow, doc changes. |
+| minor | A new workflow input, template file, ckconform check or tool. A change conforming repos must react to is also minor if every affected consumer is adjusted before the tag; the changelog marks it **Breaking**. |
+| major | A change consumers cannot absorb before the tag, such as a dropped flavor or tag, or a contract that must run beside the old one. |
 
-Every v1 caller is a repo this project maintains, so fixing consumers is
-cheaper than a second v2 line.
+Every v1 caller is a repo this project maintains, which is what lets a
+breaking change ship as a minor.
 
 ## The canary
 
-One repo deliberately stays on the moving edge:
+One repo stays on the moving edge:
 
 ```yaml
 jobs:
@@ -186,9 +202,9 @@ policy:
 ```
 
 A workflow change that calls something new in the image turns the canary red
-until *Build Dev Images* has promoted :standalone. That is expected. Keep
-exactly one canary, one whose CI someone reads. Every other repo pins v1 and
-moves when a release is cut.
+until *Build Dev Images* has promoted :standalone. Keep exactly one canary,
+one whose CI someone reads. Every other repo pins v1 and moves when a release
+is cut.
 
 ## Bootstrapping order (once)
 
@@ -203,9 +219,9 @@ first time the order is fixed:
 
 A repo pointed at v1 before step 2 gets a run that cannot start at all.
 
-Before that first tag, create a GitHub App to move the major tag; the run's
-own token cannot move a tag onto a commit with different workflow files.
-Install it on this repository only, with Contents and Workflows read & write.
-Put its client id in the variable `RELEASE_APP_CLIENT_ID` and its private key
-in the secret `RELEASE_APP_PRIVATE_KEY`. The git-tag job fails when either is
-missing.
+Before that first tag, create the GitHub App that moves the major tag; the
+run's own token cannot
+move a tag onto a commit with different workflow files. Install it on this
+repository only, with Contents and Workflows read & write. Put its client id
+in the variable `RELEASE_APP_CLIENT_ID` and its private key in the secret
+`RELEASE_APP_PRIVATE_KEY`. The git-tag job fails when either is missing.

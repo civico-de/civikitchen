@@ -1,8 +1,31 @@
 # Images
 
-CiviKitchen publishes development and demo image flavors to
-`ghcr.io/civico-de/civikitchen`. The first-boot settings are in the
-[configuration reference](configuration.md).
+CiviKitchen publishes four kinds of image. The first three are tags of
+`ghcr.io/civico-de/civikitchen`; the CLI is a package of its own.
+
+| Image | Tags | Contents | Use it for |
+|---|---|---|---|
+| [Standalone (dev)](#standalone-dev) | `:standalone`, `:standalone-<minor>` | CiviCRM Standalone and the full toolchain; needs a MariaDB beside it | Extension development and CI |
+| [Buildkit flavors (dev)](#buildkit-flavors-dev) | `:drupal10`, `:drupal11`, `:wordpress`, `:joomla`, `:backdrop` | CiviCRM on a CMS, built by civibuild, with the same toolchain; needs a MariaDB beside it | CMS-specific behaviour |
+| [Demo](#demo-images) | `:standalone-demo`, `:<cms>-demo` | One container with an embedded MariaDB and baked demo data | Demos, evaluation, screenshots |
+| [CLI](#cli-image) | `civikitchen-cli` | ck's host commands and the docker CLI, no CiviCRM | Running ck without a checkout |
+
+Two more standalone tags, `:standalone-master` and `:standalone-beta`, are
+built daily from git for testing against unreleased core
+([Tags and versions](#tags-and-versions)).
+
+What applies to several of them:
+
+- [Profiles](#profiles-civikitchen_profile) add an extension stack, seed data
+  and API users at first boot, on every flavor.
+- [Toolbelt layout](#toolbelt-layout): where the tools sit in an image and
+  which user runs them.
+- [Tags and versions](#tags-and-versions): which tags move, which are pinned,
+  and what a build passes before it is promoted.
+- [Custom or older CiviCRM versions](#custom-or-older-civicrm-versions):
+  building an image for a version that is not published.
+
+The first-boot settings are in the [configuration reference](configuration.md).
 
 ## Standalone (dev)
 

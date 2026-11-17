@@ -1,5 +1,24 @@
 # CiviCRM core development
 
+This page covers testing and comparing changes to CiviCRM core itself: core's
+own test suites in a standalone stack, Standalone built from an unreleased
+branch, and the host commands that run a check across versions, find the
+commit that broke it, or record a change on screen.
+
+| Tool | Does | Runs |
+|---|---|---|
+| [`ckcoretest`](#core-test-suites-ckcoretest) | Core's own phpunit suites against the installed core; `--ext <name>` for a core extension, `--e2e` for [end-to-end tests](#end-to-end-tests), `--fetch-only` to fetch the tests without running them | In the app container |
+| [`ckeslint --core`](#type-checking-cores-javascript) | Type-checks core's JavaScript for upstream bug reports | In the app container |
+| [`make build CIVICRM_SOURCE=git`](#standalone-on-an-unreleased-branch) | Builds Standalone from any core branch, tag or commit; mounting a core checkout tests a change on it | Checkout |
+| [`ck run`](#one-command-on-one-version-ck-run) | One command in a fresh stack on one version | Host |
+| [`ck ab`](#comparing-two-versions-ck-ab) | The same command on two versions, compared per test | Host |
+| [`ck bisect`](#finding-the-commit-ck-bisect) | The core commit at which a check starts to fail | Host |
+| [`ck demo`](#recording-a-change-before-and-after-ck-demo) | Videos of a core change before and after, side by side, on one CMS or all | Host |
+
+The host commands run through `scaffold/ck`, which needs only Docker, or
+without a checkout through the
+[civikitchen-cli image](building.md#ck-without-a-checkout).
+
 ## Core test suites: `ckcoretest`
 
 To check a core patch or backport locally, run core's own phpunit suites with
@@ -28,10 +47,10 @@ It covers the headless PHP suites: api, CRM, Civi and the extensions. It
 refuses to run until `TEST_DB_DSN` is provisioned.
 
 A typical loop: patch the file under `/var/www/html/core`, then run
-`ckcoretest tests/phpunit/api/v4/Query`. Run the suites your patch touches and
-leave the rest to civicrm.org's Jenkins, which runs the full matrix on every
-core PR. Upgrade tests and the karma and qunit JavaScript tests need a
-buildkit/civibuild environment. That gap is accepted for the same reason.
+`ckcoretest tests/phpunit/api/v4/Query`. Run the suites your patch touches;
+civicrm.org's Jenkins runs the full matrix on every core PR. Upgrade tests and
+the karma and qunit JavaScript tests need a buildkit/civibuild environment and
+are left to that matrix.
 
 ### End-to-end tests
 
@@ -60,10 +79,6 @@ bundles or tests. Next to it go a `tsconfig.json` with `allowJs` and `checkJs`
 and a declaration file for the globals that core's pages load by script tag.
 Then it runs oxlint with `--type-check`, the correctness category and the
 APIv4 contract rule.
-
-To work with core's git history in a CMS site, build a buildkit image with
-`--build-arg KEEP_GIT=1`
-([Building locally](building.md#keeping-the-civicrm-git-history-keep_git1)).
 
 ## Standalone on an unreleased branch
 
@@ -109,13 +124,14 @@ Run `cv flush` after each toggle, or the Angular and asset caches keep the old
 files. A change to composer dependencies, or to anything outside the mounted
 directory, needs a rebuilt image.
 
+To work with core's git history in a CMS site, build a buildkit image with
+`--build-arg KEEP_GIT=1`
+([Building locally](building.md#keeping-the-civicrm-git-history-keep_git1)).
+
 ## One command on one version: `ck run`
 
 `ck run` boots a fresh Standalone stack from an image, runs one command in it
-and removes the stack with its volumes. It runs on the host through
-`scaffold/ck` and needs no compose file. Without a civikitchen checkout the
-[civikitchen-cli image](building.md#ck-without-a-checkout) runs the same
-`ck run`, `ck ab`, `ck bisect` and `ck demo` command lines.
+and removes the stack with its volumes. It needs no compose file.
 
 ```bash
 ck run standalone-master -- ckcoretest tests/phpunit/api/v4/Query
@@ -145,7 +161,7 @@ and prints the commands to enter and to remove it.
 
 `ck ab` answers whether a check that passes on one CiviCRM version fails on
 another. It boots two Standalone stacks, runs the same command in both and
-compares the results. It runs on the host through `scaffold/ck`.
+compares the results.
 
 ```bash
 ck ab standalone standalone-beta -- ckcoretest --log-junit /tmp/ck-ab.xml tests/phpunit/api/v4/Query
@@ -177,8 +193,7 @@ removed at the end; with `--keep` the stacks and the compose files stay.
 `ck bisect` names the civicrm-core commit at which a check starts to fail. It
 boots one Standalone stack, mounts directories of a civicrm-core checkout over
 the image's copies and lets `git bisect run` move the checkout from commit to
-commit, running the check in the stack each time. It runs on the host through
-`scaffold/ck`.
+commit, running the check in the stack each time.
 
 ```bash
 ck bisect standalone-6.17 --core "$HOME/src/civicrm-core-bisect" --good 6.16.0 --bad 6.17.0 \
@@ -203,7 +218,9 @@ not named. `ck bisect` lists what the commits of the range touch there. The
 site installs on the `--bad` commit, so take the image whose core is that
 commit or close to it; a core far from the mounted code does not install.
 `--mount <src>:<dst>` adds a host path from outside the checkout, as with `ck
-run`: the extension whose test is the check, for example.
+run`: the extension whose test is the check, for example. `--locales` and
+`--name` work as with `ck run`; the default project name is
+`ck-bisect-<tag>`.
 
 With `tests` among the directories, `ckcoretest` runs the checkout's tests. On
 a release image it fetches `phpunit.xml.dist` and the seed SQL of the installed
@@ -235,8 +252,7 @@ that work tree or under that project name stops and names the command. The
 
 `ck demo` shows what a civicrm-core change does on screen. It boots a fresh
 site, records a video without the change and one with it, and writes both side
-by side into a single HTML page. It runs on the host through `scaffold/ck`,
-which needs only Docker; PHP and the browser run in containers.
+by side into a single HTML page. PHP and the browser run in containers.
 
 ```bash
 ck demo 12345 --page civicrm/admin/search                 # a civicrm-core PR
@@ -256,7 +272,8 @@ that leaves that CMS out.
 
 Then, per site, `ck demo` runs each `--cv` command, for example
 `--cv 'en -q riverlea'`, and records the `--page` routes logged in as
-admin/admin. It applies the change with `patch`, flushes the caches (and
+admin/admin, each route on screen for `--dwell` seconds (default 2.5) in a
+`--size` viewport (default `1280x800`). It applies the change with `patch`, flushes the caches (and
 publishes the assets on Drupal), and records again. The output directory
 (`--out`, default `./ck-demo-pr<number>` or the diff file's name) receives
 `<cms>-before.webm`, `<cms>-after.webm` and `index.html`, which embeds the

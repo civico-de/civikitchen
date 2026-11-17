@@ -1,10 +1,53 @@
 # Extension standards: what a modern extension looks like
 
-This is the target state the civikitchen tooling enforces or expects: cklint
-with the CiviKitchen mago baseline, ckmodernize, phpstan and the extension
-template. Use it for audits and as the goal when you modernize an existing
-extension. ckcreate and ckinit apply the template, which sets most of this up;
+This page is the target state the civikitchen tooling enforces or expects:
+what each gate checks, which policy key or workflow input adjusts it, and the
+escape hatch. Use it for audits and as the goal when you modernize an existing
+extension. ckcreate and ckinit apply the template, which sets most of it up;
 see [Creating an extension](extension-development.md#creating-an-extension).
+
+| Section | What it covers |
+|---|---|
+| [UI: declarative before imperative](#ui-declarative-before-imperative) | SearchKit, FormBuilder and APIv4 instead of legacy pages and forms; afform permissions; Riverlea custom properties |
+| [Code](#code) | The APIv3 ban, the APIv4 entity, action, field and parameter checks, DDL in tests, database queries, GET routes, conventions, the PHP floor, `@ck-legacy`, call-site arguments |
+| [Tooling every repo must have](#tooling-every-repo-must-have) | The mago baseline, phpstan config, architecture rules, ckdeps, cksmarty, ckeslint, ckfmt, the CI and release callers, changelog and handbook, versions and tags, committed files, GitLab, several extensions in one repository, vendored source |
+| [Known vulnerabilities and secrets](#known-vulnerabilities-and-secrets) | osv-scanner and trivy on the extension, trivy on the images, secrets in Git history |
+| [Tests and coverage](#tests-and-coverage) | Runtime deprecations, lost transactions, `ck_headless()`, the coverage floor, mutation testing |
+| [Repository policy](#repository-policy-civikitchenyaml) | `civikitchen.yaml`: licences, CiviCRM minor and floor, database, dependency pins, organisation-wide defaults, and an index of every key |
+| [Taint analysis](#taint-analysis-cktaint) | cktaint's sources, sinks and escapes, what it does not see, handling a finding |
+| [Frontend](#frontend-js-dependencies-js-tests-and-browser-tests) | JS install and unit tests, linting JavaScript, Bun, the browser job, the shell e2e job |
+| [Private dependencies](#private-dependencies) | `composer_install`, `sibling_repo`, the GitHub App |
+| [Compatibility](#compatibility-test-the-range-you-claim) | Matrix images, the lifecycle gate, upgrade from the last release, schema parity, core upgrade, the scheduled caller |
+
+## The gates at a glance
+
+`ck ci` runs these in-container gates in this order, in CI and in the dev
+stack ([Running the CI gates locally](extension-development.md#running-the-ci-gates-locally)):
+
+| Gate | Checks | Details |
+|---|---|---|
+| cklint | `php -l` and mago lint with the CiviKitchen baseline | [cklint and the mago baseline](#cklint-and-the-mago-baseline) |
+| ckconform | Repository conventions; its check names appear throughout this page | [Repository policy](#repository-policy-civikitchenyaml) |
+| ckcivix | The civix layer is current (`ckcivix --check`) | [Civix workflow](extension-development.md#civix-workflow) |
+| ckfmt | `--check`: PHP, JS and TS are formatted | [ckfmt](#ckfmt) |
+| ckcoverage | The PHPUnit suite with coverage and the transaction check | [Coverage](#coverage) |
+| phpunit-extra | A second PHPUnit config, only with `extra_phpunit_config` / `--extra-phpunit-config` | [Reusable workflows](reusable-workflows.md#extension-ciyml-inputs) |
+| phpstan | Level 10, the ban list, the APIv4, SQL and route rules, the architecture rules | [Code](#code), [Tests and phpstan config](#tests-and-phpstan-config) |
+| phpstan-tests | phpstan over tests/phpunit, only when phpstan-tests.neon(.dist) exists | [Analysing the test suite](#analysing-the-test-suite) |
+| ckanalyze | Shadow gate: its findings never fail the run | [Running the CI gates locally](extension-development.md#running-the-ci-gates-locally) |
+| ckcompat | Syntax and symbols against the PHP floor | [One PHP floor](#one-php-floor) |
+| ckdeps | composer.json against what the code uses | [ckdeps](#ckdeps) |
+| cktaint | Request input reaching a dangerous sink | [Taint analysis](#taint-analysis-cktaint) |
+| cksmarty | Every template compiles in the booted stack | [cksmarty](#cksmarty) |
+| ckeslint | oxlint over JS and TS | [Linting JavaScript](#linting-javascript) |
+
+`extension-ci.yml` adds jobs on the runner: the template drift check
+(`ckinit --check`, input `check_template`), the
+[lockfile scan](#dependencies-osv-scanner-in-extension-ciyml) and the
+[secret scan](#repository-secrets-trivy-in-extension-ciyml). The opt-in jobs
+and steps (lifecycle, matrix, upgrade, schema parity, core upgrade,
+mutation, Playwright, shell e2e) are listed with every other input under
+[`extension-ci.yml` inputs](reusable-workflows.md#extension-ciyml-inputs).
 
 ## UI: declarative before imperative
 
@@ -189,9 +232,9 @@ are therefore the one thing to declare rather than baseline.
 
 ### Routes that change data on GET
 
-A route a browser can GET must not change data. Prefetchers, link scanners and
-mail-security proxies issue GETs nobody typed, and an image tag on a hostile
-page fires one with the victim's session. The rule `ck.route.mutationOnGet`
+A route a browser can GET must not change data: prefetchers, link scanners and
+mail-security proxies issue GETs nobody typed, and a hostile page's image tag
+fires one with the victim's session. The rule `ck.route.mutationOnGet`
 checks the page_callback methods declared in xml/Menu/*.xml and run() of a
 CRM_Core_Page subclass, following writes two hops through the class's own
 methods. A write is an APIv4 create, save, update, delete or replace
@@ -394,8 +437,7 @@ unconditional step in ci, and extensions without JS pass with a log line.
 ckfmt formats PHP with [mago](https://mago.carthage.software/) and JS and TS
 with [oxfmt](https://oxc.rs/). `ckfmt --check` is a hard gate in ci. The mago
 baseline owns layout (the drupal preset plus declare spacing) and the linter
-carries no layout rule, so a red check means "run ckfmt and commit", never a
-style debate.
+carries no layout rule, so a red check means "run ckfmt and commit".
 
 Vendored trees, minified bundles and civix- or DAO-generated PHP are
 excluded, so civix upgrade and the gate never fight. A committed mago.toml or
@@ -475,8 +517,11 @@ SemVer are ignored.
 Each repo has a composer.json with the extension metadata. The description
 lives only in info.xml, which CiviCRM shows; composer.json carries no
 `description`, so the two cannot drift apart. Do not commit
-node_modules, vendor or build artifacts; a frontend build commits only dist/,
-or declares the build under `policy.dist.build` so the release zip carries it.
+node_modules, vendor or build artifacts; the ckconform check is
+committed-artifact. A repo that ships vendor/ on purpose declares it as
+`vendor: {mode: committed, reason: …}` under `policy:`. A frontend build
+commits only dist/, or declares the build under `policy.dist.build` so the
+release zip carries it.
 .gitignore covers every artifact the repo can produce, such as the phpunit
 result cache, vendor/, node_modules/ and *.tsbuildinfo.
 
@@ -607,8 +652,8 @@ phpstan keeps its own paths.
 
 ### Formatter and linter
 
-ckfmt owns layout and cklint carries no layout rule, so formatted code is
-always lint-clean; the image tests assert this on the hardest layouts.
+Formatted code is always lint-clean ([ckfmt](#ckfmt)); the image tests
+assert this on the hardest layouts.
 
 A class-level @mago-expect goes above the docblock, separated by a blank
 line, or inside it as a ` * @mago-expect lint:<rule>` line. Never put it as a
@@ -788,18 +833,54 @@ the mutants no test killed.
 
 It reads `policy.mutation.minimum_msi`, and optionally
 `policy.mutation.minimum_covered_msi`; without the first it is a no-op. Adopt
-it like coverage: measure, set the floor, ratchet. Switch it on in the
-scheduled compat.yml caller with mutation: true, never in the push run, where
-it is slow and its score moves with behaviour-neutral refactors. Scope it with
+it like coverage: measure, set the floor, ratchet. Switch it on with
+mutation: true in [the scheduled caller](#the-scheduled-caller), never in the
+push run: its score moves with behaviour-neutral refactors. Scope it with
 `policy.mutation.paths` to the domain logic. Without that key it mutates only
 lines changed against CK_MUTATE_BASE (default origin/main), which suits a
 branch but is empty on main.
 
 ## Repository policy: `civikitchen.yaml`
 
+An optional civikitchen.yaml in the extension root holds the repository's
+policy, validated against the schema in
+[`packages/civikitchen-scenario-schema/`](https://github.com/civico-de/civikitchen/tree/main/packages/civikitchen-scenario-schema/).
+Every key under `policy:`:
+
+| Key | What it sets | Details |
+|---|---|---|
+| `license`, `npm_license`, `copyright` | Expected licence and copyright values | below |
+| `vendor` | `mode: committed` with a reason: vendor/ is committed on purpose | [Committed files](#committed-files) |
+| `ignore_checks` | `checks` to skip in ckconform, with a `reason` | — |
+| `tests` | `mode: optional` with a reason, for a repo without a PHP suite | [Tests and coverage](#tests-and-coverage) |
+| `coverage.minimum` | Line-coverage floor | [Coverage](#coverage) |
+| `mutation` | `minimum_msi`, `minimum_covered_msi`, `paths` for ckmutate | [Mutation testing](#mutation-testing) |
+| `hook_style` | `listener`: business hooks live in scan classes; the hook-style check warns on the function form | — |
+| `known_hooks` | Hook names the repo defines itself, which the hook-dispatch-name check accepts | — |
+| `known_api4_entities` | APIv4 entities a required third-party extension supplies | [APIv4 entities](#apiv4-entities-must-exist-in-the-supported-core) |
+| `optional_extensions` | Extensions used only after a runtime check | [APIv4 entities](#apiv4-entities-must-exist-in-the-supported-core) |
+| `bundles` | `mode: committed` with a reason: minified third-party bundles in the repo are deliberate (vendored-bundle check) | — |
+| `deploy_hygiene` | Paths that the deploy_hygiene check would refuse (.env files, var/, documents outside docs/, tests/, examples/) but that ship on purpose | — |
+| `lfs_exempt` | Media kept in git instead of LFS | [Committed files](#committed-files) |
+| `vendored_paths` | Third-party source carried verbatim | [Third-party source](#third-party-source-a-repo-carries-verbatim) |
+| `smarty_skip_templates` | Managed MessageTemplates rendered without Smarty | [cksmarty](#cksmarty) |
+| `release` | `mode: none` with a reason, for a repo that never releases | [Releasing an extension](extension-releases.md#adopting-it-in-a-repo) |
+| `untagged_versions` | Versions that deliberately stay untagged | [Releasing an extension](extension-releases.md#a-version-that-will-never-be-released) |
+| `max_unreleased_days` | Days shipped changes may wait behind the newest tag before the unreleased-shipped-changes check warns (default 30) | — |
+| `dist` | `exclude`, `include` and `build` for the release archive | [What the archive contains](extension-releases.md#what-the-archive-contains) |
+| `javascript.type_check` | TypeScript compiler diagnostics in ckeslint | [Linting JavaScript](#linting-javascript) |
+| `lifecycle.log_ignore` | Expected log lines in the lifecycle gate | [The lifecycle gate](#the-lifecycle-gate-what-cklifecycle-adds-to-the-cycle) |
+| `template_custom` | Template-managed files the repo owns instead | [Managed and seeded template files](extension-development.md#managed-and-seeded-template-files) |
+| `renovate_preset` | The preset the managed renovate.json extends | below |
+| `civicrm` | The CiviCRM minor the stacks run | below |
+| `civicrm_floor_reasons` | Why info.xml's floor differs from the ESR | below |
+| `database` | The database image of the stacks and the smoke test | below |
+| `ci` | `gitlab` for a repository on GitLab | [CI on GitLab](#ci-on-gitlab) |
+| `extension_sources` | Pinned download or release of a dependency | below |
+
 The licence declarations in info.xml, composer.json and every package.json
-must agree. Pin the expected values in an optional civikitchen.yaml in the
-extension root, and ckconform enforces them.
+must agree. Pin the expected values in civikitchen.yaml, and ckconform
+enforces them.
 
 ```yaml
 version: 1
@@ -868,6 +949,9 @@ into each extension's civikitchen.yaml, like `civicrm`.
 
 Values shared across an organisation's repos can sit in one file of the same
 format, named by `CK_DEFAULT_CONFIG`; a repo's own file overrides it per key.
+Only license, npm_license, copyright, vendor, hook_style, max_unreleased_days
+and renovate_preset are taken from it; the ckconform check policy-key reports
+any other key there. A variable naming an unreadable file is an error.
 In CI, the policy_defaults input of extension-ci.yml names the owner/repo
 whose root civikitchen.yaml is that file, or set it once as the
 CK_POLICY_DEFAULTS Actions variable. ckinit reads it too, for
@@ -950,9 +1034,9 @@ It reports one flow per source and sink pair, so a fix can reveal the next
 call site in the following run. A clean run after a fix is not proof there was
 only one.
 
-False positives occur. A retrieve() with a validating type such as Positive is
-safe, but the type is a runtime string, so Psalm taints it anyway. Expect
-findings of exactly this shape.
+The typical false positive is a retrieve() with a validating type such as
+Positive: it is safe, but the type is a runtime string, so Psalm taints it
+anyway.
 
 ### Handling a finding
 
@@ -971,8 +1055,9 @@ in between that must stay silent, so a weakened stub shows up as a red test.
 ## Frontend: JS dependencies, JS tests and browser tests
 
 For an extension with a package.json, the default CI run does not install the
-tree, run the JS unit suite, or drive the UI in a browser. Six opt-in inputs
-on extension-ci.yml add these, all off by default:
+tree, run the JS unit suite, or drive the UI in a browser. Five switches on
+extension-ci.yml add these, all off by default, and `node_version` picks the
+Node they run on:
 
 | Input | What it adds |
 |---|---|
@@ -1082,9 +1167,8 @@ paths behave the same.
 
 ### The browser job
 
-The browser job is the slowest thing in the pipeline, so put
-`playwright: true` in the scheduled compat.yml caller below, not the push run.
-It assumes the following.
+`playwright: true` belongs in [the scheduled caller](#the-scheduled-caller),
+not the push run. The job assumes the following.
 
 The stack is the template's standalone CI stack, with no port published: the
 job drops any port the compose file publishes (Docker Compose 2.24.4 or
@@ -1328,11 +1412,9 @@ policy:
 ### Schema parity: does the upgrader arrive where install() does?
 
 upgrade_from_last_release proves the upgrader runs, not where it arrives.
-install() and the upgrade chain are two independent descriptions of one
-schema. A column nullable in one, a different varchar length, or an index only
-the installer creates leaves every upgraded site quietly different, and no
-later upgrader knows to reconcile it. Switch the check on with
-`schema_parity: true`.
+Schema parity compares the two: a column nullable in one, a different varchar
+length, or an index only the installer creates leaves every upgraded site
+quietly different. Switch the check on with `schema_parity: true`.
 
 The job installs the last tag, moves to this commit, runs
 `cv upgrade:db --mode=ext` and dumps the schema. It then recreates the stack
@@ -1406,9 +1488,10 @@ fixtures. It is the slowest single check and runs once, on image.
 
 ### The scheduled caller
 
-lifecycle runs in the push run's stack. The matrix, upgrade, schema-parity
-and core-upgrade jobs each cost at least one more stack boot, so keep ci.yml
-fast for PRs and automerge and add a second caller on a schedule:
+lifecycle runs in the push run's stack. The matrix, upgrade, schema-parity,
+core-upgrade, mutation and browser jobs each cost at least one more stack
+boot, so keep ci.yml fast for PRs and automerge and add a second caller on a
+schedule:
 
 ```yaml
 # .github/workflows/compat.yml
@@ -1443,9 +1526,9 @@ jobs:
       check_template: false
 ```
 
-A red weekly run means the released state is broken. Concurrency groups in
-extension-ci.yml carry the calling workflow's name and the image, so the
-weekly run and a push run leave each other alone as long as the second
-caller's `name:` differs from the template's CI.
+A red weekly run means the released state is broken. The weekly run and a
+push run do not cancel each other as long as the second caller's `name:`
+differs from the template's CI
+([concurrency groups](reusable-workflows.md#working-directory)).
 
 compat.yml is your policy, so ckinit neither stamps nor checks it.

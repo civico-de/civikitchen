@@ -7,6 +7,9 @@ including the next release. A check that fails because of a defect in core or
 in a foreign extension is neither deleted nor loosened: it is marked, and
 listed here until the fix has reached every image.
 
+[The flow](#the-flow) gives the steps from diagnosis to removal;
+[Open](#open) lists the bugs currently marked.
+
 ## The flow
 
 1. **Diagnose.** Reproduce the failure on a booted site and find the faulty

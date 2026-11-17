@@ -9,10 +9,14 @@ else runs in containers, browser suites and `ck demo` included.
 |---------------|------|
 | Develop an extension | [Develop an extension](extension-development.md): dev stack, tests, civix, analysis, debugging |
 | Know what the checks enforce | [Standards and checks](extension-standards.md) |
+| Configure a stack in `civikitchen.yaml` | [Declarative scenarios](scenarios.md) |
 | Test and release it on GitHub | [Releasing an extension](extension-releases.md), [Reusable workflows](reusable-workflows.md) |
-| Work on CiviCRM core | [Core development](core-development.md): core test suites, unreleased branches |
+| Work on CiviCRM core | [Core development](core-development.md): core test suites, unreleased branches, comparing versions, bisecting, recordings |
 | Try or demo CiviCRM | [Images and demos](images.md#demo-images): demo images and profiles |
 | Look up an image setting | [Images](images.md), [Configuration](configuration.md) |
+| Seed data once and restore it | [Seed snapshots](seed-snapshots.md) |
+| See which core bugs the image tests mark | [Known upstream bugs](upstream-bugs.md) |
+| Work on civikitchen itself | [Building locally](building.md), [Releases](releases.md), [Implementation architecture](implementation-architecture.md) |
 
 Start a new extension:
 

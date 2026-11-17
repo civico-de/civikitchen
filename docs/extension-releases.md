@@ -3,9 +3,20 @@
 This page covers how a conforming extension repo cuts a release. Versioning
 civikitchen itself is covered in [releases.md](releases.md).
 
-The pipeline lives here once, in `.github/workflows/extension-release.yml`,
-and the extension repo's workflow only calls it. The tool it runs, ckrelease,
-ships in the images, so a laptop and GitHub Actions build the same archive.
+The pipeline lives once, in `.github/workflows/extension-release.yml`, and the
+extension repo's workflow only calls it. The tool it runs, ckrelease, ships in
+the images, so a laptop and GitHub Actions build the same archive.
+
+| Section | What it covers |
+|---|---|
+| [What a release is](#what-a-release-is) | A reviewed version bump, a tag, and the automated rest; versions that stay untagged |
+| [Adopting it in a repo](#adopting-it-in-a-repo) | The managed caller, first-time setup, `release: none`, the [inputs](#inputs) |
+| [The changelog](#the-changelog) | The CHANGELOG.md grammar and who checks it |
+| [Cutting one](#cutting-one) | The commands, GitHub's Latest marker, building locally |
+| [What the archive contains](#what-the-archive-contains) | The exclude list, `policy.dist`, [Strauss](#prefixed-dependencies-strauss), [build output](#build-output-git-does-not-track) |
+| [The smoke test](#the-smoke-test) | The install into a fresh CiviCRM, [private dependencies](#a-dependency-only-a-credential-can-reach) |
+| [A mirror an extension directory reads](#a-mirror-an-extension-directory-reads) | `mirror_url` for a directory that builds from a tag |
+| [`ckrelease` outside CI](#ckrelease-outside-ci) | check, dist, verify, info |
 
 ## What a release is
 
@@ -19,7 +30,8 @@ ships in the images, so a laptop and GitHub Actions build the same archive.
    version's changelog section.
 
 The release-tags check in ckconform fails on any version info.xml has carried
-that the repo moved past without tagging.
+that the repo moved past without tagging; the other version and tag checks
+are in [Versions and tags](extension-standards.md#versions-and-tags).
 
 ### A version that will never be released
 
@@ -66,13 +78,12 @@ Inputs and secrets go below the marker, where they survive updates:
       draft: true
 ```
 
-An older caller without markers is rewritten onto the template, keeping its
-with and secrets blocks. If it holds anything else of its own (another
-trigger, an env block, a further job), the update writes nothing and lists
-what it would drop; move that content or declare the file under
-policy.template_custom. The update also refuses to create the caller while
-another workflow already calls the release workflow, since one tag push would
-publish twice.
+A caller without markers is rewritten onto the template, keeping its with and
+secrets blocks. If it holds anything else of its own (another trigger, an env
+block, a further job), the update writes nothing and lists what it would
+drop; move that content or declare the file under policy.template_custom. The
+update also refuses to create the caller while another workflow already calls
+the release workflow, since one tag push would publish twice.
 
 Then, once:
 
@@ -106,10 +117,16 @@ extensions releases them together from one caller at its root; see
 | `image` | empty | The smoke-test image. When empty: the standalone image of the minor in policy.civicrm, otherwise the v1 image. Setting both is an error. |
 | `smoke_test` | `true` | Disable only for an extension whose install cannot be reached this way, and say why in the caller. |
 | `draft` | `false` | Publishes the GitHub release as a draft. |
+| `runs_on` | empty | Runner label for all release jobs; see [Runner selection](reusable-workflows.md#runner-selection). |
 | `composer_install` | `false` | Installs the lockfile without dev packages and bundles the vendor tree. |
+| `node_version` | `24` | Node for a [declared build](#build-output-git-does-not-track), the same default as extension CI. |
 | `mirror_url` | empty | HTTPS address of a second git repository that receives each release; see [A mirror an extension directory reads](#a-mirror-an-extension-directory-reads). Needs the `mirror_token` secret. |
 | `composer_app_repositories` | unset | Repository names within the caller's owner, comma- or newline-separated. Required with the App secrets; it is the token allowlist. |
-| `composer_app_id`, `composer_app_private_key` | unset | A GitHub App with contents read, installed on the private dependency repos, for private Composer packages and staged dependency releases. Pass both under secrets; one without the other fails the run. |
+
+| Secret | What it is for |
+|--------|----------------|
+| `composer_app_id`, `composer_app_private_key` | A GitHub App with contents read, installed on the private dependency repos, for private Composer packages and staged dependency releases. Pass both; one without the other fails the run. |
+| `mirror_token` | A token that may push to `mirror_url`. |
 
 ## The changelog
 
@@ -179,44 +196,6 @@ can inspect it before pushing. Archives that need composer_install or
 tree instead; they carry the build time and match other builds in content but
 not byte for byte.
 
-## A mirror an extension directory reads
-
-An extension directory that builds its download from a git tag, such as
-civicrm.org's, gets a source archive: no vendor/, no build output. With
-`mirror_url` the release also goes to a second repository made for that
-reader, after the GitHub release exists:
-
-```yaml
-# END CIVIKITCHEN MANAGED caller
-    with:
-      mirror_url: https://lab.civicrm.org/extensions/example.git
-    secrets:
-      mirror_token: ${{ secrets.MIRROR_TOKEN }}
-```
-
-The mirror receives:
-
-- the default branch as it is at the release, with its history and its Git LFS
-  objects, so the source is readable there;
-- a tag named after the bare version, 1.3.0 for v1.3.0. It points at one
-  commit on top of the released one whose files are the archive's files, so an
-  archive of that tag is the release archive: vendor/ and build output
-  included, the development layer left out, LFS media as plain files.
-
-The v-prefixed tags stay in the source repository. A release from an older
-line publishes its tag and leaves the mirror's branch alone. A tag the mirror
-already holds never moves: a re-run that builds the same files changes
-nothing, one that builds other files fails. Pre-release tags are mirrored
-too. Only the workflow writes to the mirror; a commit made there blocks the
-branch from following and is reported in the run.
-
-`mirror_token` reaches git through a credential helper and never appears in a
-URL or a command line. On GitLab, create a project access token with the
-write_repository scope and the Maintainer role, allow that role to create
-tags and to push to the default branch, and store the token as a repository
-secret. The mirror takes one extension per repository; a release with several
-archives fails at this step.
-
 ## What the archive contains
 
 The tracked files at the tag plus declared build output, under one top-level
@@ -240,7 +219,9 @@ effective list for a repo:
 ckconform --dist-paths
 ```
 
-vendor/ and dist/ are deliberately not excluded. Either commit vendor/ or set
+vendor/ and dist/ are not excluded. Either commit vendor/ (declared as
+`vendor: {mode: committed, …}`, see
+[Committed files](extension-standards.md#committed-files)) or set
 composer_install so the release bundles the locked production tree; with it,
 package-level copies of the excluded paths are stripped too. A committed
 frontend build in dist/ is the shipped artifact; an uncommitted one is
@@ -331,7 +312,7 @@ dist.exclude, and when package.json has no exact Bun pin or bun.lock is not
 committed.
 
 The build runs before any credential is minted on the runner. A build script
-that calls Node gets the node_version input, defaulting as in extension CI.
+that calls Node gets the node_version input.
 
 Locally, run the two Bun commands first; `ckrelease dist` never builds. It
 takes the outputs from the working tree, not from the ref, and refuses while
@@ -347,11 +328,14 @@ GitHub only.
 
 The archive is unzipped into a fresh CiviCRM in the standalone image and
 enabled with cv, with no source mount, so the site sees exactly what a user
-downloads. The database is policy.database, MariaDB 11.4 without it. Missing requires entries from info.xml are downloaded and enabled
-first, from the registry or from a matching policy.extension_sources entry.
+downloads. The database is policy.database, MariaDB 11.4 without it. Missing
+requires entries from info.xml are downloaded and enabled first, from the
+registry or from a matching policy.extension_sources entry.
 
 It catches what green CI does not: a PHP file the exclude list swallowed, a
-requirement nothing serves, an upgrader that fatals on first install.
+requirement nothing serves, an upgrader that fatals on first install. It
+costs a few minutes per release. If it turns flaky, turn it off visibly in
+the caller with smoke_test: false.
 
 ### A dependency only a credential can reach
 
@@ -381,8 +365,43 @@ Outside the release workflow, the archive comes from `CK_DEP_ARCHIVE_DIR`
 ([configuration](configuration.md)). In a dev stack you normally mount the
 dependency instead, and no pin is consulted.
 
-The smoke test costs a few minutes per release. If it turns flaky, turn it
-off visibly in the caller with smoke_test: false.
+## A mirror an extension directory reads
+
+An extension directory that builds its download from a git tag, such as
+civicrm.org's, gets a source archive: no vendor/, no build output. With
+`mirror_url` the release also goes to a second repository made for that
+reader, after the GitHub release exists:
+
+```yaml
+# END CIVIKITCHEN MANAGED caller
+    with:
+      mirror_url: https://lab.civicrm.org/extensions/example.git
+    secrets:
+      mirror_token: ${{ secrets.MIRROR_TOKEN }}
+```
+
+The mirror receives:
+
+- the default branch as it is at the release, with its history and its Git LFS
+  objects, so the source is readable there;
+- a tag named after the bare version, 1.3.0 for v1.3.0. It points at one
+  commit on top of the released one whose files are the archive's files, so an
+  archive of that tag is the release archive: vendor/ and build output
+  included, the development layer left out, LFS media as plain files.
+
+The v-prefixed tags stay in the source repository. A release from an older
+line publishes its tag and leaves the mirror's branch alone. A tag the mirror
+already holds never moves: a re-run that builds the same files changes
+nothing, one that builds other files fails. Pre-release tags are mirrored
+too. Only the workflow writes to the mirror; a commit made there blocks the
+branch from following and is reported in the run.
+
+`mirror_token` reaches git through a credential helper and never appears in a
+URL or a command line. On GitLab, create a project access token with the
+write_repository scope and the Maintainer role, allow that role to create
+tags and to push to the default branch, and store the token as a repository
+secret. The mirror takes one extension per repository; a release with several
+archives fails at this step.
 
 ## `ckrelease` outside CI
 

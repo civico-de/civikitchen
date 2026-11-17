@@ -3,6 +3,34 @@
 The standalone image is built around the usual loop: edit the code, reload the
 page, run phpunit. Start from the example in
 [`examples/standalone/`](https://github.com/civico-de/civikitchen/tree/main/examples/standalone/).
+What the gates enforce is in [Extension standards](extension-standards.md),
+releasing in [Releasing an extension](extension-releases.md).
+
+| Section | What it covers |
+|---|---|
+| [The dev stack](#the-dev-stack) | Mounting the extension, composer, ports, phpMyAdmin, ckup and ckx |
+| [Headless tests](#headless-tests) | The `_test` database, grants, `cktestreset`, `ck_headless()` |
+| [Dev profile and provisioning hooks](#dev-profile-and-provisioning-hooks) | Seed data in the dev profile, first-boot scripts in `/civikitchen-init.d/` |
+| [No calls to civicrm.org](#no-calls-to-civicrmorg) | Version check and extension feed are off |
+| [Creating an extension](#creating-an-extension) | ckcreate, ckinit, [managed and seeded template files](#managed-and-seeded-template-files), the shell e2e helpers |
+| [Civix workflow](#civix-workflow) | civix in the image, ckcivix |
+| [Static analysis and linting](#static-analysis-and-linting) | phpstan's bootstrap, cklint, ckconform, cktaint |
+| [Modernizing](#modernizing) | ckmodernize, the APIv3 migration, ckmigrate |
+| [CI](#ci) | The shared workflow, [running the CI gates locally](#running-the-ci-gates-locally) |
+| [Several extensions in one repository](#several-extensions-in-one-repository) | Layout, CI and release callers for a monorepo |
+| [UI tests with Playwright](#ui-tests-with-playwright) | `ck playwright` against the dev stack |
+| [IDE step debugging](#ide-step-debugging) | Xdebug with VS Code or PhpStorm |
+| [Troubleshooting](#troubleshooting) | Known error messages and their cause |
+
+The commands on this page use the host-side scripts in `scaffold/`:
+
+| Script | Purpose |
+|---|---|
+| `ckup` | Starts the dev stack on free ports, after a composer install |
+| `ckx` | Runs a command in the stack, in the matching extension directory |
+| `ckcreate` | Generates a new extension with the tooling layer |
+| `ckinit` | Applies, checks or updates the tooling layer on an existing extension |
+| `ck` | Runs ck in a container, for example `ck playwright` |
 
 ## The dev stack
 
@@ -31,8 +59,8 @@ docker compose exec app cv ext:enable myextension
 docker compose exec app bash -c "cd /var/www/html/ext/myextension && phpunit"
 ```
 
-ckup does the composer install for every mounted extension before it starts
-the stack.
+ckup does that composer install for every mounted extension that has a
+composer.json and no vendor/, before it starts the stack.
 
 `docker compose down` keeps the database volume, so the next boot is fast and
 the data survives. A recreated container re-applies profile, locales and
@@ -41,10 +69,10 @@ goes too, and the next start is a fresh install.
 
 Several stacks on one machine collide on host ports. The template's compose
 file reads its ports from a gitignored `.docker/.env` (keys CK_HTTP_PORT,
-CK_MAILDEV_PORT, CK_SMTP_PORT, CK_PMA_PORT). The first run of ckup
-writes that file with free ports, then runs `docker compose up -d` with any
-further arguments. Without the file the ports are 8080 (web), 1080 (Maildev),
-1025 (SMTP) and 8081 (phpMyAdmin).
+CK_MAILDEV_PORT, CK_SMTP_PORT, CK_PMA_PORT). ckup adds each missing key with
+the first free port at or above its default and keeps the keys already there,
+then runs `docker compose up -d` with any further arguments. Without the file
+the ports are 8080 (web), 1080 (Maildev), 1025 (SMTP) and 8081 (phpMyAdmin).
 
 phpMyAdmin is opt-in, like the browser service. Add `COMPOSE_PROFILES=pma` to
 `.docker/.env` (ckup keeps the line, and compose reads it on every call), or
@@ -139,12 +167,16 @@ return ck_headless('org.example.optional')->apply();
 
 ## Dev profile and provisioning hooks
 
+### Dev profile
+
 Data a test setup needs beyond the extension belongs in the dev profile,
 `.docker/profiles/dev/profile.json`: dependencies, settings, seed records,
 scripts and API users, in the
 [profile format](images.md#profiles-civikitchen_profile). Both template stacks
 and ckboot use it. Its dependencies are enabled before the extension and its
 content runs after it, so a seed script can use the extension's own entities.
+
+### Provisioning hooks
 
 What the stack itself needs, such as a renderer binary or system packages, goes
 into first-boot hooks. Scripts mounted into `/civikitchen-init.d/` run after
@@ -171,7 +203,7 @@ services:
 
 CiviCRM's status check contacts civicrm.org for the version check and the
 extension feed. Without outbound network each call waits for a socket timeout,
-long enough to fail a Playwright test. First-boot provisioning therefore turns
+long enough to fail a Playwright test. First-boot provisioning turns
 both off on every flavor, and the status page shows *Update Check Disabled* and
 *Extensions check disabled*. `cv ext:download` still works. To switch the
 version check back on in an init hook:
@@ -300,9 +332,6 @@ same.
 
 ## Static analysis and linting
 
-What each gate enforces, and why, is in
-[Extension standards](extension-standards.md).
-
 PHPStan resolves CiviCRM classes through the managed
 [`phpstanBootstrap.php`](https://github.com/civico-de/civikitchen/blob/main/scaffold/template/extension/phpstanBootstrap.php).
 It loads core, core's own ext packages, and every extension listed under
@@ -346,7 +375,7 @@ reads them:
 - APIv4 hides deleted, test and template records unless the where clause names
   the field. Test recurring contributions or a trashed contact can appear or
   disappear.
-- APIv3-only defaults, such as entity_table on Note, no longer filter.
+- APIv3-only defaults, such as entity_table on Note, do not filter in APIv4.
 
 When a release retires a tool, `ckx ckmigrate` moves the repository off it in
 place. For phpcs it turns ignores of sniffs that became mago rules into mago
@@ -393,7 +422,7 @@ mount that civikitchen.yaml into the container and pass its container path as
 The template drift check, the lockfile and secret scans, the JS unit tests and
 the stack start run on the host and only in the workflow. Private composer
 packages and private sibling extensions need opt-in inputs and secrets,
-described in [Extension standards](extension-standards.md#private-dependencies).
+described in [Private dependencies](extension-standards.md#private-dependencies).
 
 ## Several extensions in one repository
 
@@ -588,8 +617,8 @@ extension sends it.
 - `DB Error: already exists` on install: an earlier attempt failed after
   creating some tables, typically `Class "…" not found` on a schema without
   its DAO stub. A retry on the same database hits the tables that exist.
-- The status check still calls civicrm.org: the stack was provisioned before
-  the setting existed. Recreate it with `docker compose down -v`. If you set
+- The status check calls civicrm.org: the stack was provisioned by an image
+  that did not turn the checks off. Recreate it with `docker compose down -v`. If you set
   ext_repo_url yourself, set it to boolean false in `civicrm.settings.php` as
   `$civicrm_setting['Extension Preferences']['ext_repo_url'] ??= FALSE;`, which
   leaves `cv ext:download` its own feed; an empty string still checks.

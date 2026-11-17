@@ -8,8 +8,20 @@ decision and its alternatives are in
 [ADR-0018](adr/0018-seed-data-is-generated-once-and-restored.md).
 
 Snapshots work on the standalone image. On the other flavors a profile with a
-`snapshot` block runs its scripts as before, and the apply log says so in one
-line.
+`snapshot` block runs its scripts on every fresh boot, and the apply log says
+so in one line.
+
+| Section | Covers |
+|---|---|
+| [Opting in](#opting-in) | The `snapshot` block in `profile.json`: `calendar`, `sizes`, `after_restore` |
+| [What a fresh boot does](#what-a-fresh-boot-does) | Restore or generate, [the key](#the-key), [what a dump holds](#what-a-dump-holds) |
+| [Dates](#dates) | The date shift and the calendar rules that keep period windows correct |
+| [Writing a generator](#writing-a-generator) | The `seed-lib.php` helpers, sizes, correctness rules |
+| [`ck seed`](#ck-seed) | `restore`, `save`, `status`, `rebuild`, `prune`, `today`, and the `CK_SEED_*` variables |
+| [Where snapshots are kept](#where-snapshots-are-kept) | Dev stack, CI cache, file names |
+| [Headless tests](#headless-tests) | How snapshots meet the `<db>_test` database |
+| [How restore works](#how-restore-works) | Dump command, date shift and triggers |
+| [Costs](#costs) | Measured generation, dump and restore times |
 
 ## Opting in
 
@@ -30,7 +42,7 @@ Add a `snapshot` object to the profile's `profile.json`:
 | `sizes` | `["demo"]` | The sizes the scripts can generate. `CK_SEED_SIZE` picks one; a size no selected snapshot profile lists is an error. |
 | `after_restore` | `[]` | Scripts inside the profile directory that run after a restore, for example to fill reporting tables. |
 
-A profile without `snapshot` behaves as before.
+A profile without `snapshot` applies its scripts on every fresh boot.
 
 ## What a fresh boot does
 
@@ -139,6 +151,45 @@ shift keeps its distance to today.
 size such as `bench` is meant for local runs: CI never sets `CK_SEED_SIZE`, so
 it restores or generates `demo` only.
 
+Rules that keep generated data correct:
+
+- **Draw from `CK_SEED_TODAY` and the seeded RNG only.** Draw whole days, or a
+  time of day from the RNG. A draw bounded by the current second makes the RNG
+  stream depend on when the run started.
+- **Compare balances with core's.** Core's balance is 0 for Completed, the
+  rest for Partially paid, and the full amount for Pending, Cancelled and
+  Refunded; Refunded and Cancelled have `cancel_date` set. A test of a
+  refunded contribution checks the balance core computes, not 0.
+- **Pass ISO country codes.** `country_id:name` takes the ISO code (`DE`), not
+  the country name; `'Germany'` is written as NULL without an error.
+  `ck_seed_individual` and `ck_seed_org` in `docker/profiles/lib.php` pass
+  `DE`.
+- **Key comparisons on content, not ids.** Parallel workers interleave ids
+  depending on scheduling, while each worker's own RNG stream keeps the counts
+  per period deterministic.
+- **Receipts.** `ck_seed_contribution` passes
+  `is_send_contribution_notification=0`. With the default notification on, a
+  payment renders a receipt even with outbound mail disabled, and on a stack
+  with SMTP to maildev it sends one and sets `receipt_date`.
+
+To generate a large size faster:
+
+- Run several workers, each its own `cv scr` process that creates its share of
+  contacts and attaches records only to its own contacts. Eight workers gave
+  about 4.5 times the single-worker rate on 6 vCPU.
+- Set the server variable `innodb_flush_log_at_trx_commit=2` for the
+  generation run. It changes durability, not what core writes, and needs the
+  database root user.
+- Do not batch records into one transaction when workers run in parallel:
+  `INSERT INTO civicrm_address` then deadlocks against other workers' long
+  transactions. One transaction per API call does not.
+- `logging` is already off in the dev image, and these creates do not touch
+  smart group or ACL caches, so neither needs a setting.
+- For a plain Completed history, `Contribution.create` with status Completed
+  is about five times cheaper than Order plus Payment. It is a core write path
+  too, but writes the payment transaction from NULL instead of from Accounts
+  Receivable and leaves `receipt_date` NULL.
+
 ## `ck seed`
 
 | Command | Does |
@@ -174,277 +225,56 @@ ignored.
 
 ## Headless tests
 
-The headless test database `<db>_test` is copied at first boot before the
-profile applies, so it holds no seed data. `cktestreset` copies the whole site
-database, seed data included, and Civi\Test then drops and rebuilds the schema
-on its first run. The copy costs time and disk in proportion to the seed and
-nothing else; a seed of bench size makes `cktestreset` slow.
+On standalone, the headless test database `<db>_test` is copied from the site
+database at first boot before the profile applies, so it holds no seed data:
+`ck_post_install_config` copies it (`ck_setup_test_db` in
+`docker/runtime/provision.sh`), and only then does `ck_post_install_provision`
+apply the profile, where the restore runs. Both steps are marker-gated, so a
+later boot does not copy again. The buildkit images make no copy; civibuild
+handles their test database.
 
-## Measurements (2026-10-20)
+`cktestreset` copies the whole site database at any time, seed data included.
+Headless suites still never see that data: `Civi\Test::headless()` rebuilds
+the schema with `Schema::dropAll()` whenever the `civitest_revs` signature
+differs, which it always does in a fresh copy. The copy costs time and disk in
+proportion to the seed and nothing else; a seed of bench size makes
+`cktestreset` slow.
 
-The numbers the design rests on, recorded once. The spike's volume driver
-and its date-shift script were replaced by `ck seed` and `docker/profiles/seed-lib.php`;
-file names below are the ones the spike used.
+## How restore works
 
-### Setup
+- **Dump.** `ck seed save` pipes `mysqldump --single-transaction --quick
+  --routines --skip-triggers --no-tablespaces --skip-dump-date`, with
+  `--ignore-table-data` for each runtime table, into `zstd -3 -T0`. The
+  standalone image ships `zstd` for this.
+- **Load.** `ck seed restore` drops everything in the site database and loads
+  the dump.
+- **Shift.** Core installs triggers on the tables the shift updates:
+  `civicrm_email`, `_address`, `_phone`, `_im` and `_website` set
+  `civicrm_contact.modified_date` on UPDATE, `civicrm_activity` touches
+  `civicrm_case.modified_date`, and `civicrm_relationship` rewrites
+  `civicrm_relationship_cache`. With them in place the shift would overwrite
+  or double-shift values. The shift therefore refuses a schema that has
+  triggers, runs one `UPDATE` per table that sets all of the table's date
+  columns at once, so `ON UPDATE CURRENT_TIMESTAMP` never fires, and runs in
+  UTC, so a TIMESTAMP keeps its time across a daylight-saving change. It needs
+  no CiviCRM boot, so it runs before `cv upgrade:db`.
+- **Rebuild.** `cv upgrade:db` runs when the dump's core is older than the
+  site's; the after-restore step then rebuilds the triggers with the caches.
 
-- **Image:** `ghcr.io/civico-de/civikitchen:v1` (standalone, CiviCRM 6.19.1, PHP 8.4)
-  with MariaDB 11.4.
-- **Host:** colima VM on a laptop, 6 vCPU and 12 GiB. About ten other stacks
-  were running on the same VM, so single figures vary by up to ±30 %.
-- **API generation (A):** a fresh stack with nothing else in its database.
-- **Dump and restore (B, D):** an extension dev stack whose bulk-SQL
-  seeder fills realistic volume.
-- **Generator:** a spike version of the seed helpers (`CK_SEED_TODAY`, a
-  seeded `Random\Randomizer` per worker, bucket dates, creators for people,
-  contributions, memberships, participants and activities) and a volume driver
-  that took counts, worker shard and transaction batch from the environment.
-- **Contribution statuses:** Completed 80 %, Pending 6 %, Partially paid 4 %,
-  Refunded 5 %, Cancelled 5 %. Every contribution starts with `Order.create`.
-  - Completed adds `Payment.create` for the full amount.
-  - Partially paid adds `Payment.create` for half.
-  - Refunded adds a full payment, then a status change to Refunded.
-  - Cancelled adds a status change to Cancelled.
-- **Rates:** records per second, timed in-process around the creation loop.
-  For parallel runs, the aggregate rate is the total count divided by the
-  slowest worker's time.
+## Costs
 
-### A. Generation rate through the API
+Measured on 2026-10-20 on the standalone image with MariaDB 11.4, in a 6-vCPU
+laptop VM shared with other stacks; single figures vary by up to 30 %. The
+bench figures are extrapolated linearly from a 20,000-contact data set.
 
-**Single worker, defaults**, measured with 2,000 contacts and 10,000
-contributions. In these defaults every completing payment renders a receipt.
-
-| Entity | Rate per second | Bench count | Bench time |
-|---|---:|---:|---:|
-| Contact with email and address | 40.6 | 200,000 | 1.4 h |
-| Contribution (status mix) | 7.9 | 1,000,000 | 35 h |
-| Membership | 80 | — | — |
-| Participant | 81 | — | — |
-| Activity with one target | 69 | 1,500,000 | 6.1 h |
-
-That is about 43 h for the bench, so single-threaded API generation is out.
-
-**Where a contribution's time goes**, measured over 40 calls each:
-
-| Call | ms each |
+| What | Time |
 |---|---:|
-| `Order.create` | 34 |
-| `Payment.create`, receipt notification on (the default) | 155–180 |
-| `Payment.create` with `is_send_contribution_notification=0` | 64–84 |
-| `Contribution.create` with status Completed, no Order | 22 |
+| Demo seed (about 1,000 contacts, 3,700 contributions): restore end to end | about 45 s, mostly `cv` boots |
+| Bench seed (200,000 contacts, 1 M contributions, 1.5 M activities): restore end to end | about 10 min |
+| Bench seed: generate through the API on 8 workers | about 4.5 h |
+| Bench seed: dump size with zstd | about 150 MB |
+| One worker with core's defaults: contacts / contributions | about 40 / 8 per second |
+| One worker, receipts off and `innodb_flush_log_at_trx_commit=2`: contributions | about 19 per second |
 
-- With outbound mail disabled, the receipt is still rendered, at about 54
-  queries per payment, but never sent. `receipt_date` stays NULL either way.
-- On a stack with SMTP to maildev, every payment would send a mail and set
-  `receipt_date`.
-- A seed sends no receipts, so the helper passes
-  `is_send_contribution_notification=0`. That setting changes nothing core
-  writes when mail is off.
-
-**Settings that speed generation up**, single worker, 2,000 contributions:
-
-| Variant | Contributions per second |
-|---|---:|
-| Receipts off | 12.3 |
-| + `CRM_Core_Transaction` around every 50 records | 14.8 |
-| Receipts off + `innodb_flush_log_at_trx_commit=2` | 18.9 |
-| Both | 17.3 |
-
-- The flush setting is a server variable for the generation run. It changes
-  durability, not what core writes, and needs the database root user.
-  Transaction batching adds nothing on top of it.
-- `logging` is already off in the dev image (`0`), so there is nothing to
-  gain there.
-- Smart group and ACL caches are not touched by these creates, so no setting
-  is needed for them.
-
-**Parallel workers.** Each worker runs its own `cv scr` process with
-`CK_SEED_WORKER`/`CK_SEED_WORKERS`, creates its share of contacts and attaches
-its records only to its own contacts. Totals per run: 800 contacts, 4,000
-contributions, 400 memberships, 400 participants, 1,200 activities. Receipts
-off, flush setting 2.
-
-| Workers | Contacts/s | Contributions/s | Activities/s | Errors |
-|---:|---:|---:|---:|---|
-| 1 | 40 | 17–19 | 117 | none |
-| 2 | 60 | 38 | 226 | none |
-| 4 | 157 | 63 | 311 | none |
-| 8 | 172 | 86 | 403 | none |
-| 2/4/8 with a 50-record transaction batch | — | — | — | 1/2, 3/4 and 5/8 workers died with a deadlock |
-
-- The deadlocks came from `INSERT INTO civicrm_address` while other workers
-  held long transactions. With one transaction per API call, no worker hit a
-  deadlock. Parallel generation must therefore not batch transactions.
-- Eight workers give about 4.5× on 6 vCPU.
-
-**Bench extrapolation, 8 workers:**
-
-| Entity | Time |
-|---|---:|
-| 200,000 contacts | 19 min |
-| 1,000,000 contributions | 3.2 h |
-| 1,500,000 activities | 1.0 h |
-| Memberships and participants, tens of thousands each | a few minutes |
-
-That is about 4.5 h in all.
-
-- The rates were stable from 50 to 37,000 contributions in the database. Index
-  growth towards 1 million was not measured.
-- Using `Contribution.create` Completed for the plain Completed history (22 ms
-  against about 110 ms) would bring the contribution part down further. It is
-  a core write path too, but it writes a payment trxn from NULL instead of
-  from Accounts Receivable and leaves `receipt_date` NULL. It was measured
-  single-threaded only.
-
-**Correctness checks:**
-
-- Per status, core's own balance is: Completed 0, Partially paid the rest,
-  Pending, Cancelled and Refunded the full amount. Refunded and Cancelled have
-  `cancel_date` set.
-- A refunded contribution therefore shows its full amount as balance in core
-  too, through both the status-change path and the negative-payment path. The
-  "Integrity after restore" test must compare against the balance core
-  computes, not against 0.
-- `country_id:name` takes the ISO code (`DE`), not the country name.
-  `'Germany'` is silently written as NULL. `ck_seed_individual` and
-  `ck_seed_org` in `docker/profiles/lib.php` had that bug; they pass `DE` now.
-
-**Determinism:**
-
-- Each worker draws from its own fixed RNG stream, so the counts per bucket are
-  deterministic.
-- Ids interleave between workers depending on scheduling. Snapshot comparisons
-  must key on content, not on ids.
-- Generators draw whole days, or a time of day from the seeded RNG, relative to
-  `CK_SEED_TODAY`. They never draw "up to now" from the wall clock. A draw
-  bounded by the current second makes the RNG stream depend on when the run
-  started.
-
-### B. Dump, restore and date shift at bench size
-
-Measured at 20,000 contacts and **extrapolated linearly** to the bench size.
-The bench size itself was not run.
-
-**Data set:** 20,000 contacts, 66,787 contributions with line items, financial
-items and trxns, 127,511 activities with 269,066 activity contacts, 12,801
-participants and 5,235 memberships. That is 234 MB on disk, and 478,813 rows
-carry at least one date. The plan's bench (200,000 contacts, 1 M contributions,
-1.5 M activities) is 10–15 times that, so the factor below is 12–15.
-
-| Step | 20k measured | Bench, extrapolated |
-|---|---:|---:|
-| Dump with zstd | 3.3 s | 40–50 s |
-| Dump size, zstd | 11.1 MB | 135–170 MB |
-| Dump size, raw SQL | 96 MB | 1.2–1.4 GB |
-| Restore into an empty database | 18.5 s | 3.7–4.6 min |
-| Restore over the site database | 22.7–26.8 s | 4.5–6.7 min |
-| Date shift, 67 tables, 155 columns | 8.9–10.5 s | 1.8–2.6 min |
-| `cv flush --triggers` (26 triggers back) | 6.5–8.9 s | constant |
-| `cv upgrade:db`, same core | 10.3 s | constant |
-| `cv ext:upgrade-db` | 5.4 s | constant |
-| `Managed.reconcile` | 1.8 s | constant |
-| `cv flush` | 6.4 s | constant |
-| Smart groups: flush, then `loadAll()` for 7 groups | 3.5 s | 45–55 s |
-| Refresh of 6 SearchKit DB-entity displays | 1.3 s | 16–20 s |
-
-- **Bench restore end to end:** about 9–12 min, against about 4.5 h to
-  generate.
-- **Cost of the `cv` steps:** about 30 s that do not grow with volume. Each
-  step pays a full CiviCRM boot. `ck seed restore` should run them in one
-  process where it can.
-- **Shift check** (on the demo-size copy, see D): every shifted value moved by
-  exactly Δ days with the time of day kept. That covers 9,643 receive dates,
-  every `modified_date` and every birth date.
-
-The volume came from a bulk-SQL seeder that writes rows before the contacts
-they reference. Its insert session therefore ran with foreign-key checks off.
-A count afterwards found no orphans.
-
-### C. Headless test DB versus profile apply
-
-- On standalone, the test DB is copied from the main DB **before** the profile
-  is applied:
-  - `docker/standalone/entrypoint.sh` runs `ck_post_install_config`, which
-    calls `ck_setup_test_db` in `docker/runtime/provision.sh`. Its
-    `ck_provision_test_db` copies the main DB into `<db>_test`.
-  - Only then does the entrypoint run `ck_post_install_provision`, which
-    applies the profile through `ck_apply_profile`, `deps` then `content`.
-- Both bundles are marker-gated, so a later boot does not copy again.
-- On buildkit there is no copy at all: `docker/buildkit/entrypoint-common.sh:71`
-  leaves the test DB to civibuild.
-- `cktestreset` (`toolbelt/bin/cktestreset:46-48`) copies the main DB **at
-  any time**. After a restore it would copy the seed, a bench seed included.
-- Headless suites never see that data, though. `Civi\Test\CiviEnvBuilder::apply()`
-  (core `Civi/Test/CiviEnvBuilder.php:253`) rebuilds whenever the
-  `civitest_revs` signature differs, which it always does in a fresh copy.
-  `Civi\Test::headless()` starts that rebuild with `Schema::dropAll()`
-  (`Civi/Test.php:122`).
-- The only cost is copy time and disk.
-- **Consequence:** snapshot restore runs inside `ck_apply_profile content`,
-  after the test-DB copy, so first boot copies no seed data. `cktestreset`
-  keeps copying the whole database; see [Headless tests](#headless-tests).
-
-### D. Demo-size dump and restore
-
-- **Data set:** the extension's demo seed. It has 1,002 contacts and 3,686
-  contributions, and the schema is 26 MB on disk.
-- **Command:** `mariadb-dump --single-transaction --quick --routines --skip-triggers`
-  with `--ignore-table-data` for the 11 runtime tables (cache, queue, job and
-  system log, `log_*`, `civicrm_sk_*`), piped into `zstd -3 -T0`.
-- **Dump:** 0.45–0.65 s. The dump is 0.82 MB compressed and 6.5 MB as raw SQL.
-- **Restore into an empty database:** 2.7–5.0 s.
-- **End to end, about 43 s:**
-  - restore over the site database, 7.2 s;
-  - shift by 30 days, 0.3 s;
-  - `cv flush --triggers`, 7.6 s;
-  - `cv upgrade:db`, 11.0 s;
-  - `cv ext:upgrade-db`, 5.6 s;
-  - `Managed.reconcile`, 2.9 s;
-  - `cv flush`, 3.5 s;
-  - smart groups, 4.0 s;
-  - SearchKit refresh, 0.8 s.
-
-  The `cv` boots dominate.
-- **Date shift of the restored copy by 10 days:** 0.3 s for 67 tables, 155
-  columns and 27,178 rows.
-  - All 9,643 `receive_date` values moved by exactly 10 days with the time of
-    day kept.
-  - Every `modified_date` and `birth_date` moved by exactly 10 days as well.
-- `zstd` was in the MariaDB image but not in the app image. The standalone
-  app image installs it since, for the store.
-
-### Date shift: what the spike changed in the design
-
-- Core installs triggers on the tables the shift updates:
-  - `civicrm_email`, `_address`, `_phone`, `_im` and `_website` set
-    `civicrm_contact.modified_date = CURRENT_TIMESTAMP` on UPDATE.
-  - `civicrm_activity` touches `civicrm_case.modified_date`.
-  - `civicrm_relationship` rewrites `civicrm_relationship_cache`.
-- Shifting with the triggers in place would therefore overwrite or double-shift
-  values.
-- The spike's date-shift script, now `DateShift` behind `ck seed restore`, handles this:
-  - It refuses a schema that has triggers.
-  - The dump is made with `--skip-triggers`. The restore loads it, the shift
-    runs, and `cv flush --triggers` rebuilds the triggers.
-  - It runs one `UPDATE` per table that sets all of the table's date columns at
-    once, so `ON UPDATE CURRENT_TIMESTAMP` never fires.
-  - It runs in UTC, so a TIMESTAMP keeps its time across a DST change.
-  - It needs no CiviCRM boot, so it can run before `cv upgrade:db`.
-
-### What the numbers mean for the bench size
-
-- API generation is fine for `demo`. About 5,000 contributions take roughly
-  7 min single-threaded and under 2 min on 8 workers.
-- For `bench` it takes about 4.5 h on 8 workers on a laptop. That is
-  acceptable as a once-a-year local run per key, because every later boot
-  restores in about 10 min (extrapolated) and the snapshot is about 150 MB.
-- It does not fit a CI cache miss: a 2–4 vCPU runner and GitHub's 6 h job
-  limit rule it out.
-- So the bench size does need its own path, but not a SQL one:
-  - Keep the API generator, run it parallel with
-    `innodb_flush_log_at_trx_commit=2` and receipts off, and without
-    transaction batching.
-  - Mark `bench` as local-only in `sizes`, so CI restores or generates `demo`
-    only.
-  - If even the local time matters, generate the plain Completed history with
-    `Contribution.create` (about 5× cheaper per record, still core-written).
+A bench generation does not fit a CI cache miss on a 2–4 vCPU runner within
+GitHub's 6-hour job limit, which is why CI stays on `demo`.
