@@ -29,7 +29,7 @@
         "tests": {"type": "object", "additionalProperties": false, "required": ["mode", "reason"], "properties": {"mode": {"enum": ["optional"]}, "reason": {"$ref": "#/$defs/reason"}}},
         "license": {"$ref": "#/$defs/nonEmptyString"},
         "copyright": {"$ref": "#/$defs/nonEmptyString"},
-        "vendor": {"oneOf": [{"$ref": "#/$defs/nonEmptyString"}, {"type": "object", "additionalProperties": false, "required": ["mode", "reason"], "properties": {"mode": {"enum": ["committed"]}, "reason": {"$ref": "#/$defs/reason"}}}]},
+        "vendor": {"type": "object", "additionalProperties": false, "required": ["mode", "reason"], "properties": {"mode": {"enum": ["committed"]}, "reason": {"$ref": "#/$defs/reason"}}},
         "hook_style": {"enum": ["listener"]},
         "known_hooks": {"$ref": "#/$defs/stringList"},
         "known_api4_entities": {"type": "object", "additionalProperties": false, "required": ["entities", "reason"], "properties": {"entities": {"$ref": "#/$defs/stringList"}, "reason": {"$ref": "#/$defs/reason"}}},

@@ -31,10 +31,15 @@ printf '%s\n' 'version: 1' > "$work/empty-config.yaml"
 if "$root/toolbelt/bin/ck" config validate "$work/empty-config.yaml" >/dev/null 2>&1; then
   echo "configuration accepted neither policy nor scenario" >&2; exit 1
 fi
-printf '%s\n' 'version: 1' 'policy:' '  vendor:' '    surprise: true' > "$work/invalid-oneof.yaml"
-if "$root/toolbelt/bin/ck" config validate "$work/invalid-oneof.yaml" >/dev/null 2>&1; then
-  echo "configuration accepted a vendor value outside every oneOf alternative" >&2; exit 1
-fi
+printf '%s\n' 'version: 1' 'policy:' '  vendor:' '    mode: committed' '    reason: deployed without composer install' > "$work/vendor-committed.yaml"
+"$root/toolbelt/bin/ck" config validate "$work/vendor-committed.yaml" >/dev/null
+printf '%s\n' 'version: 1' 'policy:' '  vendor:' '    surprise: true' > "$work/vendor-unknown-key.yaml"
+printf '%s\n' 'version: 1' 'policy:' '  vendor: committed' > "$work/vendor-string.yaml"
+for bad in vendor-unknown-key vendor-string; do
+  if "$root/toolbelt/bin/ck" config validate "$work/$bad.yaml" >/dev/null 2>&1; then
+    echo "configuration accepted $bad: policy.vendor is {mode: committed, reason}" >&2; exit 1
+  fi
+done
 if "$root/toolbelt/bin/ck" scenario plan "$work/policy-only.yaml" >/dev/null 2>&1; then
   echo "scenario plan accepted a policy-only configuration" >&2; exit 1
 fi
@@ -191,9 +196,7 @@ for loopback_host in localhost localhost. 127.0.0.1 127.0.0.2; do
   fi
 done
 
-# Real CiviCRM keys are commonly reverse-domain identifiers while <file> is a
-# shorter PHP symbol prefix. The scenario contract follows the root extension
-# key and must not conflate these two independent identifiers.
+# The scenario follows the extension key (reverse-domain), not <file>.
 mkdir -p "$work/dotted-extension"
 printf '%s\n' '<extension key="org.example.demo" type="module"><file>demo</file></extension>' \
   > "$work/dotted-extension/info.xml"
@@ -229,9 +232,8 @@ if "$root/toolbelt/bin/ck" scenario validate "$work/secret-log.yaml" >/dev/null 
   echo "scenario accepted credential logging without explicit consent" >&2; exit 1
 fi
 
-# The scenario smoke jobs execute the host-side YAML renderer before starting
-# a container. A clean GitHub runner therefore needs the locked parser just as
-# a fresh local checkout does; cached vendor trees must never make CI green.
+# The scenario smoke jobs run the host-side YAML renderer, so they install the
+# locked parser first.
 for leg in build-dev-images:scenario-test-standalone build-cms-images:scenario-test-buildkit; do
   job=${leg#*:}
   steps=$(awk -v job="$job" '

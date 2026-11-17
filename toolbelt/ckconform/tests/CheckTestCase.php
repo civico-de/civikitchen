@@ -15,20 +15,14 @@ use Symfony\Component\Yaml\Yaml;
 /**
  * Builds a throwaway extension directory per test and runs a single check
  * against it.
- *
- * Why fixtures and not just the golden output: half of the bash checks printed
- * nothing when they passed, so a port could silently drop one and the golden
- * comparison would still be green. A check without a fixture that makes it FAIL
- * has never been shown to fire at all.
  */
 abstract class CheckTestCase extends TestCase
 {
     private ?string $dir = null;
 
     /**
-     * Suppressions share instances per contents across a run, so a fixture
-     * whose ignore was consumed in one test would still count as consumed in
-     * the next. One run per test.
+     * Suppressions share instances per contents across a run; reset them per
+     * test so a consumed ignore does not carry over.
      */
     protected function setUp(): void
     {
@@ -76,10 +70,8 @@ abstract class CheckTestCase extends TestCase
     }
 
     /**
-     * A repository whose root is no extension and whose direct subdirectories
-     * are the one under inspection and, when files are given for it, a
-     * neighbour. $rootFiles are relative to the repository root,
-     * which write(), gitCommit() and gitTag() address as well.
+     * A monorepo holding the extension under inspection and optionally a
+     * neighbour; $rootFiles, write(), gitCommit() and gitTag() use its root.
      *
      * @param array<string, string> $rootFiles
      * @param array<string, string> $extensionFiles
@@ -151,7 +143,7 @@ abstract class CheckTestCase extends TestCase
                 case 'min_coverage': $policy['coverage']['minimum'] = ctype_digit($plain) ? (int) $plain : $plain; break;
                 case 'tests': $policy['tests'] = ['mode' => $plain, 'reason' => $reason]; break;
                 case 'ignore_checks': $policy['ignore_checks'] = ['checks' => $list, 'reason' => $reason]; break;
-                case 'vendor': $policy['vendor'] = $plain === 'committed' ? ['mode' => $plain, 'reason' => $reason] : $value; break;
+                case 'vendor': $policy['vendor'] = ['mode' => $plain, 'reason' => $reason]; break;
                 case 'known_hooks': $policy['known_hooks'] = $list; break;
                 case 'known_api4_entities': $policy['known_api4_entities'] = ['entities' => $list, 'reason' => $reason]; break;
                 case 'optional_extensions': $policy['optional_extensions'] = ['extensions' => $list, 'reason' => $reason]; break;
@@ -182,10 +174,7 @@ abstract class CheckTestCase extends TestCase
         return Yaml::dump(['version' => 1, 'policy' => $policy], 8, 2) . "\n";
     }
 
-    /**
-     * A minimal but valid info.xml. Named arguments keep the interesting bit of
-     * each test visible instead of buried in boilerplate XML.
-     */
+    /** A minimal but valid info.xml. */
     protected function infoXml(
         string $key = 'fixture',
         string $license = 'Proprietary',
@@ -257,18 +246,8 @@ abstract class CheckTestCase extends TestCase
     }
 
     /**
-     * Git in the fixture repo, insulated from the developer's own config.
-     *
-     * A global gitignore listing `.env` (a common personal setting) makes
-     * `git add -A` skip a fixture that deliberately tracks one, so a check that
-     * works reports nothing and its test fails on that machine only. CI, with
-     * no global config, stays green — which is the worst version of a flaky
-     * test. Point both the global and system config at nowhere instead.
-     */
-    /**
-     * Fixture repositories are created without git's background maintenance:
-     * it runs detached after a commit and removing its lock file mid-teardown
-     * aborts the recursive delete.
+     * Without git's background maintenance: its detached lock file aborts the
+     * recursive delete in teardown.
      */
     private function gitInit(): void
     {
@@ -279,6 +258,7 @@ abstract class CheckTestCase extends TestCase
         $this->git('add -A');
     }
 
+    /** Git insulated from global config, e.g. a personal gitignore listing `.env`. */
     protected function git(string $args, string $env = ''): void
     {
         exec(
@@ -288,9 +268,7 @@ abstract class CheckTestCase extends TestCase
     }
 
     /**
-     * Stage everything and commit it, optionally dated. The identity is passed
-     * per call because the fixture has no config to read one from, and the date
-     * because the age-based rules need history a test cannot wait for.
+     * Stage everything and commit it, optionally dated for the age-based rules.
      *
      * @param string $date an ISO 8601 timestamp — git rejects approxidate
      *                     ('5 days ago') in the date environment variables
@@ -314,8 +292,7 @@ abstract class CheckTestCase extends TestCase
     }
 
     /**
-     * Make the fixture look like a truncated clone — what `.git/shallow` means
-     * to git, and the state a default actions/checkout leaves behind.
+     * Make the fixture look like a truncated clone (`.git/shallow`).
      */
     protected function gitShallow(): void
     {

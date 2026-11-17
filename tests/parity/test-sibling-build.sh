@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# The private-deps sibling build: a sibling declaring policy.dist.build with
-# Bun is built before the mount, one without a declaration stays untouched,
-# and every way the build can go wrong fails the step. `bun` and `composer`
+# Private-deps sibling build: policy.dist.build siblings build before the mount,
+# others stay untouched, failures fail the step. `bun` and `composer`
 # are stubbed; civikitchen.yaml is read by the real ckconform.
 set -euo pipefail
 
@@ -31,7 +30,7 @@ declare_build() {
 }
 declare_build "$sibs/built" 1.3.0
 declare_build "$sibs/other" 1.2.0
-printf 'version: 1\npolicy:\n  vendor: committed\n' > "$sibs/plain/civikitchen.yaml"
+printf 'version: 1\npolicy:\n  license: MIT\n' > "$sibs/plain/civikitchen.yaml"
 echo '{"packageManager": "bun@1.3.0"}' > "$sibs/plain/package.json"
 
 calls="$work/calls"

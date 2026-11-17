@@ -9,12 +9,8 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * The `policy:` section of civikitchen.yaml: its single parser and the
- * inventory of what may be in it. Shell tools read it only through
- * `ckconform --policy-env` / `--policy <key>`.
- *
- * The public YAML uses typed nested objects. This class normalizes them to the
- * stable scalar/list view consumed by existing PHP and shell checks.
+ * The `policy:` section of civikitchen.yaml: its single parser, normalizing
+ * the typed YAML to the scalar/list view PHP and shell consumers read.
  */
 final class Policy
 {
@@ -38,7 +34,7 @@ final class Policy
         'tests' => "ckconform + ckcoverage: 'optional -- <reason>' for a repo with no PHP suite",
         'license' => 'ckconform: the licence this repo ships under',
         'copyright' => 'ckconform: the copyright holder in file headers',
-        'vendor' => 'ckconform: the composer vendor name',
+        'vendor' => "ckconform: 'committed -- <reason>' for a repo that commits vendor/ on purpose",
         'hook_style' => 'ckconform: which hook declaration style this repo uses',
         'known_hooks' => 'ckconform: hook names this repo defines itself',
         'known_api4_entities' => 'ckconform: APIv4 entities supplied by required third-party extensions, reason mandatory',
@@ -78,10 +74,7 @@ final class Policy
 
     /**
      * Keys where every occurrence counts, rather than the first one winning.
-     *
-     * `template_custom` is deliberately NOT one: its value is a comma-separated
-     * list on one line and ckinit stops at the first occurrence, so a second
-     * line does nothing. It stays scalar and PolicyKeyCheck reports the repeat.
+     * `template_custom` is not one: ckinit reads only its first occurrence.
      *
      * @var list<string>
      */
@@ -92,27 +85,21 @@ final class Policy
 
     /**
      * Environment variable naming an organisation-wide defaults file in the
-     * same format. Its keys apply to every repo whose tools see the variable;
-     * the repo's own `civikitchen.yaml` overrides per key.
+     * same format; the repo's own `civikitchen.yaml` overrides per key.
      */
     public const DEFAULTS_ENV = 'CK_DEFAULT_CONFIG';
 
     /**
-     * The keys a defaults file may set: those read by ckconform and ckinit
-     * only. In CI the variable reaches the template check and the `ci` job's
-     * gates, not the mutation, lifecycle or compat runs; a key another gate reads
-     * (min_coverage, mutation_*, lifecycle_log_ignore, ...) would apply in one
-     * job and silently not in another, so it stays per repo.
+     * The keys a defaults file may set: those read by ckconform and ckinit only.
+     * The variable does not reach every CI job, so other gates' keys stay per repo.
      *
      * @var list<string>
      */
     public const SHARED = ['license', 'npm_license', 'copyright', 'vendor', 'hook_style', 'max_unreleased_days', 'renovate_preset'];
 
     /**
-     * The defaults file's contents, null when the variable is unset. A variable
-     * that names a file which cannot be read is an error, not an absent layer:
-     * a fleet whose licence policy silently stopped applying is the exact
-     * failure the layer exists to prevent.
+     * The defaults file's contents, null when the variable is unset; an
+     * unreadable file is an error, not an absent layer.
      */
     public static function defaultsRaw(): ?string
     {
@@ -129,14 +116,9 @@ final class Policy
     }
 
     /**
-     * Defaults overlaid by the repo's own file, per key: a key the repo sets
-     * REPLACES the default's values — for repeatable keys too, so a repo's
-     * `vendored_paths` lines never silently inherit a fleet-wide one. Keys the
-     * repo does not mention keep the default. The defaults' keys come first,
-     * so "first occurrence wins" ordering is preserved within each source.
-     * Only SHARED keys are taken from the defaults; PolicyKeyCheck reports the
-     * others, and dropping them here keeps a gate honest even where it does
-     * not run.
+     * Defaults overlaid by the repo's own file: a key the repo sets replaces the
+     * default's values, repeatable keys included. Only SHARED keys are taken
+     * from the defaults.
      *
      * @return array<string, list<string>>
      */
@@ -148,9 +130,7 @@ final class Policy
     }
 
     /**
-     * The view every reader gets: the repo config over the CK_DEFAULT_CONFIG
-     * layer. Context::policy() and the CLI read-outs go through here, so the
-     * merge happens in exactly one place.
+     * The view every reader gets: the repo config over the CK_DEFAULT_CONFIG layer.
      *
      * @return array<string, list<string>>
      */
@@ -195,7 +175,7 @@ final class Policy
         if (isset($policy['coverage']['minimum'])) $out['min_coverage'] = [(string) $policy['coverage']['minimum']];
         if (isset($policy['ignore_checks'])) $out['ignore_checks'] = [implode(',', $policy['ignore_checks']['checks']) . ' -- ' . $policy['ignore_checks']['reason']];
         if (isset($policy['tests'])) $out['tests'] = [$policy['tests']['mode'] . ' -- ' . $policy['tests']['reason']];
-        if (isset($policy['vendor'])) $out['vendor'] = [is_array($policy['vendor']) ? $policy['vendor']['mode'] . ' -- ' . $policy['vendor']['reason'] : $policy['vendor']];
+        if (isset($policy['vendor'])) $out['vendor'] = [$policy['vendor']['mode'] . ' -- ' . $policy['vendor']['reason']];
         if (isset($policy['known_hooks'])) $out['known_hooks'] = [implode(',', $policy['known_hooks'])];
         if (isset($policy['known_api4_entities'])) $out['known_api4_entities'] = [implode(',', $policy['known_api4_entities']['entities']) . ' -- ' . $policy['known_api4_entities']['reason']];
         if (isset($policy['optional_extensions'])) $out['optional_extensions'] = [implode(',', $policy['optional_extensions']['extensions']) . ' -- ' . $policy['optional_extensions']['reason']];
@@ -235,8 +215,7 @@ final class Policy
             if (isset($item['url'])) {
                 $out['extension_source'][] = $item['key'] . '@' . $item['url'] . '#sha256=' . strtolower($item['sha256']) . ' -- ' . $item['reason'];
             } else {
-                // Space-separated: the schema forbids a space in every field, and
-                // both consumers (the extension provisioner, the release workflow) split on it.
+                // Space-separated: the schema forbids a space in every field.
                 $out['extension_release'][] = implode(' ', [
                     $item['key'],
                     $item['release']['repository'],
@@ -269,12 +248,8 @@ final class Policy
     }
 
     /**
-     * Any YAML document, through the one parser this tool carries — a workflow
-     * or a compose file is structured and never read with a regex.
-     *
-     * Null on failure, with $error saying which: a document that does not parse,
-     * or a parser that is not installed. Neither may abort the run or read as a
-     * pass, so both come back as a message for the calling check to report.
+     * Any YAML document, through the one parser this tool carries. Null on
+     * failure, with $error saying whether the document or the parser failed.
      */
     public static function parseYaml(string $raw, ?string &$error = null, bool $customTags = false): mixed
     {
@@ -305,10 +280,8 @@ final class Policy
     }
 
     /**
-     * The value without its ` -- <reason>` suffix. For the shell view only:
-     * inside ckconform the reason stays part of the value, because checks match
-     * on it (TestSuiteRequiredCheck accepts `optional -- <reason>` and nothing
-     * else) and stripping it would make a mandatory reason optional.
+     * The value without its ` -- <reason>` suffix, for the shell view only:
+     * checks inside ckconform match on the reason.
      */
     public static function stripReason(string $value): string
     {
@@ -318,10 +291,8 @@ final class Policy
     }
 
     /**
-     * `CK_POLICY_<KEY>='<value>'` lines for `eval` in a shell tool. Scalar keys
-     * only, reason stripped; repeatable keys go through `--policy <key>`.
-     * escapeshellarg, not quotes by hand: values are free text from a repo.
-     * Takes the repo file's contents; the defaults layer is applied here.
+     * `CK_POLICY_<KEY>='<value>'` lines for `eval` in a shell tool: scalar keys,
+     * reason stripped, defaults layer applied to the repo file's contents.
      */
     public static function toShell(string $raw): string
     {
