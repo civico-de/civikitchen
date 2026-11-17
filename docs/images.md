@@ -1,18 +1,15 @@
 # Images
 
-CiviKitchen publishes four kinds of image. The first three are tags of
+CiviKitchen publishes five kinds of image. The first four are tags of
 `ghcr.io/civico-de/civikitchen`; the CLI is a package of its own.
 
 | Image | Tags | Contents | Use it for |
 |---|---|---|---|
 | [Standalone (dev)](#standalone-dev) | `:standalone`, `:standalone-<minor>` | CiviCRM Standalone and the full toolchain; needs a MariaDB beside it | Extension development and CI |
+| [Standalone from git](#tags-and-versions) | `:standalone-master`, `:standalone-beta` | The standalone dev image built daily from civicrm-core's `master` and its newest release branch | Testing against unreleased core |
 | [Buildkit flavors (dev)](#buildkit-flavors-dev) | `:drupal10`, `:drupal11`, `:wordpress`, `:joomla`, `:backdrop` | CiviCRM on a CMS, built by civibuild, with the same toolchain; needs a MariaDB beside it | CMS-specific behaviour |
 | [Demo](#demo-images) | `:standalone-demo`, `:<cms>-demo` | One container with an embedded MariaDB and baked demo data | Demos, evaluation, screenshots |
 | [CLI](#cli-image) | `civikitchen-cli` | ck's host commands and the docker CLI, no CiviCRM | Running ck without a checkout |
-
-Two more standalone tags, `:standalone-master` and `:standalone-beta`, are
-built daily from git for testing against unreleased core
-([Tags and versions](#tags-and-versions)).
 
 What applies to several of them:
 
