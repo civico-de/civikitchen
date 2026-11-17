@@ -8,14 +8,9 @@ declare(strict_types=1);
  * Usage:
  *   php tools/gen-permission-catalog.php <core-dir> [out-file]
  *
- * Reads the permission maps core declares, by token scan:
- * CRM_Core_Permission::getCorePermissions(), the synthetic cms: permissions of
- * CRM_Core_Permission_Base::getAvailablePermissions(), each component's
- * CRM/<X>/Info.php getPermissions(), and the hook_civicrm_permission and permissionList functions
- * of the extensions under ext/. A permission is a top-level key mapped to an
- * array (`'edit all events' => [...]`) or assigned (`$permissions['x'] = …`).
- * The CMS-native prefixes are the translatePermission() calls in
- * CRM/Core/Permission/.
+ * Token-scans the permission maps of core, its components and ext/; a
+ * permission is a top-level key mapped to an array or assigned to
+ * `$permissions['x']`. CMS prefixes come from translatePermission() calls.
  */
 
 if ($argc < 2) {

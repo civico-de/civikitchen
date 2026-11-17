@@ -9,9 +9,8 @@ use CiviKitchen\Ckconform\Tests\CheckTestCase;
 use CiviKitchen\Ckconform\Tests\FakeCoreTrait;
 
 /**
- * The regression this check exists for: an api3->v4 migration moved two pages
- * onto \Civi\Api4\MailingAB, which core exposes only @since 6.17 while the
- * extension declared 6.10. Nothing caught it — the pages had no test.
+ * Pins entities that are missing or newer than the declared floor, e.g.
+ * \Civi\Api4\MailingAB (@since 6.17) in an extension declaring 6.10.
  */
 final class Api4EntityCheckTest extends CheckTestCase
 {
@@ -170,10 +169,8 @@ final class Api4EntityCheckTest extends CheckTestCase
     }
 
     /**
-     * The first cut parsed @since with sed's \+, unsupported by BSD sed, which
-     * silently returned nothing — so the version check passed on everything. A
-     * class with no @since must be treated as "cannot tell", never as "too new",
-     * but a class WITH one must actually be read.
+     * A class with no @since is "cannot tell", never "too new"; a class with one
+     * must actually be read.
      */
     public function testAnEntityWithoutASinceTagIsNotFlagged(): void
     {
@@ -206,11 +203,8 @@ final class Api4EntityCheckTest extends CheckTestCase
     }
 
     /**
-     * A stub file or a docblock may name the class in prose. Without the leading
-     * backslash it is not a reference to the entity at all — inside a namespaced
-     * file it would resolve relative to that namespace. One extension carries
-     * exactly such a mention in a phpstan stub, and treating it as a reference
-     * produced a false positive on an extension that no longer uses the entity.
+     * Without the leading backslash a name in prose is no reference: inside a
+     * namespaced file it would resolve relative to that namespace.
      */
     public function testProseWithoutTheLeadingBackslashIsNotAReference(): void
     {
@@ -223,9 +217,8 @@ final class Api4EntityCheckTest extends CheckTestCase
     }
 
     /**
-     * The fully-qualified form in a docblock is still prose. One extension's
-     * EntityApplier says "rather than the concrete \Civi\Api4\Xxx classes"; Xxx
-     * exists nowhere, and matching it turned a comment into a build failure.
+     * The fully-qualified form in a docblock is still prose: "rather than the
+     * concrete \Civi\Api4\Xxx classes" names no entity.
      */
     public function testAFullyQualifiedNameInACommentIsNotAReference(): void
     {
@@ -262,9 +255,8 @@ final class Api4EntityCheckTest extends CheckTestCase
     }
 
     /**
-     * An entity shipped by a core-bundled extension. $tag is the info.xml tag
-     * that marks core plumbing (mgmt:required / component); pass null for a
-     * genuinely optional extension like riverlea.
+     * An entity shipped by a core-bundled extension; $tag marks core plumbing
+     * (mgmt:required / component), null an optional extension like riverlea.
      */
     private function bundle(string $ext, string $entity, ?string $since, ?string $tag): void
     {

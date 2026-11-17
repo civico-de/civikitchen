@@ -41,8 +41,7 @@ final class GitignoreCoverageCheckTest extends CheckTestCase
     }
 
     /**
-     * A PHP-only extension must never be nagged about node_modules — noise is
-     * how a checker teaches people to stop reading its output.
+     * A PHP-only extension must never be nagged about node_modules.
      */
     public function testNodeModulesIsNotDemandedWithoutAPackageJson(): void
     {
@@ -105,10 +104,8 @@ final class GitignoreCoverageCheckTest extends CheckTestCase
     }
 
     /**
-     * The exact pattern that let one repo track a build cache: TypeScript names
-     * the file after its tsconfig, so 'frontend/.tsbuildinfo' matches nothing.
-     * The first version of this check accepted it — the very bug it was written
-     * to catch.
+     * TypeScript names the cache after its tsconfig, so 'frontend/.tsbuildinfo'
+     * matches nothing and must not be accepted.
      */
     public function testTheBrokenTsbuildinfoPatternIsNotAccepted(): void
     {

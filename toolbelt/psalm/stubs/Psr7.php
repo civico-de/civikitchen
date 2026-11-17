@@ -1,24 +1,8 @@
 <?php
 
 /**
- * Taint SOURCES: PSR-7 request objects.
- *
- * PSR-7 routes are the house standard for HTTP endpoints, so everything a
- * handler can read off its `$request` is request input by definition — the
- * same category as $_GET, and Psalm sees none of it, because psr/http-message
- * lives in vendor/ and cktaint ignores vendor/.
- *
- * Stubbed as the interfaces, not the Guzzle implementations: handlers type
- * their parameter as RequestInterface/ServerRequestInterface, and a taint
- * annotation on the interface method applies to every call made through that
- * type.
- *
- * The taint sits on the methods that return data, not on the ones that return
- * another object: Psalm taints values, and a tainted UriInterface would not
- * make ->getQuery() tainted. So getUri()/getBody() are plain, and the getters
- * on UriInterface/StreamInterface/UploadedFileInterface are sources
- * themselves. That also keeps `$request->getUri()->getPath()` reported at the
- * getPath() call, where the data actually enters.
+ * Taint SOURCES: the PSR-7 request interfaces. Psalm taints values, so the
+ * sources are the getters that return data, not getUri()/getBody().
  *
  * Interface shapes per PSR-7 (psr/http-message 2.x).
  */
@@ -54,9 +38,7 @@ interface RequestInterface extends MessageInterface {
   public function getRequestTarget();
 
   /**
-   * The verb is request-controlled too, but it is compared, never
-   * concatenated — tainting it would flag every `if ($request->getMethod()
-   * !== 'POST')` guard the standard asks for.
+   * Not a source: it is compared, never concatenated.
    */
   public function getMethod();
 

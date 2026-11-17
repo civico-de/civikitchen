@@ -1572,11 +1572,6 @@ final class SharedPhpTest extends TestCase
         self::assertContains('Civi/Tracked.php', $formatted);
     }
 
-    /**
-     * The first recorded command whose program is $program.
-     *
-     * @return list<string>
-     */
     public function testVendorInstallerInstallsOnlyCheckoutsThatNeedAndMayWriteVendor(): void
     {
         $lock = static fn(string $name): string => json_encode(['packages' => [['name' => $name]], 'packages-dev' => []], JSON_THROW_ON_ERROR);
@@ -1640,6 +1635,11 @@ final class SharedPhpTest extends TestCase
         self::assertSame(1, (new VendorInstaller($runner))->install([$this->temporary . '/badlock']));
     }
 
+    /**
+     * The first recorded command whose program is $program.
+     *
+     * @return list<string>
+     */
     private function firstCommand(RecordingRunner $runner, string $program): array
     {
         foreach ($runner->commands as $command) {

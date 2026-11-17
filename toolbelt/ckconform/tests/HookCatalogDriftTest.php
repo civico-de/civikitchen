@@ -8,11 +8,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * The committed hook and permission catalogs must match their generators.
- *
- * Without this, `src/HookCatalog.php` silently rots: core adds hooks every
- * release, and a stale catalog reports them as typos. Skipped when no core
- * checkout is around, the same way the APIv4 checks degrade — ckconform has to
- * stay runnable in a CI job that has no CiviCRM.
+ * Skipped when no core checkout is around.
  */
 final class HookCatalogDriftTest extends TestCase
 {

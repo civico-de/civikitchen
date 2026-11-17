@@ -3,16 +3,10 @@
 declare(strict_types=1);
 
 /**
- * Every job of the shared extension CI workflow that boots a compose stack has
- * to layer the sibling override onto its `up`, and reach the private-dependency
- * steps that produce it. An extension whose `<requires>` names a sibling the
- * extension registry does not know cannot boot at all without them, so a job
- * that skips the wiring is not "unsupported" — it is unusable for that repo.
- *
- * A job that consumes `sibling_repo` at all has to get its checkout from the
- * same private-deps action: that is what names the directory after the
- * extension key, which is where phpstan's ArchitectureTest and the test
- * bootstrap look for it. A bespoke checkout lands somewhere else.
+ * Every compose-booting job of the shared extension CI layers the sibling
+ * override onto its `up` and runs the private-deps steps that produce it. A job
+ * reading `sibling_repo` checks out through that action, which names the
+ * directory after the extension key where ArchitectureTest and the bootstrap look.
  *
  * Usage: php sibling-wiring.php <workflow.yml> [<workflow.yml> ...]
  */

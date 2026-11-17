@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# ck_setup_test_db creates, grants and seeds <db>_test as the database root
-# user — the app user has rights on its own database only. Fake mysql /
-# mysqldump record what is issued and can be told to fail.
+# ck_setup_test_db creates, grants and seeds <db>_test as the database root user.
+# Fake mysql / mysqldump record what is issued and can be told to fail.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

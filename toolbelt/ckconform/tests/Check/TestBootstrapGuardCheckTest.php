@@ -86,9 +86,8 @@ final class TestBootstrapGuardCheckTest extends CheckTestCase
     }
 
     /**
-     * The guard has to run, not be described. Two repos passed this check while
-     * mentioning TEST_DB_DSN only in explanatory comments — and this is what
-     * stands between a headless run and the main dev database.
+     * The guard has to run, not be described: TEST_DB_DSN named only in a
+     * comment is no guard.
      */
     public function testAMentionInACommentIsNotAGuard(): void
     {
@@ -101,10 +100,8 @@ final class TestBootstrapGuardCheckTest extends CheckTestCase
     }
 
     /**
-     * Naming the constant in code is still not the guard: a guard reads
-     * TEST_DB_DSN and STOPS the run when it is absent. Without a terminating
-     * statement, `$dsn = getenv('TEST_DB_DSN')` protects nothing — the run
-     * proceeds against whatever civicrm.settings.php falls back to.
+     * Naming the constant in code is not the guard either: without a throw, exit
+     * or die, `$dsn = getenv('TEST_DB_DSN')` protects nothing.
      */
     public function testANameInCodeWithoutATerminatorIsNotAGuard(): void
     {

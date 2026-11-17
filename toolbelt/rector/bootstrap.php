@@ -3,9 +3,7 @@
 declare(strict_types = 1);
 
 /**
- * Register CiviCRM's class loader so core symbols (Civi, CRM_*, Civi\Api4\*)
- * resolve for rector's reflection — the extension counterpart of the template's
- * phpstanBootstrap.php.
+ * Register CiviCRM's class loader so core symbols resolve for rector's reflection.
  */
 
 $coreDir = getenv('CIVICRM_CORE_DIR') ?: '/var/www/html/core';

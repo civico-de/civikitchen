@@ -9,13 +9,9 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * Without a release there is no immutable ref: a consumer can pin nothing but a
- * branch, which moves under it, and no site ever installs a verified archive.
- *
- * The caller is a template-managed file, so `ckinit --update` adopts it; the
- * only way out is `release: none` with a reason. In a repository of several
- * extensions the job whose working_directory is this extension builds it, and a
- * publish job needing that job releases every extension under one tag.
+ * An extension without the template's release caller (opt-out: `release: none`
+ * with a reason). In a multi-extension repository all extensions release in
+ * lockstep under one tag.
  */
 final class ReleaseWorkflowCheck implements Check
 {
@@ -28,9 +24,7 @@ final class ReleaseWorkflowCheck implements Check
     {
         $declared = $context->policyValue('release');
         if ($declared !== null) {
-            // Only the documented form opts out, and the reason is not
-            // optional: an exemption nobody has to justify is how a rule ends
-            // up declared away everywhere.
+            // Only the documented form opts out, and the reason is mandatory.
             if (preg_match('/^none\s+--\s+\S/', $declared) === 1) {
                 $publishers = $this->publishingCallers($context);
                 if ($publishers !== []) {

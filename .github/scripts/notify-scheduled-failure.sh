@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# Open (or bump) a labelled issue in $REPO pointing at $RUN_URL, so a failed
-# scheduled run has a place to be seen. Needs $GH_TOKEN. The defaults describe
-# the image rebuild; a caller overrides LABEL/LABEL_DESCRIPTION/TITLE/BODY/AGAIN
-# for another scheduled workflow.
+# Open (or bump) a labelled issue in $REPO pointing at $RUN_URL. Needs $GH_TOKEN.
+# Defaults describe the image rebuild; override LABEL/LABEL_DESCRIPTION/TITLE/BODY/AGAIN.
 set -euo pipefail
 
 LABEL="${LABEL:-ci-scheduled-failure}"

@@ -96,9 +96,8 @@ TXT;
     }
 
     /**
-     * Called before each selected profile's content. At the first snapshot
-     * profile it restores the set's snapshot; later profiles up to the last
-     * snapshot profile are then already in it. MISS means: apply the profile.
+     * At the first snapshot profile, restores the set's snapshot, which already
+     * holds later profiles up to the last one. MISS means: apply the profile.
      */
     private function restore(string $profile): int
     {

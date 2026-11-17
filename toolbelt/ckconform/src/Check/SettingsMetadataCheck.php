@@ -10,25 +10,15 @@ use CiviKitchen\Ckconform\ExtensionUtilStub;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A setting placed on a settings page (settings_pages) without an html_type
- * or quick_form_type takes the whole admin page down: the generic form
- * (CRM_Admin_Form_Generic) passes the empty element type to QuickForm, which
- * throws "unregistered element" while BUILDING the page — a fatal on every
- * visit, invisible until someone opens the page.
- *
- * The files are `return [...]` PHP with at most an ExtensionUtil `E::ts()`
- * dependency, so they can be evaluated outside CiviCRM with a stubbed
- * ExtensionUtil. A file that throws anyway is reported as a warning, not
- * silently skipped.
+ * Settings metadata that fatals its admin page: a settings_pages entry without
+ * html_type/quick_form_type, or a bad 'table' pseudoconstant. Files are evaluated
+ * with a stubbed ExtensionUtil; one that throws is a warning.
  */
 final class SettingsMetadataCheck implements Check
 {
     /**
-     * Keys of a 'table' pseudoconstant that Civi\Core\SettingsMetadata::fillOptions()
-     * and CRM_Core_PseudoConstant::renderOptionsFromTablePseudoconstant() actually
-     * read (core 6.18, both camelCase). A snake_case sibling like 'key_column' is
-     * silently ignored, leaving keyColumn/labelColumn NULL — which fatals every
-     * settings page that loads options ("... is not of the type MysqlColumnNameOrAlias").
+     * Keys of a 'table' pseudoconstant core reads (core 6.18, camelCase); a
+     * snake_case sibling is ignored and fatals the page.
      */
     private const TABLE_PSEUDOCONSTANT_KEYS = [
         'table', 'keyColumn', 'labelColumn', 'condition', 'nameColumn', 'abbrColumn',
@@ -114,9 +104,8 @@ final class SettingsMetadataCheck implements Check
                 : "$relative: setting '$key' pseudoconstant key '$pcKey' is not read by core's settings code (table pseudoconstant)");
         }
 
-        // Measured on a real install (core 6.18): a 'table' pseudoconstant with
-        // no keyColumn/labelColumn leaves both NULL, which throws the same
-        // "not of the type MysqlColumnNameOrAlias" fatal as the snake_case case.
+        // Measured on core 6.18: missing keyColumn/labelColumn throws the same
+        // "not of the type MysqlColumnNameOrAlias" fatal.
         if (!isset($pseudoconstant['keyColumn']) || !isset($pseudoconstant['labelColumn'])) {
             $reporter->fail("$relative: setting '$key' has a 'table' pseudoconstant without both keyColumn and labelColumn — CRM_Core_PseudoConstant::renderOptionsFromTablePseudoconstant() fatals with \"not of the type MysqlColumnNameOrAlias\"");
         }

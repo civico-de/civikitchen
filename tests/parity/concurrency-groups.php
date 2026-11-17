@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 /**
  * Every concurrency group names the caller workflow and the run's image, a
- * matrix job's group also what its legs differ in, and no two jobs share one.
- * A group missing any of them cancels jobs that are not its own copy in a
- * newer run: the other legs of a matrix, a second call on another image, the
- * scheduled caller next to the push caller.
+ * matrix job's group also what its legs differ in, and no two jobs share one;
+ * otherwise a newer run cancels jobs that are not its own copy.
  *
  * Usage: php concurrency-groups.php <workflow.yml> [<workflow.yml> ...]
  */

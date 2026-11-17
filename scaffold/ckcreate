@@ -1,21 +1,8 @@
 #!/bin/bash
 #
-# ckcreate — create a new extension that already conforms to the house standard.
-#
-# Three things have to meet for a new extension, and they live in three places:
-# civix (in the image) generates the scaffold, ckinit (this checkout's, run in
-# the image) seeds the template layer, and the org's own values (license,
-# copyright, author) belong to whoever runs this — they are deliberately NOT
-# baked in here. The host needs only bash and Docker.
-#
-# The awkward part is civix: `generate:module` boots CiviCRM and opens a real
-# database connection, so it cannot run against the bare image. This boots a
-# throwaway stack for the duration and tears it down again. `civix upgrade`
-# does NOT need that (see ckcivix), which is why only creation is expensive.
-#
-# Values are read, in order, from: flags, $CKCREATE_* in the environment, and
-# ~/.config/civikitchen/ckcreate.conf (shell syntax, e.g. CKCREATE_AUTHOR="…").
-#
+# ckcreate — create a conforming extension: civix scaffold, then ckinit. civix
+# needs a database, so a throwaway stack runs meanwhile. Values come from flags,
+# $CKCREATE_* and ~/.config/civikitchen/ckcreate.conf, in that order.
 set -euo pipefail
 
 tool="ckcreate"
@@ -177,9 +164,7 @@ services:
       retries: 20
 EOF
 
-# --wait is enough on its own: the image's own HEALTHCHECK tests the
-# provisioning marker, so "healthy" already means cv core:install has finished.
-# A second wait loop here would only duplicate that contract.
+# The HEALTHCHECK tests the provisioning marker, so --wait covers the install.
 echo "$tool: booting a throwaway CiviCRM (civix needs one to generate; this takes a few minutes) …"
 docker compose -p "$project" -f "$work/compose.yml" up -d --wait >/dev/null \
   || die "the throwaway CiviCRM did not come up healthy"

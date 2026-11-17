@@ -1,18 +1,7 @@
 <?php
 /**
- * Configure API users from profile.json (apiUsers + authx sections).
- *
- * Runs via `cv scr` from apply.sh. cv boots CiviCRM *and* the host CMS, so
- * one script covers every user framework natively — no drush, no wp-cli:
- *   Drupal8    → Drupal entity API (\Drupal\user\Entity\User / Role)
- *   Backdrop   → user_save() / user_role_save() / user_role_grant_permissions()
- *   WordPress  → wp_insert_user() / add_role() / WP_Role::add_cap()
- *   Standalone → standaloneusers User/Role APIv4 entities
- *
- * Input: path to profile.json via the CK_PROFILE_JSON env var (`cv scr` has
- * no argv passthrough). Idempotent: load-or-create everywhere, so a re-run
- * after an aborted first boot converges instead of duplicating. Fails loudly:
- * an uncaught exception makes cv exit non-zero and apply.sh abort.
+ * Configure API users from profile.json (CK_PROFILE_JSON) through each CMS's
+ * own user API, booted by `cv scr`. Idempotent; any exception aborts apply.sh.
  */
 
 $configFile = getenv('CK_PROFILE_JSON');
@@ -126,8 +115,7 @@ function ck_contact_is_profile_managed(int $contactId): bool {
 
 /**
  * Return the managed contact behind an existing CMS username, or NULL when
- * that username is unused. An existing unmanaged account is a hard collision:
- * profile data must never reset its password, roles, groups, email or UFMatch.
+ * unused. An existing unmanaged account is a hard collision.
  */
 function ck_existing_profile_account_contact(string $uf, string $username): ?int {
   $uid = 0;
@@ -265,9 +253,7 @@ foreach ($apiUsers as $spec) {
   )));
 }
 
-// Establish ownership and validate every permission for the complete desired
-// set before making any changes. In particular, do not deactivate stale users
-// and only then discover a username/role collision or typo.
+// Validate ownership and every permission before changing anything.
 $knownPermissions = [];
 foreach (\Civi\Api4\Permission::get(FALSE)->addSelect('name')->execute() as $permission) {
   $knownPermissions[] = (string) $permission['name'];
@@ -337,10 +323,8 @@ if ($apiUsers || ($authxPolicy !== FALSE && $authxPolicy !== '') || isset($confi
   // === Per-CMS prep: AuthX permissions for the administrator role ===
   switch ($uf) {
     case 'Drupal8':
-      // AuthX's perm guard requires one permission per credential type. Grant it
-      // only to the roles that should expose API authentication; granting it to
-      // Drupal's global `authenticated` role would expand the profile's access
-      // policy to every existing CMS account.
+      // AuthX's perm guard goes to these roles only: on `authenticated` it would
+      // reach every existing CMS account.
       $adminRole = \Drupal\user\Entity\Role::load('administrator');
       if ($adminRole) {
         foreach (['authenticate with password', 'authenticate with api key'] as $permission) {
@@ -484,12 +468,8 @@ foreach ($apiUsers as $spec) {
       break;
 
     case 'Joomla':
-      // Fine-grained Joomla ACL — the same least-privilege model as the other
-      // CMSs, no Super User. Create a usergroup named after the role, grant it
-      // exactly $perms (+ the authx guards) on the com_civicrm asset (ensured in
-      // the prep step above), and put the user in that group. CiviCRM's
-      // CRM_Core_Permission_Joomla maps each permission to a 'civicrm.<munged>'
-      // action on that asset, so this grants precisely what the role needs.
+      // A usergroup per role, granted exactly $perms plus the authx guards on the
+      // com_civicrm asset as 'civicrm.<munged>' actions; no Super User.
       $db = \Joomla\CMS\Factory::getContainer()->get(\Joomla\Database\DatabaseInterface::class);
       $grp = new \Joomla\CMS\Table\Usergroup($db);
       if (!$grp->load(['title' => $roleName])) {
@@ -524,9 +504,8 @@ foreach ($apiUsers as $spec) {
       break;
 
     case 'Standalone':
-      // save+match keeps re-runs idempotent; "password" is a write-only field
-      // hashed on save; "roles" wants role IDs. The User row IS the uf_match
-      // record on Standalone, so the UFMatch step below is skipped.
+      // "roles" wants role IDs. The User row is the uf_match record here, so the
+      // UFMatch step below is skipped.
       $roleId = \Civi\Api4\Role::save(FALSE)
         ->setRecords([
           [
@@ -562,9 +541,8 @@ foreach ($apiUsers as $spec) {
       ->execute();
   }
 
-  // API key: exactly 32 hex chars — civicrm_contact.api_key is varchar(32),
-  // anything longer is silently mangled on save and authx rejects the key we
-  // record here. The username mapping is in the credentials file anyway.
+  // civicrm_contact.api_key is varchar(32): a longer key is mangled on save and
+  // authx rejects the recorded one.
   $apiKey = bin2hex(random_bytes(16));
   \Civi\Api4\Contact::update(FALSE)
     ->addWhere('id', '=', $contactId)

@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# init.d hooks are marked in the database: a recreated container (no marker
-# file, database volume kept) re-applies profile, locales and extensions, which
-# restore its file system, but does not run the hooks a second time. Fake cv
-# keeps the setting in a file.
+# A recreated container with the database kept re-applies profile, locales and
+# extensions but not the init.d hooks marked in the database. Fake cv uses a file.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

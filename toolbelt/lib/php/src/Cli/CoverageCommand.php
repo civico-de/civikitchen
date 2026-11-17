@@ -29,9 +29,7 @@ final class CoverageCommand implements Command
         if (!is_file('info.xml')) {
             return $this->error('no info.xml here - run from the extension root.');
         }
-        // policy.tests always carries a reason, so the value is
-        // 'optional -- <reason>', never the bare word (TestSuiteRequiredCheck
-        // reads the same key the same way).
+        // policy.tests is 'optional -- <reason>', never the bare word.
         $testsOptional = preg_match('/^optional\s+--\s+\S/', $this->policy->value('tests')) === 1;
         $config = is_file('phpunit.xml') ? 'phpunit.xml' : (is_file('phpunit.xml.dist') ? 'phpunit.xml.dist' : null);
         if ($config === null) {

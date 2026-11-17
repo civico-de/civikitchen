@@ -161,8 +161,7 @@ final class LockfileCheckTest extends CheckTestCase
 
     /**
      * A commented-out entry must not trigger the rule, even though it ends in
-     * "/pnpm-lock.yaml" — the shape the bash regex's unanchored alternative
-     * would have matched.
+     * "/pnpm-lock.yaml".
      */
     public function testACommentedGitignoreLineIsNotAMatch(): void
     {

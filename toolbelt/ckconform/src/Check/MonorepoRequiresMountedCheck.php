@@ -10,30 +10,9 @@ use CiviKitchen\Ckconform\Policy;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A dependency that lives in the same repository and is not mounted into the
- * stack.
- *
- * `sibling_repo` clones a dependency from another repository; a neighbour two
- * directories away is a hand-written volume line instead, and nothing declares
- * it. Without that line the stack comes up without the dependency and
- * `cv ext:enable` fails at the end of a full boot, pointing at the extension
- * rather than at the missing mount.
- *
- * The mount is all there is to check: the entrypoint enables every directory
- * bind-mounted under CK_EXT_DIR and resolves each one's `<requires>` first
- * (docker/runtime/provision.sh hands them to ExtensionProvisioner), so the
- * order of the volume lines is irrelevant.
- *
- * The expected target is named after the dependency's KEY, not its `<file>`:
- * a required extension is looked up under `<ext dir>/<key>` — the template's
- * phpstan bootstrap resolves it there and the shared CI mounts every sibling
- * there. Only an extension's own mount carries its `<file>`.
- *
- * Only the compose file the shared CI boots counts: `compose_file` from each
- * scoped job calling extension-ci.yml, else that input's default. The dev
- * stack is never booted in CI, and CI mounts only other-repository siblings
- * itself, so a neighbour mounted in the dev file alone is missing there. A
- * `compose_file` given as an expression is not guessed: not evaluated.
+ * A same-repository `<requires>` dependency not bind-mounted at `<ext dir>/<key>`
+ * (its key, not its `<file>`) in the compose file the shared CI boots; mount
+ * order is irrelevant. A `compose_file` given as an expression is not evaluated.
  */
 final class MonorepoRequiresMountedCheck implements Check
 {
@@ -163,13 +142,9 @@ final class MonorepoRequiresMountedCheck implements Check
     }
 
     /**
-     * The bind mounts the `app` service of one compose file declares, container
-     * path => resolved host path. Only that service counts: the template defines
-     * the site in it and the shared workflow runs `cv` and phpunit in it, so a
-     * mount into another service is not on the site's extension path. Read
-     * through the YAML parser, in both volume spellings; a source that does not
-     * exist on disk is no mount. A source compose interpolates is not guessed:
-     * it lands in $interpolated, target => source.
+     * Bind mounts of the `app` service (where `cv` and phpunit run), container
+     * path => host path, in both volume spellings; a missing source is no mount.
+     * Interpolated sources land in $interpolated, target => source.
      *
      * @param array<string, string> $interpolated
      * @return array<string, string>

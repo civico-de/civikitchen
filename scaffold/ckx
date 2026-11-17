@@ -7,10 +7,8 @@
 #   ckx env CIVICRM_UF=UnitTests phpunit
 #   ckx                              an interactive shell
 #
-# Run from anywhere inside the extension repo; the subdirectory you are in maps
-# to the same one in the container. For an extension below the git root, the
-# git-reading gates get CK_TOOL_PATH=/civikitchen-repo/<directory>.
-# CKX_USER overrides the user (e.g. CKX_USER=root ckx apt-get …).
+# The current subdirectory maps to the same one in the container. CKX_USER
+# overrides the user (e.g. CKX_USER=root ckx apt-get …).
 set -euo pipefail
 
 tool="ckx"

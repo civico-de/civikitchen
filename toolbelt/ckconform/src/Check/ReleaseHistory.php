@@ -8,12 +8,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * The tag the release checks compare against, or the reason there is none.
- *
- * Both questions they ask — is the version ahead of the tag, how old is the
- * unreleased work — are unanswerable in a checkout with no tags or no history,
- * and a rule that reports success without looking is worse than no rule. So
- * "cannot tell" is a distinct state here, and it is reported.
+ * The tag the release checks compare against, or the reason there is none;
+ * "cannot tell" (no tags or no history) is a distinct, reported state.
  */
 final class ReleaseHistory
 {
@@ -43,9 +39,8 @@ final class ReleaseHistory
             return new self($tag, null);
         }
 
-        // A full checkout without tags has released nothing yet. A repo that
-        // released and lost its tags has moved past versions, and release-tags
-        // fails it for that.
+        // A full checkout without tags has released nothing yet; lost tags are
+        // release-tags' finding.
         return new self(null, null);
     }
 

@@ -10,31 +10,9 @@ use CiviKitchen\Ckconform\PhpSource;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * An upgrade path that only breaks while it is upgrading.
- *
- * Everything here shares one property: it is invisible on a fresh install and on
- * every test run, and it detonates during `civicrm-ext-upgrade` on a live site —
- * the one moment where the schema is half-migrated and rolling back is a manual
- * job. The classes of breakage found in the wild:
- *
- *  - info.xml declares an <upgrader> class whose file does not exist (renamed
- *    extension, moved namespace): the upgrade fatals before step one.
- *  - Two upgrade steps with the same numeric revision (upgrade_01 and upgrade_1).
- *    Core sorts revisions numerically, so they collide and one is skipped or run
- *    in an undefined order.
- *  - An upgrade_* method that is private or protected. Core calls it from
- *    outside; a non-public step is silently never executed, and the schema
- *    change it carries never lands.
- *  - executeSqlFile() pointing at a .sql file the repo does not ship.
- *  - A committed sql/upgrade_*.sql nobody references — dead weight, or a step
- *    someone forgot to wire up. Only a warning: it cannot break an upgrade, it
- *    can only mean one is missing.
- *  - An Upgrader class that exists but is not declared anywhere: written,
- *    committed, never called.
- *
- * The upgrader is read as text (regex over the source), never autoloaded: the
- * class extends CiviCRM base classes that do not exist outside a boot, so
- * reflection is not available to a static checker.
+ * Upgrader defects that break only during an upgrade: a missing <upgrader> class
+ * file, colliding or non-public upgrade_* steps, missing or orphaned SQL files,
+ * an undeclared Upgrader. Read as text; the class cannot load outside a boot.
  */
 final class UpgraderIntegrityCheck implements Check
 {
@@ -59,10 +37,8 @@ final class UpgraderIntegrityCheck implements Check
         if ($declared === null) {
             $this->reportUndeclaredUpgrader($context, $reporter, $tracked);
         } elseif (($schema = $this->automaticUpgraderShortName($declared)) !== null) {
-            // CiviMix\Schema\<X>\AutomaticUpgrader is generated at runtime, so
-            // its "file" never exists in the repo. Legal on its own; but if the
-            // repo ships CRM/<X>/Upgrader.php it is meant to be the delegating
-            // subclass, and its class name has to match.
+            // CiviMix\Schema\<X>\AutomaticUpgrader is generated at runtime; a shipped
+            // CRM/<X>/Upgrader.php is then its delegating subclass and must match.
             $candidate = 'CRM/' . $schema . '/Upgrader.php';
             if (in_array($candidate, $tracked, true)) {
                 $file = $candidate;
@@ -119,9 +95,8 @@ final class UpgraderIntegrityCheck implements Check
     }
 
     /**
-     * The committed file for a class name: PSR-0 for CRM_ (underscores to
-     * slashes), PSR-4-ish for namespaced classes (backslashes to slashes).
-     * A repo may nest either under a subdirectory, so a suffix match counts.
+     * The committed file for a class name, PSR-0 for CRM_ and PSR-4-ish for
+     * namespaced classes; a suffix match counts, for repos nesting either.
      *
      * @param list<string> $tracked
      */
@@ -146,8 +121,7 @@ final class UpgraderIntegrityCheck implements Check
     }
 
     /**
-     * Revision collisions, non-public steps and missing SQL files, from the
-     * upgrader source. Read as text on purpose — see the class docblock.
+     * Revision collisions, non-public steps and missing SQL files.
      *
      * @param list<string> $tracked
      */
@@ -295,8 +269,7 @@ final class UpgraderIntegrityCheck implements Check
 
     /**
      * An Upgrader class the repo ships but info.xml never declares. Silent for
-     * civix-legacy repos, where the .civix shim calls the upgrader from
-     * hook_civicrm_upgrade instead of the <upgrader> declaration.
+     * civix-legacy repos, whose .civix shim calls it from hook_civicrm_upgrade.
      *
      * @param list<string> $tracked
      */

@@ -2,22 +2,10 @@
 #
 # ckcoretest — run CiviCRM *core* phpunit suites in the standalone image.
 #
-# The standalone image installs core from the release tarball, and
-# core's .gitattributes export-ignores tests/, phpunit.xml.dist, tools/ and the
-# two sql/test_data*.mysql seed files — so the dist can't initialize or run
-# its own suite cleanly. This fetches exactly the missing pieces for the
-# *installed* core version (sparse, blob-filtered checkout of the matching tag)
-# into the core tree, then runs phpunit headless (CIVICRM_UF=UnitTests) against
-# the scratch test DB.
-#
-# The fetched tree is cached in the container ([core]/tests/.ckcoretest-version
-# marker); re-runs skip the network. A core that already ships tests/ (a
-# CIVICRM_SOURCE=git build) is left untouched. A tests/ mounted from a checkout
-# into a tarball core stays as it is and gets only the config and the seed SQL.
-#
-# Requires the CIVIKITCHEN_TEST_DB provisioning (the default): without a
-# TEST_DB_DSN in ~/.cv.json this refuses to run, because headless phpunit
-# would silently run against — and wipe — the dev DB.
+# Fetches the pieces the release tarball export-ignores (tests/, phpunit.xml.dist,
+# tools/, sql/test_data*.mysql) for the installed core's tag, cached in the
+# container, then runs phpunit headless against the test DB. Refuses to run
+# without TEST_DB_DSN in ~/.cv.json, which would wipe the dev DB.
 #
 # Usage (inside the app container):
 #   ckcoretest tests/phpunit/api/v4/Query
@@ -27,9 +15,7 @@
 #   ckcoretest --e2e --ext afform/mock tests/phpunit/E2E   # browser/e2e tests, see below
 #   ckcoretest --e2e tests/extensions/router-test/tests/phpunit
 #
-# Without --ext the test path goes last. A path inside a directory below core with its
-# own phpunit.xml.dist (tests/extensions/<name>, ext/<name>) runs from that directory,
-# so its config boots the system the way that suite expects.
+# Without --ext the test path goes last; a path below its own phpunit.xml.dist runs from there.
 #
 # --e2e runs @group e2e tests against the dev site instead (CIVICRM_UF from the
 # image, no test DB): they install extensions into it and log in as ADMIN_USER.
@@ -166,10 +152,8 @@ if [ "${1:-}" = "--ext" ]; then
 fi
 
 cd "${run_dir}"
-# A suite with its own phpunit.xml.dist below core (tests/extensions/<name>) runs from
-# there: core's config boots only to settings level, so the test listener skips the boot.
-# The last word is the test path unless it is an option or the value of one; phpunit's
-# own help names the options that take a value (--filter <pattern>, -c|--configuration <file>).
+# A suite with its own phpunit.xml.dist runs from there (core's config skips the boot).
+# The last word is the test path unless it is an option or the value of one.
 path=""
 if [ "${run_dir}" = "${CK_CORE_DIR}" ] && [ $# -gt 0 ]; then
   last="${!#}"

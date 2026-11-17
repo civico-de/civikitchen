@@ -13,36 +13,15 @@ use CiviKitchen\Ckconform\Suppressions;
 
 /**
  * A conventional file that CiviCRM never loads because its mixin is not declared.
- *
- * civix wires each family of convention-over-configuration files through a
- * mixin listed in info.xml: managed records through mgd-php, entity schemas
- * through entity-types-php, xml/Menu routes through menu-xml, and so on. Ship
- * the files but forget the mixin and the files just sit there — the entity is
- * never registered, the menu route 404s — while every test that does not
- * exercise that exact path stays green.
- *
- * scan-classes fails: an entity picked up by Civi\Api4\Service\LegacyEntityScanner
- * raises a status-check message on every site ("APIv4 Entities using Legacy
- * Entity Scanner") and adds an extension file scan to every cache rebuild.
- *
- * The others warn: older civix wired xmlMenu/managed hooks into the .civix shim
- * instead of a mixin, so such a repo loads the files another way and is not
- * broken — a prompt for a human: is the mixin missing, or the file a vestige?
+ * scan-classes fails (core reports it on the status page); the others warn, as
+ * older civix loaded those families through hooks in the .civix shim.
  */
 final class MixinDeclarationCheck implements Check
 {
     /**
-     * civix mixin => the paths it loads, relative to the extension root and
-     * mirroring core's mixin/<name>@<version>/mixin.php: `*` stays within one
-     * directory; `dir`, `**`, `name` matches name at any depth below dir. A file anywhere else
-     * (a nested example extension, a fixture) is no evidence. Version-agnostic:
-     * mgd-php@1.0.0 and mgd-php@2.0.0 both satisfy "mgd-php".
-     *
-     * 'hook' names the hook older civix loaded the family through. It serves only
-     * that purpose, so the extension implementing it loads the files anyway.
-     *
-     * 'fail' marks a gap core itself reports on the site's status page; 'class'
-     * counts only files that declare a class.
+     * civix mixin => the paths it loads, mirroring core's mixin.php globs (`*`
+     * stays within one directory). 'hook' is the hook older civix used instead,
+     * 'fail' a gap core reports itself, 'class' counts only class files.
      *
      * @var array<string, array{globs: list<string>, label: string, hook?: string, class?: bool, fail?: bool}>
      */

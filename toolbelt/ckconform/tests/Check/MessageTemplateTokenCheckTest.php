@@ -66,8 +66,8 @@ final class MessageTemplateTokenCheckTest extends CheckTestCase
     }
 
     /**
-     * The one that cost real mails: core overwrites unknown contact.* tokens
-     * with the empty string, so the value is silently blank.
+     * Core overwrites unknown contact.* tokens with the empty string, so the
+     * value is silently blank.
      */
     public function testWarnsAboutOwnTokensRegisteredUnderTheContactNamespace(): void
     {

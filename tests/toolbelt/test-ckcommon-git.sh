@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ck_git tells git which directory to trust. That has to be the worktree root:
-# from an extension subdirectory of a multi-extension repo, a cwd guard leaves
-# dubious ownership standing and ls-files then reports nothing at all.
+# ck_git trusts the worktree root, also from an extension subdirectory; a cwd
+# guard there leaves dubious ownership standing and ls-files reports nothing.
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 work=$(mktemp -d)

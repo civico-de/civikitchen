@@ -8,13 +8,8 @@ declare(strict_types=1);
  * Usage:
  *   php tools/gen-route-catalog.php <extension-dir> [out-file]
  *
- * OPTIONAL. The `ck.route.mutationOnGet` rule reads xml/Menu/*.xml itself
- * and only prefers this file when it exists — the catalog is an override
- * for a repo whose routes are not where the parser looks, not a
- * precondition. Both paths use RouteCatalog::fromMenuXml(), so a generated
- * file and a live parse see the same routes.
- *
- * Default output is <extension-dir>/.ck-routes.json.
+ * Optional: `ck.route.mutationOnGet` parses xml/Menu/*.xml itself and prefers
+ * this file only when it exists. Default output is <extension-dir>/.ck-routes.json.
  */
 
 require_once dirname(__DIR__) . '/src/RouteCatalog.php';

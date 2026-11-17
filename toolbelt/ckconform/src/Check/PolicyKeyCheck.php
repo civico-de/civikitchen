@@ -10,39 +10,10 @@ use CiviKitchen\Ckconform\Policy;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * Keeps the `policy:` mapping in civikitchen.yaml honest.
- * SuppressionHygieneCheck.
- *
+ * Keeps the `policy:` mapping of civikitchen.yaml and CK_DEFAULT_CONFIG honest:
+ * unknown, repeated, malformed or non-numeric keys and bad `extension_source`.
  * A typo'd check name in an inline `ckconform-ignore` is reported as a dead
- * ignore; `min_covrage=70` would disable a coverage floor in silence. Same
- * typo, same consequence, so both are caught.
- *
- * Three failure modes, all silent by nature:
- *
- *   unknown key   nothing will ever read it, so the policy it expresses does
- *                 not exist. Reported against Policy::KEYS, the single inventory.
- *   bad number    a percentage that is not one. `min_coverage=seventy` reached
- *                 a numeric comparison as a string, and `min_coverage=70%`
- *                 likewise — both compare as 0, which passes every floor.
- *   repeated key  every key but lifecycle_log_ignore is first-wins, so a
- *                 second line is not an addition, it is a line that does
- *                 nothing. A repo declaring two `template_custom=` lines gets
- *                 one honoured and one ignored without being told.
- *   malformed     a non-comment line without `KEY=` never becomes a key, so
- *                 the three checks above cannot see it — `min_coverage 70`
- *                 disables a floor as silently as the typo'd name does.
- *   bad source    an `extension_source` that is not `<key>@<http URL>` never
- *                 matches the dependency it was written for, so the
- *                 entrypoint falls back to the registry — the exact download
- *                 the pin was declared to avoid.
- *
- * Both layers are checked — the repo config and the CK_DEFAULT_CONFIG
- * file — each finding named after the file it came from.
- *
- * What is deliberately NOT here: whether a value means the right thing. The
- * key's owner judges that, one tool per question — TestSuiteRequiredCheck is
- * the only thing that decides what `tests=` may say, and this check duplicating
- * it would put two verdicts on one line.
+ * ignore elsewhere; a typo'd policy key is reported here.
  */
 final class PolicyKeyCheck implements Check
 {
@@ -138,10 +109,8 @@ final class PolicyKeyCheck implements Check
     }
 
     /**
-     * A typo is the overwhelmingly likely cause, so name the nearest key when
-     * there is an obvious one. Distance 3 over key lengths of 5-24 characters
-     * catches a transposition or a dropped letter without pairing unrelated
-     * keys ('license' and 'vendor' stay 6 apart).
+     * Name the nearest key: distance 3 over key lengths of 5-24 characters
+     * catches a transposition without pairing 'license' and 'vendor'.
      */
     private function didYouMean(string $key): string
     {

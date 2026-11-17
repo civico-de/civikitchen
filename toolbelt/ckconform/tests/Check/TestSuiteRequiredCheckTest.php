@@ -40,9 +40,7 @@ final class TestSuiteRequiredCheckTest extends CheckTestCase
     }
 
     /**
-     * The count once missed this case entirely: a config-only extension keeps
-     * its logic in the root <key>.php, so the repo looked like it had nothing
-     * worth covering.
+     * A config-only extension keeps its logic in the root <key>.php.
      */
     public function testTheRootPhpFileCounts(): void
     {

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Sibling-wiring suite: every stack-booting job of the shared extension CI
-# workflow must reach the private-dependency steps and layer their override —
-# plus the fixture leg, because the check is silent on success.
+# reaches the private-dependency steps and layers their override.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."

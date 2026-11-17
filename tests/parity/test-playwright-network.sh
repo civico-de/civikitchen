@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# The browser job's network: the override step, run as written, publishes no
-# port and points CIVIKITCHEN_SITE_URL and CIVICRM_BASE_URL at http://localhost,
-# merged over the template CI compose or the CMS example, which publishes 8080
-# itself. The suite runs through ck playwright in the app container's network
-# namespace. Needs jq and the docker CLI, not a daemon.
+# The browser job's override step publishes no port and points the site URLs at
+# http://localhost, over the template CI compose or the CMS example. Needs jq and
+# the docker CLI, not a daemon.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

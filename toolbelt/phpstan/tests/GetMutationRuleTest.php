@@ -31,9 +31,7 @@ final class GetMutationRuleTest extends RuleTestCase
     }
 
     /**
-     * A route declared only in xml/Menu, with no generated catalog beside
-     * it, must still be seen — otherwise adding a route and forgetting to
-     * regenerate would silently switch the gate off.
+     * A route declared only in xml/Menu, with no generated catalog, is still seen.
      */
     public function testRoutesAreReadFromTheMenuXmlWhenNoCatalogExists(): void
     {

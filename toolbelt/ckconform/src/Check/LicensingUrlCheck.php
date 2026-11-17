@@ -9,13 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * The civix scaffold ships `<url desc="Licensing">` pointing at the AGPL text.
- * If the extension is relicensed and only `<license>` is edited, the link
- * survives — so the extension browser shows terms nobody granted. Readers trust
- * the link over the tag, so a stale one is worse than none.
- *
- * The url is located by attribute through SimpleXML, so attribute order and
- * whitespace inside the tag cannot decide whether the check runs at all.
+ * A `<url desc="Licensing">` (civix ships the AGPL text) that contradicts the
+ * extension's `<license>`, located by attribute through SimpleXML.
  */
 final class LicensingUrlCheck implements Check
 {

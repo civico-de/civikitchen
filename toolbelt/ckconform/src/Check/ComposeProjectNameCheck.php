@@ -9,14 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A compose file without an explicit project name.
- *
- * Compose derives the project from the directory the file sits in. Every
- * extension keeps its stacks in `.docker/`, so all of them resolve to one
- * project called "docker" and share containers, networks and volumes: `up` in
- * one repo bind-mounts another's checkout, `down -v` removes a sibling's
- * volumes. CI never sees it (one repo per runner); it bites the developer with
- * several checkouts.
+ * A compose file in a subdirectory without an explicit project name: all
+ * `.docker/` stacks resolve to project "docker" and share containers and volumes.
  */
 final class ComposeProjectNameCheck implements Check
 {
@@ -38,9 +32,7 @@ final class ComposeProjectNameCheck implements Check
 
         $unnamed = [];
         foreach ($context->composeFiles() as $file) {
-            // A file in the repo root derives the repo's own directory name,
-            // which is already unique — only the ones tucked into a shared
-            // subdirectory (.docker/) collide with their siblings.
+            // A root-level file derives the repo's own, unique directory name.
             if (!str_contains($file, '/')) {
                 continue;
             }
@@ -64,8 +56,7 @@ final class ComposeProjectNameCheck implements Check
     }
 
     /**
-     * Compose merges a `compose.override.y(a)ml` into the base file beside it,
-     * so the base file's name is the override's too.
+     * Compose merges a `compose.override.y(a)ml` into the base file beside it.
      *
      * @param array<string, bool> $named
      */

@@ -7,10 +7,8 @@ namespace CiviKitchen\Ckconform\Check;
 use CiviKitchen\Ckconform\Context;
 
 /**
- * What the CI jobs judging this extension actually run: their workflow and
- * GitLab pipeline text without comments, the gates behind `ck` subcommands and the shared CI,
- * the npm and composer scripts they invoke by name, and the repo's own shell scripts they invoke
- * by path, followed transitively.
+ * What the CI jobs judging this extension run: workflow and GitLab text without
+ * comments, `ck` and shared-CI gates, npm/composer scripts and repo shell scripts, transitively.
  */
 final class CiCommands
 {
@@ -68,9 +66,8 @@ final class CiCommands
     }
 
     /**
-     * Workflow text with YAML comments removed, so a step a comment describes
-     * never counts as one that runs. Line-based: a '#' inside a quoted value
-     * is dropped too, which errs toward reporting a missing runner.
+     * Workflow text with YAML comments removed, line-based; a '#' inside a quoted
+     * value is dropped too, erring toward reporting a missing runner.
      */
     public static function withoutComments(string $yaml): string
     {

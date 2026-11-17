@@ -47,9 +47,7 @@ image_sha=$(git log -1 --format=%H HEAD -- "${paths[@]}")
 # Repo from origin: no script in this repo hardwires the slug.
 repo=$(git config --get remote.origin.url | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')
 # Any run on a commit from the image commit up to HEAD counts, whatever its
-# event: this workflow builds exactly the images that gate a release; the CMS
-# flavors build in build-cms-images.yml and catch up later (docs/releases.md).
-# One line per run, newest last: reruns mean a commit can have several runs.
+# event. One line per run, newest last: a commit can have several runs.
 run=$(gh run list -R "$repo" --workflow build-dev-images.yml \
   --branch main --limit 100 --json status,conclusion,updatedAt,databaseId,event,headSha \
   --jq '.[] | "\(.updatedAt) \(.databaseId) \(.event) \(.status) \(.conclusion) \(.headSha)"' | sort |

@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
-# Matrix legs of the shared extension CI workflow: every leg boots its own
-# compose project and uploads under its own name (checker plus fixture, as the
-# check is silent on success), the compat-images step turns the inputs into
-# the compat, browser and core upgrade legs as written, and without
-# matrix_playwright or matrix_core_upgrade those jobs keep their single leg on
-# `image`.
+# Matrix legs of the shared extension CI: own compose project and artifact name
+# per leg, and the compat-images step's compat, browser and core upgrade legs.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

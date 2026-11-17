@@ -9,19 +9,9 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * Binary media is committed through Git LFS: a screenshot or video in plain
- * git stays in every clone for good, however often it is regenerated. SVG is
- * text and stays in git.
- *
- * The verdict comes from the index, not the work tree: a checkout without
- * git-lfs holds pointer files on disk, a checkout with it the real bytes, and
- * both are the same commit.
- *
- * A repo that keeps a media file in git on purpose (a test fixture, a file an
- * upstream owns) lists it in its civikitchen.yaml policy:
- * lfs_exempt=<path>[,<path>] -- <reason>; a directory covers every file below
- * it. Such a path must also be taken out of the LFS filter in .gitattributes,
- * or git reports the file as modified in every checkout.
+ * Binary media (not SVG) must be committed through Git LFS, judged from the index.
+ * Exemptions go in the civikitchen.yaml policy: lfs_exempt=<path>[,<path>] -- <reason>,
+ * and out of the LFS filter in .gitattributes.
  */
 final class MediaLfsCheck implements Check
 {

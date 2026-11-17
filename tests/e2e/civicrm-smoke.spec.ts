@@ -2,27 +2,15 @@ import { test, expect } from '@playwright/test';
 
 const TARGET = process.env.CIVIKITCHEN_E2E_TARGET ?? 'standalone';
 
-// E2E smoke tests for the standalone dev image. Boots via the example compose
-// stack (or any reachable CIVICRM_BASE_URL) and verifies the auto-installed
-// site renders.
-//
-// What this catches that the in-image functional tests can't:
-//   - cv core:install ran but produced an unwriteable cache dir (see commit
-//     introducing `runuser -u www-data`) — the page renders, but every
-//     request drops a permission-error banner into the response
-//   - Apache + PHP wired up but Civi assets 404 (SITE_URL mismatch)
-//   - The Angular crmLogin bundle fails to boot — login form never appears
-//   - settings.php missing/broken so /civicrm/* hits a 500
+// E2E smoke tests for the standalone dev image: the auto-installed site at
+// CIVICRM_BASE_URL renders, with its assets and the crmLogin bundle.
 
 test.describe('standalone CiviCRM site', () => {
   test.skip(TARGET !== 'standalone', 'Standalone-specific routes and login form');
 
   test('homepage redirects anonymous users to login', async ({ page }) => {
-    // Upstream CiviCRM's standaloneusers extension sends /civicrm/home to a
-    // 403 for unauthenticated users instead of redirecting to login — bad UX
-    // for a freshly-installed dev image. The image patches this with an
-    // Apache RedirectMatch in /etc/apache2/conf-enabled/civicrm.conf. This
-    // test guards that fix.
+    // standaloneusers answers /civicrm/home with a 403; the image's Apache
+    // RedirectMatch (conf-enabled/civicrm.conf) sends it to login.
     await page.goto('/');
     expect(page.url(), 'should land on /civicrm/login').toMatch(/\/civicrm\/login/);
   });
@@ -30,22 +18,17 @@ test.describe('standalone CiviCRM site', () => {
   test('login page renders without permission errors', async ({ page }) => {
     await page.goto('/civicrm/login');
 
-    // Title is set early in the template — confirms civi booted, settings
-    // loaded, and the standaloneusers extension's login route resolved.
+    // The title confirms civi booted and the login route resolved.
     await expect(page).toHaveTitle(/Log In/i);
 
-    // Regression guard: this exact banner appears on every request when the
-    // private/cache dir was created with the wrong owner (root vs www-data).
-    // It's still a 200, the test would pass on status-code-only assertions.
+    // This banner (with a 200) means private/cache has the wrong owner.
     const html = await page.content();
     expect(html, 'cache dir should be writable').not.toContain(
       'could not write'
     );
 
-    // The login form is a CiviCRM Angular module (crmLogin) that renders the
-    // username + password fields with ARIA labels rather than name= attrs.
-    // If the asset bundle never loads, this times out — exactly the
-    // regression a static curl-check would miss.
+    // crmLogin renders the fields with ARIA labels, not name= attributes;
+    // this times out if the asset bundle never loads.
     await expect(page.getByRole('textbox', { name: 'Username' })).toBeVisible({
       timeout: 15_000,
     });

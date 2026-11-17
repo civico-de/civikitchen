@@ -13,33 +13,11 @@ use PHPStan\Rules\Rule;
 use PHPStan\Rules\RuleErrorBuilder;
 
 /**
- * API parameters declared as properties of a custom APIv4 action.
- *
- * On a subclass of AbstractAction every protected property without a leading
- * underscore IS an API parameter: the generic action reads them, `getFields`
- * publishes them, and a caller may leave any of them unset. A
- * property without a default therefore does not produce the API
- * validation error the author expected — it produces PHP's "must not be
- * accessed before initialization" Error, from inside the API kernel, with a
- * stack trace that names no field.
- *
- * `@required` does NOT save it, which is the whole point of this rule:
- * ValidateFieldsSubscriber::onApiPrepare() reads every parameter through its
- * getter FIRST and only then asks whether it was required, so the read that
- * fatals happens before the check that would have produced
- * `Parameter "x" is required.`. Verified in a running install. Core's own
- * dominant form for a mandatory parameter is therefore untyped: a property
- * with no default, an `@var` docblock for the type and `@required`.
- *
- * The same holds for `?T` and `mixed`: a typed property without a default
- * starts uninitialized whatever its type. Properties a trait contributes are
- * parameters too, and one the constructor assigns is initialized. A declared
- * getter that reads it only through `??` or isset() is what the kernel calls, so
- * it is safe too.
- *
- * The mirror image is reported too: `@required` next to a default the kernel
- * accepts (anything but null, '', [] or FALSE) promises a validation that
- * cannot happen, because the parameter is never missing.
+ * A typed APIv4 action parameter without a default fatals as uninitialized
+ * when omitted, even with `@required`: ValidateFieldsSubscriber reads it before
+ * checking the requirement. A constructor assignment or a getter reading it
+ * only through `??`/isset() makes it safe. Also reports `@required` beside a
+ * non-empty default.
  *
  * @implements Rule<InClassNode>
  */
@@ -411,11 +389,8 @@ final class Api4ActionPropertyRule implements Rule
     }
 
     /**
-     * Whether the class is a custom APIv4 action.
-     *
-     * Reflection first, so an own intermediate base class counts. The textual
-     * fallback keeps the rule alive in a run that cannot see core: every
-     * generic action base is `Civi\Api4\Generic\Abstract*Action`.
+     * Whether the class is a custom APIv4 action: by reflection, else by the
+     * textual `Civi\Api4\Generic\Abstract*Action` parent when core is not visible.
      */
     private static function isApi4Action(ClassReflection $class, InClassNode $node): bool
     {

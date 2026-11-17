@@ -1,11 +1,7 @@
 #!/bin/bash
-# Boots a Standalone dev image with a MariaDB sidecar and the given profile
-# set, then runs the profile browser suites (tests/e2e/profiles) against it.
-# A profile that fails to apply keeps the container unhealthy. Used for the
-# weekly check of the extension stacks against the next CiviCRM release.
-# CK_CHECKOUT_PROFILES=1 mounts this checkout's docker/profiles and the profile
-# schema over the image's, to test profile changes on a published image before
-# it is rebuilt.
+# Boots a Standalone dev image with a MariaDB sidecar and the given profiles,
+# then runs their browser suites (tests/e2e/profiles) against it.
+# CK_CHECKOUT_PROFILES=1 mounts this checkout's docker/profiles and schema.
 #
 # Usage:
 #   bash tests/images/e2e-profiles-standalone.sh <image> <profile[,profile...]>

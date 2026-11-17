@@ -1,7 +1,6 @@
 <?php
-// A SearchKit table of donors with their completed donations (membership fees
-// excluded), shown as an Afform
-// page at civicrm/demo/donors.
+// A SearchKit table of donors' completed donations (membership fees excluded),
+// shown as an Afform page at civicrm/demo/donors.
 
 require_once __DIR__ . '/../../lib.php';
 

@@ -3,18 +3,10 @@
 declare(strict_types=1);
 
 /**
- * A workflow job that boots a compose stack AND can land on a self-hosted
- * runner must name its own compose project. The extension repos' compose files
- * name the project after the extension, so two such jobs of one run share it —
- * and the second one's `down -v --remove-orphans` SIGKILLs the first one's
- * containers (exit 137).
- *
- * A job pinned to a GitHub-hosted label gets its own VM and cannot collide, so
- * it is not flagged; the trigger is `runs-on` carrying an expression, which is
- * how a job reaches the self-hosted host with its several job slots.
- *
- * Such a project is never reused, so no later run's `down -v` removes it: the
- * job itself needs an `always()` step that does, or its networks pile up.
+ * A job that boots a compose stack and has an expression in `runs-on` (so it can
+ * share a self-hosted Docker host) names its own compose project, or another
+ * job's `down -v` kills its containers (exit 137). It also needs an `always()`
+ * step that removes that project, since no later run reuses it.
  *
  * Usage: php compose-project-isolation.php <workflow.yml> [<workflow.yml> ...]
  */
@@ -36,9 +28,8 @@ foreach ($files as $file) {
         if (!ck_job_boots($definition)) {
             continue;
         }
-        // A hardcoded GitHub-hosted label means one VM per job — no shared
-        // Docker daemon, nothing to collide over. Read from the `runs-on` key,
-        // not from the job text: a label named in a comment is not a runner.
+        // A hardcoded GitHub-hosted label means one VM per job; read the
+        // `runs-on` key, not the job text.
         $runsOn = ck_scalar_text($definition['runs-on'] ?? null);
         if ($runsOn !== '' && !str_contains($runsOn, '${{')) {
             continue;

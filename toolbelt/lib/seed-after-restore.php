@@ -1,13 +1,9 @@
 <?php
 
 /**
- * The steps after a seed snapshot is loaded and its dates are shifted, in one
- * CiviCRM boot: `cv scr --user=admin seed-after-restore.php`.
- *
- * Runs pending extension upgrades, rebuilds triggers and caches and reconciles
- * managed entities, invalidates every smart group cache, refreshes every
- * SearchKit DB-entity display, then runs the profile's after_restore scripts
- * (CK_SEED_AFTER_RESTORE, one path per line) in this same process.
+ * The steps after a seed snapshot is loaded and date-shifted, in one boot
+ * (`cv scr --user=admin seed-after-restore.php`), ending with the profile's
+ * after_restore scripts (CK_SEED_AFTER_RESTORE, one path per line).
  */
 
 $started = microtime(TRUE);

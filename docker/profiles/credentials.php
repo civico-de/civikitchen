@@ -21,11 +21,8 @@ function ck_credentials_writes_log(string $mode): bool {
 }
 
 /**
- * Remove a previous disclosure channel before rotating any credentials.
- *
- * `log` and `none` promise that no credentials file remains. Leaving an old
- * file in place is especially dangerous when passwords are stable across a
- * re-apply, so failure to remove it is fatal rather than a warning.
+ * Remove a previous credentials file before rotating; `log` and `none` promise
+ * none remains, so a failure is fatal.
  */
 function ck_credentials_remove_file(string $path): void {
   if (!file_exists($path) && !is_link($path)) {

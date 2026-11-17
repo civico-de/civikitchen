@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Promote-scanned suite: every promote job of the image pipelines waits for the
-# scan of its own candidates — plus the fixture leg, because the check is
-# silent on success.
+# scan of its own candidates.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."

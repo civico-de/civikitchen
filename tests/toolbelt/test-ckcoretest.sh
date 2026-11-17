@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# ckcoretest --e2e runs only @group e2e against the dev site, as www-data when started as root:
-# no UnitTests UF and no TEST_DB_DSN gate. Headless runs keep both and get core's startup ini.
-# A test path below a directory with its own phpunit.xml.dist runs from there.
-# A core version without a tag stops before fetching; a mounted tests/ in a release
-# tarball gets its phpunit config from the tag. Fakes record the calls.
+# ckcoretest: --e2e runs @group e2e against the dev site without the test-DB gate,
+# headless runs keep it; untagged cores stop before fetching. Fakes record calls.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

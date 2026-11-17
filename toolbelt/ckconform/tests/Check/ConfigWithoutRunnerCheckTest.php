@@ -45,9 +45,8 @@ final class ConfigWithoutRunnerCheckTest extends CheckTestCase
     }
 
     /**
-     * The indirection that matters in practice: CI runs `npm run test`, and the
-     * script is what names vitest. Without resolving it this would be a false
-     * positive, and noise is how a checker gets ignored.
+     * CI runs `npm run test` and the script names vitest; the script has to be
+     * resolved to avoid a false positive.
      */
     public function testAnNpmScriptCountsAsInvokingTheTool(): void
     {
@@ -125,9 +124,7 @@ final class ConfigWithoutRunnerCheckTest extends CheckTestCase
     }
 
     /**
-     * A step described in a comment is not a step. one repo's workflow explains
-     * why its phpunit job was retired, and that prose alone satisfied the first
-     * version of this check.
+     * A step described in a comment is not a step.
      */
     public function testAToolNamedOnlyInACommentDoesNotCount(): void
     {

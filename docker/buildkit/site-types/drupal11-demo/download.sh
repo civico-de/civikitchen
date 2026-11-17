@@ -2,19 +2,9 @@
 
 ## download.sh -- Download Drupal 11 and CiviCRM
 ##
-## CiviKitchen's drupal11-demo civibuild site type. Upstream civicrm-buildkit
-## ships no drupal11-demo — only drupal11-dev (a git/path-repo dev build
-## without demo data, enabled components, or a demoadmin) and drupal11-empty
-## (CMS-only). This is drupal10-demo's composer-based download recipe pinned
-## to Drupal ^11; the demo assets it shares with drupal10-demo (logo, config/,
-## install-*.php) are copied from the sibling drupal10-demo dir when this type
-## is installed into the buildkit clone (see docker/buildkit/bake.sh).
-## Retire this dir when upstream ships its own drupal11-demo.
-##
-## The body below intentionally stays byte-close to upstream drupal10-demo so
-## the two can be diffed; civibuild sources this file inside its own harness,
-## which supplies the env vars and aborts on failed steps itself — hence the
-## upstream-style bare pushd/popd (SC2164) stay as-is.
+## drupal10-demo's download pinned to Drupal ^11, as buildkit ships no
+## drupal11-demo; bake.sh copies the shared demo assets. Byte-close to upstream:
+## civibuild's harness sources it and aborts on failure, so bare pushd/popd stay.
 # shellcheck disable=SC2164
 
 ###############################################################################

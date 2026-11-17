@@ -12,18 +12,9 @@ use PHPStan\Type\Constant\ConstantArrayType;
 use PHPStan\Type\Type;
 
 /**
- * The shared judgement behind the three APIv4 contract rules.
- *
- * An APIv4 call is a string protocol: entity, action and field names are
- * literals that nothing checks until the call runs. A typo in a select
- * survives the linters, phpstan and every test that does not execute that line,
- * and then throws on a customer's site. The catalog makes the contract
- * checkable at analysis time.
- *
- * The rule only ever speaks when it is sure. Anything non-literal, anything
- * dotted (joins, `custom.*`), anything on an entity whose field list the
- * source tree cannot settle is passed over in silence — a static checker
- * that guesses about a dynamic API teaches people to ignore it.
+ * The shared judgement behind the three APIv4 contract rules. It reports only
+ * provable errors: non-literal names, unresolvable dotted paths and entities
+ * with an incomplete field list pass silently.
  */
 final class Api4Contract
 {
@@ -110,11 +101,8 @@ final class Api4Contract
             return null;
         }
 
-        // An unknown name is only reportable when it is a near-miss of a core
-        // entity. Extensions call each other's entities (CiviRulesRule,
-        // Twingle...) and their classes are not in the analysis; the only
-        // unknown entity this rule can prove wrong is one that reads like a
-        // typo of a real one.
+        // An unknown entity is reported only as a near-miss of a core one;
+        // other extensions' entities are not in the analysis.
         $suggestion = self::nearestEntity($entity);
         if ($suggestion === null) {
             return null;
@@ -142,9 +130,7 @@ final class Api4Contract
         if (in_array(strtolower($action), array_map(strtolower(...), Api4Catalog::actions($entity)), true)) {
             return null;
         }
-        // Extensions add actions to core entities by dropping a class into
-        // Civi\Api4\Action\<Entity>\, which AbstractEntity::__callStatic
-        // then resolves.
+        // Extensions add actions to core entities via Civi\Api4\Action\<Entity>\.
         if ($this->classes->declaredName(sprintf(
             'Civi\\Api4\\Action\\%s\\%s',
             self::entityClass($entity),
@@ -180,13 +166,8 @@ final class Api4Contract
     }
 
     /**
-     * The right-hand side of a dotted path, against the join's target entity.
-     *
-     * `address_primary.street_address` is only checkable when the left side
-     * is an implicit join the catalog knows: everything else that reads like
-     * a path — an explicit `addJoin()` alias, a custom-group name, a
-     * multi-level path, a price-set field — names something no source tree
-     * can resolve, and is passed over without a word.
+     * The right-hand side of a dotted path, against the join's target entity;
+     * checked only when the left side is an implicit join the catalog knows.
      *
      * @param list<string> $shadowedAliases aliases an explicit join rebound
      */
@@ -277,13 +258,8 @@ final class Api4Contract
     }
 
     /**
-     * Names the catalog is allowed to have an opinion about.
-     *
-     * A dot is a join or a custom field (`address_primary.city`,
-     * `custom.my_group.my_field`), whose right-hand side lives on another
-     * entity or only on a configured site. A star, a space, a parenthesis
-     * or a quote means a SQL expression (`COUNT(*) AS total`), not a field.
-     * `row_count` is SearchKit's synthetic column.
+     * Names the catalog may judge: no dot (join, custom field), no SQL
+     * expression characters, not SearchKit's synthetic `row_count`.
      */
     private static function isCheckableFieldName(string $field): bool
     {
@@ -314,9 +290,8 @@ final class Api4Contract
                 return true;
             }
         }
-        // Anything the analysis can see a class for: the extension's own
-        // entities, and those of the extensions it declares a dependency on.
-        // Core looks entities up by exact name, so `contact` is not Contact.
+        // Entities the analysis sees a class for (own and required extensions);
+        // core looks them up by exact name, so `contact` is not Contact.
         $class = 'Civi\\Api4\\' . self::entityClass($entity);
         if ($this->classes->declaredName($class) === $class) {
             return true;
@@ -334,10 +309,8 @@ final class Api4Contract
     }
 
     /**
-     * Entity names the analysed extension defines itself.
-     *
-     * Kept as a fallback next to the reflection lookup: an entity class the
-     * autoloader does not reach is still this extension's business.
+     * Entity names the analysed extension defines itself, for classes the
+     * autoloader does not reach.
      *
      * @return list<string>
      */

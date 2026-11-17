@@ -10,11 +10,9 @@ use CiviKitchen\Ckconform\Policy;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * Holds info.xml's lowest `<compatibility><ver>` at CiviCRM's current ESR.
- * An extension that declares another version says why in
- * `policy.civicrm_floor_reasons`, one entry per reason with the version that
- * reason needs; one entry names the declared version, and none lies on the
- * ESR's side of it or past it. Every finding is a warning.
+ * Holds info.xml's lowest `<compatibility><ver>` at CiviCRM's current ESR. Another
+ * floor needs `policy.civicrm_floor_reasons`, each reason with the version it needs:
+ * one names the declared version, none lies on the ESR's side of it. Warnings only.
  */
 final class CivicrmFloorCheck implements Check
 {

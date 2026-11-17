@@ -12,47 +12,15 @@ use CiviKitchen\Ckconform\Reporter;
 use CiviKitchen\Ckconform\Suppressions;
 
 /**
- * A hook implementation only fires under this extension's own hook prefix, and
- * only if the hook still exists.
- *
- * CiviCRM resolves `hook_civicrm_post` to `<prefix>_civicrm_post`, where
- * `<prefix>` is the extension's file name (`<file>` in info.xml, i.e. the
- * basename of its main PHP file). A function copied out of another extension —
- * `otherext_civicrm_post()` — is perfectly valid PHP, loads without a murmur
- * and is never called. Same for a typo'd hook name: `..._civicrm_postCommmit`
- * is dead code that looks like a working feature. A hook core has since removed
- * fails the same way, and just as quietly.
- *
- * Nothing else catches the removed and deprecated cases. A hook implementation
- * is a function *definition* matching a naming convention, not a call to a
- * deprecated symbol, so static analysis of deprecations has nothing to bind to.
- *
- * The listener forms fail just as silently, so they are scanned too: a
- * 'hook_civicrm_*' string literal (addListener, getSubscribedEvents, dispatch)
- * and a scan-classes listener method (`hook_*` / `on_*` / `self_*`, the three
- * prefixes EventScanner::findFunctionListeners matches) both bind by name, and
- * a typo in either registers a listener no event will ever reach.
- *
- * Four verdicts, deliberately asymmetric:
- *  - a wrong prefix FAILS, because the expected prefix is knowable from
- *    info.xml, so the mismatch is statically proven;
- *  - a removed hook FAILS, because core no longer dispatches the name at all;
- *  - a deprecated hook WARNS, because it still fires today;
- *  - an unrecognised suffix WARNS, because third-party extensions publish
- *    their own hooks (`hook_civicrm_acmeConnectors`) that no embedded list can
- *    enumerate — a <requires> extension found on disk contributes the hooks
- *    it dispatches, so only the rest needs declaring.
+ * A hook implementation or listener name that never fires: a wrong prefix or a
+ * removed hook fails, a deprecated hook or unknown suffix warns. Unknown
+ * third-party hooks come from <requires> extensions on disk or `known_hooks`.
  */
 final class HookDispatchNameCheck implements Check
 {
     /**
-     * Hooks CiviCRM has removed: suffix => guidance.
-     *
-     * Hand-verified, and deliberately not generated: a removed hook leaves no
-     * trace in a core checkout, and deriving from dev-docs prose condemns live
-     * hooks (`post`, `install`, `enable` are built dynamically; `alterExternUrl`
-     * is dispatched from CRM/Utils/System.php). Each entry is confirmed absent
-     * from CRM/, Civi/, api/ and ext/, ignoring CRM/Upgrade/Incremental/.
+     * Hooks CiviCRM has removed: suffix => guidance. Hand-verified: each is
+     * absent from CRM/, Civi/, api/ and ext/, ignoring CRM/Upgrade/Incremental/.
      *
      * @var array<string, string>
      */
@@ -67,10 +35,7 @@ final class HookDispatchNameCheck implements Check
     ];
 
     /**
-     * Deprecations that exist only in the dev docs, never as a core marker.
-     *
-     * The generator reads core's `@deprecated` tags and its runtime deprecation
-     * warnings; these carry neither, so they are listed by hand.
+     * Deprecations only in the dev docs, with no `@deprecated` tag or runtime warning.
      *
      * @var array<string, string>
      */
@@ -97,11 +62,8 @@ final class HookDispatchNameCheck implements Check
             return;
         }
 
-        // Hooks invented by other extensions can't live in the public catalog.
-        // A <requires> extension present on disk publishes them by dispatching
-        // them — its call sites are read directly. What that cannot reach (a
-        // dependency not mounted, this repo's own hooks) a repo declares in
-        // its civikitchen.yaml policy: known_hooks=acmeConnectors,otherHook
+        // Third-party hooks: dispatched by a <requires> extension on disk, or
+        // declared in civikitchen.yaml as known_hooks=acmeConnectors,otherHook
         $policyHooks = array_filter(array_map('trim', explode(',', $context->policyValue('known_hooks') ?? '')));
         foreach ($context->requiredExtensionDirs() as $dir) {
             $policyHooks = array_merge($policyHooks, HookSurface::dispatchedSuffixes($dir));
@@ -188,22 +150,15 @@ final class HookDispatchNameCheck implements Check
     }
 
     /**
-     * The suffix verdict shared by all three binding forms; the prefix rule is
-     * function-only and stays with its loop.
-     *
-     * Judging and reporting are separate so that the ignore is consulted only
-     * where there is something to ignore: a suppression consulted on a clean
-     * hook would count as consumed and hide the unused-ignore report that
-     * SuppressionHygieneCheck exists for.
+     * The suffix verdict shared by all three binding forms. Judged apart from
+     * reporting so a suppression is consulted only where something fires.
      *
      * @param  list<string> $policyHooks
      * @return array{bool, string}|null [is a failure, message], null if clean
      */
     private function suffixVerdict(string $file, string $subject, string $suffix, array $policyHooks): ?array
     {
-        // A repo that declares a suffix in civikitchen.yaml is asserting a live
-        // third-party hook under that name; core's history about a same-named
-        // hook then says nothing about this code.
+        // A suffix declared in civikitchen.yaml is a live third-party hook.
         if (in_array($suffix, $policyHooks, true)) {
             return null;
         }
@@ -280,11 +235,8 @@ final class HookDispatchNameCheck implements Check
     }
 
     /**
-     * Methods (any depth) whose name EventScanner would bind to a hook:
-     * `hook_civicrm_x`, `on_hook_civicrm_x`, `self_hook_civicrm_x`. Dotted
-     * events (`on_civi_foo_bar` → civi.foo.bar) are a different namespace the
-     * catalog cannot judge. A stray *global* function under these names is dead
-     * code too, so no depth filter.
+     * Methods (any depth) EventScanner binds to a hook: `hook_civicrm_x`,
+     * `on_hook_civicrm_x`, `self_hook_civicrm_x`. Dotted civi.* events are skipped.
      *
      * @return list<array{string, string, int}> [method name, hook suffix, line]
      */
@@ -318,11 +270,8 @@ final class HookDispatchNameCheck implements Check
     }
 
     /**
-     * String literals naming a hook event: addListener/getSubscribedEvents/
-     * dispatch all bind by exactly such a string. A leading '&' (by-reference
-     * marker) and an '::Entity' scope (the self_ form's target) wrap the same
-     * name and are stripped before judging. Only plain single-part literals are
-     * seen — interpolated strings build names the scan cannot resolve.
+     * String literals naming a hook event (addListener, getSubscribedEvents,
+     * dispatch), with a leading '&' and an '::Entity' scope stripped.
      *
      * @return list<array{string, string, int}> [literal (unquoted), hook suffix, line]
      */

@@ -10,32 +10,9 @@ use CiviKitchen\Ckconform\Reporter;
 use CiviKitchen\Ckconform\Suppressions;
 
 /**
- * A Playwright suite that leaves nothing behind when it fails.
- *
- * A browser test that fails in CI is a stack trace and a screenshot of nothing.
- * Without a trace there is no way to see what the page actually looked like, and
- * re-running locally often will not reproduce it. Several separate gaps each
- * look configured while producing exactly that:
- *
- *   - `trace: 'on-first-retry'` records nothing for the FIRST failure. With
- *     retries disabled it never records at all, and where retries are on, a
- *     flaky test that passes on the second attempt leaves a trace nobody reads.
- *     `retain-on-failure` keeps one for every attempt that actually failed.
- *   - No reporter configured means no `playwright-report/` directory exists,
- *     so an upload of that path archives nothing.
- *   - An `upload-artifact` step with no `if:` is SKIPPED when a previous step
- *     fails — which is exactly, and only, when the report matters. It needs
- *     `if: always()` (or `!cancelled()` / `failure()`).
- *   - The upload has to sit in the SAME job as the Playwright run: GitHub
- *     runners share no filesystem, so an upload in another job collects
- *     nothing. A global "some workflow runs playwright, some workflow uploads"
- *     lets two unrelated workflows satisfy each other.
- *
- * A job is judged when it runs `playwright test`, directly or through a package
- * script; naming Playwright in an input, a make target or a lint plugin runs no suite.
- * A job that delegates to a reusable workflow (`uses:` at job level) is exempt:
- * it has no steps of its own, so `playwright: true` there is an input to the
- * callee, and the callee is where the upload has to live.
+ * A Playwright job that keeps no diagnostics on failure: trace not
+ * `retain-on-failure`, no reporter, or no `if: always()` report upload in the
+ * same job. Jobs that call a reusable workflow are exempt.
  */
 final class PlaywrightDiagnosticsCheck implements Check
 {
@@ -269,9 +246,8 @@ final class PlaywrightDiagnosticsCheck implements Check
     }
 
     /**
-     * A job body split into its step blocks — each from a `- ` list item under
-     * `steps:` to the next at the same indent; lists under `services:` or
-     * `strategy:` are no steps.
+     * A job body split into its step blocks; lists under `services:` or
+     * `strategy:` are not steps.
      *
      * @return list<string>
      */
@@ -312,10 +288,8 @@ final class PlaywrightDiagnosticsCheck implements Check
     }
 
     /**
-     * Drop `#` line comments so a commented-out step or a `# playwright` note
-     * cannot satisfy or trip the check. A `#` that starts a comment is at line
-     * start or follows whitespace; one inside a quoted run-command value does
-     * not, and is left alone.
+     * Drop `#` comments (at line start or after whitespace) so a commented-out
+     * step cannot satisfy or trip the check.
      */
     private function stripComments(string $body): string
     {
@@ -328,9 +302,8 @@ final class PlaywrightDiagnosticsCheck implements Check
     }
 
     /**
-     * Return only the object literal exported as the Playwright config.
-     * Unrelated constants and quoted examples must not satisfy the policy.
-     * Supports ESM direct/variable exports and CommonJS module.exports.
+     * Only the object literal exported as the Playwright config (ESM direct or
+     * variable export, CommonJS module.exports).
      */
     private function exportedConfig(string $body): string
     {
@@ -548,10 +521,8 @@ final class PlaywrightDiagnosticsCheck implements Check
     }
 
     /**
-     * Mask JavaScript comments and template literals while preserving code,
-     * quoted string values, newlines, and byte positions. This is enough to
-     * recognize object properties without allowing prose or template content
-     * to satisfy the configuration contract.
+     * Mask JavaScript comments and template literals, keeping code, quoted
+     * strings, newlines and byte positions.
      */
     private function javascriptCode(string $body): string
     {

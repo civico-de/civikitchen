@@ -9,17 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * The .gitignore has to cover the artifacts this repo can actually produce.
- *
- * CommittedArtifactCheck punishes a tracked cache after the fact; this one stops
- * it being tracked in the first place: phpunit writes .phpunit.result.cache next
- * to its config on every run, so a `git add -A` straight after a test run commits it.
- *
- * Only artifacts the repo can generate are demanded, so a PHP-only extension is
- * never nagged about node_modules, nor one with cacheResult="false" about the
- * result cache. git check-ignore decides, so a repository-root .gitignore counts. The counterpart rule lives in LockfileCheck:
- * a lockfile must NEVER be ignored. Ignore what a build regenerates, commit what
- * pins it.
+ * The .gitignore has to cover the artifacts this repo can actually produce
+ * (result cache, vendor/, node_modules/, *.tsbuildinfo), decided by git check-ignore.
  */
 final class GitignoreCoverageCheck implements Check
 {
@@ -74,15 +65,9 @@ final class GitignoreCoverageCheck implements Check
     }
 
     /**
-     * Where this artifact would actually appear, if anywhere.
+     * Where this artifact would appear, beside the manifest or config that
+     * produces it; an empty list means the repo cannot produce it.
      *
-     * Derived from the real manifest locations rather than assumed at the repo
-     * root: npm creates node_modules beside the package.json that declared it,
-     * and TypeScript writes its cache beside its tsconfig. Demanding a
-     * root-level ignore for a repo whose frontend lives in frontend/ is a false
-     * positive, and noise is how a checker teaches people to stop reading it.
-     *
-     * An empty list means the repo cannot produce the artifact at all.
      *
      * @return list<string>
      */
@@ -125,8 +110,8 @@ final class GitignoreCoverageCheck implements Check
 
     /**
      * Where phpunit writes its result cache: nowhere with cacheResult="false",
-     * at cacheResultFile (relative to the config, a directory gaining the default
-     * name) when set, otherwise .phpunit.result.cache — PHPUnit 9's Loader.
+     * at cacheResultFile (relative to the config) when set, else .phpunit.result.cache.
+     *
      *
      * @return list<string>
      */

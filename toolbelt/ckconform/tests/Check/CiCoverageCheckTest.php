@@ -67,10 +67,8 @@ final class CiCoverageCheckTest extends CheckTestCase
     }
 
     /**
-     * The failure this rule exists for: eight repos declared a min_coverage
-     * while CI ran `phpunit --coverage-text`, which prints a percentage and
-     * always exits 0. A floor nothing enforces reads like a gate and stops
-     * nothing.
+     * A declared min_coverage needs ckcoverage in CI: `phpunit --coverage-text`
+     * prints a percentage and always exits 0.
      */
     public function testADeclaredFloorWithoutCkcoverageFails(): void
     {

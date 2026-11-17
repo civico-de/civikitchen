@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# patch-test-db-boot.php routes CIVICRM_UF=UnitTests boots of the standalone
-# stub at the test database and at a cache that lives in it; the buildkit
-# settings shim test-db-cache.php does the cache half. Core's bootSettings()
-# and civibuild's settings header are stubbed; the settings files set a file
-# cache the way a site would in civicrm.settings.php.
+# UnitTests boots go to the test database and its cache: patch-test-db-boot.php
+# (standalone) and test-db-cache.php (buildkit, cache only). Boot code is stubbed.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

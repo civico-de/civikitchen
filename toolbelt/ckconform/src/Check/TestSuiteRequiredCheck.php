@@ -9,15 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A repo with real PHP logic and no suite is a gap, not a style preference.
- * Config-only extensions can say so in civikitchen.yaml: tests=optional -- <reason>
- *
- * The source count must include the extension's own root .php file, which is
- * exactly where a config-only extension keeps whatever logic it has. Counted are
- * all .php under Civi/ and CRM/ plus the .php directly in the repo root;
- * generated and machine-owned files (.civix.php, DAO/, phpstanBootstrap.php)
- * do not count as surface anyone is asked to test. BAO/ does: civix only seeds
- * the class, the business logic in it is the repo's own.
+ * A repo with PHP logic (Civi/, CRM/, root .php; not .civix.php, DAO/,
+ * phpstanBootstrap.php) and no suite. Opt-out in civikitchen.yaml: tests=optional -- <reason>
  */
 final class TestSuiteRequiredCheck implements Check
 {
@@ -42,9 +35,7 @@ final class TestSuiteRequiredCheck implements Check
 
         $optout = $context->policyValue('tests');
         if ($optout !== null) {
-            // Only the documented form opts out — 'tests=required' or a typo
-            // must not silently disable the check, and the reason is not
-            // optional.
+            // Only the documented form opts out, and the reason is mandatory.
             if (preg_match('/^optional\s+--\s+\S/', $optout) === 1) {
                 $reporter->ok("no test suite — declared optional in civikitchen.yaml ({$optout})");
 
@@ -66,9 +57,8 @@ final class TestSuiteRequiredCheck implements Check
     /** @return list<string> */
     private function sourceFiles(Context $context): array
     {
-        // sourceFiles() falls back to the filesystem outside a git checkout
-        // (tarball, exported build), where a source-heavy repo would otherwise
-        // silently pass; the root files need their own non-recursive fallback.
+        // sourceFiles() falls back to the filesystem outside a git checkout;
+        // the root files need their own non-recursive fallback.
         $candidates = array_merge(
             $context->sourceFiles('Civi', ['.php']),
             $context->sourceFiles('CRM', ['.php']),
@@ -92,10 +82,9 @@ final class TestSuiteRequiredCheck implements Check
     }
 
     /**
-     * The repo root only, not recursively — everything below the root is either
-     * already counted via Civi//CRM/ or deliberately out of scope (tests/, ang/,
-     * vendor/). Tracked, not on-disk: an untracked <key>.php lying in the root
-     * must not turn a config-only repo into one that "has source to cover".
+     * Tracked .php files in the repo root only; an untracked <key>.php does not
+     * count as source.
+     *
      *
      * @return list<string>
      */

@@ -29,9 +29,8 @@ if ! docker image inspect "$image" >/dev/null 2>&1; then
   docker build --target toolchain -f "$checkout/$dockerfile" -t "$image" "$checkout" >&2
 fi
 
-# Docker resolves bind mounts on its own side, so every path ck hands a container
-# is mounted at its own path: $HOME (what colima and Docker Desktop share), this
-# checkout and the current git work tree.
+# Docker resolves bind mounts on its side, so $HOME, this checkout and the
+# current work tree are mounted at their own paths.
 cwd="$(pwd -P)"
 tree="$cwd"
 while [ "$tree" != / ] && [ ! -e "$tree/.git" ]; do tree="$(dirname "$tree")"; done

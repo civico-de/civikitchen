@@ -1,35 +1,19 @@
-# zizmor (docs.zizmor.sh) audits the workflows for supply-chain footguns:
-# unpinned actions, expression injection, over-broad tokens, checkouts that
-# leave a usable token in .git/config. Run by the Lint workflow and, locally,
-# by `scaffold/ck make lint-actions`, which pins the version.
-#
-# --no-online-audits keeps the run hermetic and deterministic: the online
-# audits (known-vulnerable-actions, stale-action-refs) would turn an upstream
-# advisory into a red build on an unrelated PR. Action updates arrive through
-# Dependabot instead (.github/dependabot.yml).
-#
-# Every entry below is an exemption, and each one has to say why it is not a
-# finding. Nothing goes in here to make the run green.
+# zizmor workflow audit, run by `scaffold/ck make lint-actions` with
+# --no-online-audits. Every entry below is an exemption and states its reason.
 
 rules:
   unpinned-uses:
     config:
       policies:
-        # The extension repos call this repo's reusable workflows at a moving
-        # major ref on purpose — workflow, template, ck* tools and images ship
-        # as one versioned contract, and fixes have to reach the extension fleet
-        # without a PR in each. See docs/adr/0001-*, which also spells out
-        # what a hash pin would cost. Third-party actions still need a hash.
+        # This repo's reusable workflows are called at the moving @v1 ref, the
+        # versioned contract (docs/adr/0001-*). Third-party actions need a hash.
         civico-de/civikitchen/*: ref-pin
         "*": hash-pin
 
   template-injection:
     ignore:
-      # `matrix.version` / `matrix.variant` come from resolve-civicrm, which
-      # emits only exact ^[0-9]+\.[0-9]+\.[0-9]+$ versions (validated, or
-      # resolved from versions.json and re-validated) and exits non-zero
-      # otherwise — the values cannot carry shell syntax. The matrix is
-      # dynamic, so zizmor cannot see that check.
+      # The dynamic matrix comes from resolve-civicrm, which emits only
+      # validated ^[0-9]+\.[0-9]+\.[0-9]+$ versions or exits non-zero.
       - build-dev-images.yml
 
   cache-poisoning:
@@ -40,7 +24,6 @@ rules:
 
   use-trusted-publishing:
     ignore:
-      # Trusted publishing (OIDC) is an npmjs.com feature; this package goes to
-      # GitHub Packages, where the scoped, run-lived GITHUB_TOKEN is the
-      # intended credential — there is no long-lived secret to replace.
+      # Trusted publishing is an npmjs.com feature; GitHub Packages takes the
+      # run-scoped GITHUB_TOKEN, so there is no long-lived secret to replace.
       - publish-schema.yml

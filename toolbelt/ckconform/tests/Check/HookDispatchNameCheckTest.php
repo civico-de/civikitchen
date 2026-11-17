@@ -500,9 +500,8 @@ final class HookDispatchNameCheckTest extends CheckTestCase
     }
 
     /**
-     * A hook another extension invents is defined where that extension
-     * dispatches it. With the dependency present under the ext dir, the
-     * implementing repo declares nothing — in both dispatch forms.
+     * A hook another extension dispatches needs no declaration when that
+     * dependency is present under the ext dir, in both dispatch forms.
      */
     public function testARequiredExtensionPublishesTheHooksItDispatches(): void
     {

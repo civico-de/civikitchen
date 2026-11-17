@@ -2,16 +2,7 @@
 
 /**
  * Taint SINKS: the CRM_Utils_System calls that end up in a response header.
- *
- * redirect() is a Location header (open redirect / header injection when the
- * URL comes from the request); setHttpHeader() is the raw header API, name
- * and value; download() writes Content-Type from $mimeType and
- * Content-Disposition from $name — a request-controlled filename there is the
- * header-injection half of an upload bug.
- *
- * download()'s $buffer is the response body, i.e. HTML taint, and TaintedHtml
- * is off by policy (see psalm-taint.xml.dist) — deliberately not annotated,
- * so the config stays the single place that decision is made.
+ * download()'s $buffer is HTML taint, which psalm-taint.xml.dist turns off.
  *
  * Signatures verified against CiviCRM 6.18.0 (CRM/Utils/System.php).
  */

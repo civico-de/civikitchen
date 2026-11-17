@@ -9,12 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * civix scaffolds a composer.json for every extension; its absence usually
- * means a hand-rolled repo that skipped the generator and has no
- * machine-readable metadata (name, autoload, dependencies) at all.
- *
- * The description lives only in info.xml, which CiviCRM shows: a second copy
- * in composer.json is read by nothing and drifts.
+ * A missing composer.json, or one carrying a description: that belongs only in
+ * info.xml, which CiviCRM shows.
  */
 final class ComposerJsonCheck implements Check
 {

@@ -1,16 +1,7 @@
 <?php
 /**
- * Apply a profile's declarative content: config, then seed.
- *
- * Runs via `cv scr` from apply.sh; the profile path comes in CK_PROFILE_JSON
- * (`cv scr` has no argv passthrough).
- *   config  converges on every apply: whatever differs is written back;
- *           anonymous_permissions are added, never revoked.
- *   seed    creates each record once, matched by its anchor (contacts by
- *           external_identifier = ref, contributions by a synthetic trxn_id),
- *           and never touches an existing one, so edits in the UI survive.
- * Every missing prerequisite is listed before anything is written, except
- * that settings and components go first: they must be on to check the rest.
+ * Apply CK_PROFILE_JSON's config (converged every run) and seed (created once
+ * per anchor, never updated). Prerequisites are checked before any write.
  */
 
 use Civi\Api4\Contact;

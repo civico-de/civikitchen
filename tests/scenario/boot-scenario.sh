@@ -106,10 +106,8 @@ while IFS= read -r check; do
   docker compose -f "$compose" exec -T -w /civikitchen-extension app bash -lc "$check"
 done < <("$root/toolbelt/bin/ck" scenario commands "$root/tests/scenario/civikitchen.yaml")
 
-# Ownership is a hard trust boundary. A profile must fail before mutating the
-# existing managed set when a desired username belongs to the site's real CMS
-# administrator. Then prove exact reconciliation by removing the managed API
-# user and checking both identity state and API-key revocation.
+# A profile claiming the CMS administrator's username fails before changing the
+# managed set; removing a managed API user deactivates it and revokes its key.
 docker compose -f "$compose" exec -T app php -r '
   $v=json_decode(file_get_contents($argv[1]), TRUE, 512, JSON_THROW_ON_ERROR);
   $second=$v["apiUsers"][0];

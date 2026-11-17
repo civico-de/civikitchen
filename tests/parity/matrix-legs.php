@@ -3,11 +3,8 @@
 declare(strict_types=1);
 
 /**
- * The legs of a matrix job run in one run and, where an expression picks the
- * runner, possibly on one Docker host. A leg that boots a compose stack there
- * needs a project of its own, or the next leg's `down -v` kills its stack;
- * every leg needs its own artifact name, as a run refuses a second upload
- * under a name it already holds.
+ * Matrix legs that may share a Docker host each boot their own compose project,
+ * and every leg uploads under its own artifact name.
  *
  * Usage: php matrix-legs.php <workflow.yml> [<workflow.yml> ...]
  */

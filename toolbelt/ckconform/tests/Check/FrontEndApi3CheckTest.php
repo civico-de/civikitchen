@@ -75,8 +75,7 @@ final class FrontEndApi3CheckTest extends CheckTestCase
     }
 
     /**
-     * grep is line-based, so a reason wrapped onto the following line never
-     * counted — the PHP version matches per line for the same reason.
+     * Matched per line, so a reason wrapped onto the following line does not count.
      */
     public function testTheReasonMustBeOnTheAnnotationLine(): void
     {
@@ -97,8 +96,8 @@ final class FrontEndApi3CheckTest extends CheckTestCase
     }
 
     /**
-     * The bash exclusion pattern requires both slashes, so a top-level dist/ is
-     * deliberately still checked.
+     * The exclusion requires both slashes of '/dist/', so a top-level dist/ is
+     * still checked.
      */
     public function testATopLevelDistDirectoryIsStillChecked(): void
     {

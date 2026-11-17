@@ -7,16 +7,9 @@ namespace CiviKitchen\Ckconform\Check;
 use CiviKitchen\Ckconform\Context;
 
 /**
- * Which class-name prefixes belong to the extension under inspection.
- *
- * The static checks that resolve a class name to a file can only judge the
- * extension's own classes: a missing CRM_Contact_Page_View is a typo in the
- * check, not a bug in the repo, because core ships it. Guessing wrong in either
- * direction is costly — too narrow and a genuinely dangling callback passes, too
- * wide and every core reference fails — so the shortname is taken from both
- * ends: info.xml (<key>/<file>) and the directories the repo actually ships
- * (CRM/<X>/, Civi/<X>/). Comparison is case-insensitive; PSR-0 case drift is
- * Psr0ClassPathCheck's job, not this one's.
+ * Which class-name prefixes belong to the extension under inspection, from
+ * info.xml (<key>/<file>) and the shipped CRM/<X>/ and Civi/<X>/ directories,
+ * compared case-insensitively.
  */
 final class ExtensionNamespace
 {

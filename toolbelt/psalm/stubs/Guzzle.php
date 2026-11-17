@@ -1,18 +1,9 @@
 <?php
 
 /**
- * Taint SINKS: Guzzle — the HTTP client CiviCRM ships and Civi::httpClient()
- * hands out. A request-controlled URI here is SSRF.
+ * Taint SINKS: Guzzle's URI argument (SSRF); $options is not a sink.
  *
- * Guzzle lives in vendor/, which cktaint ignores, so nothing about it is
- * visible to Psalm without this file.
- *
- * Only the URI is a sink: $options carries body and headers, and an
- * attacker-controlled body sent to a fixed host is not SSRF — flagging it
- * would make every forwarder red.
- *
- * Signatures per guzzlehttp/guzzle 7.x (ClientInterface plus the __call verb
- * shortcuts, declared explicitly because Psalm cannot annotate __call).
+ * Signatures per guzzlehttp/guzzle 7.x.
  */
 
 namespace GuzzleHttp;
@@ -36,9 +27,8 @@ interface ClientInterface {
 }
 
 /**
- * The magic verb methods (get/post/put/…) are not on the interface — they go
- * through __call — so they are declared here as @method-style stubs with the
- * same sink on the URI.
+ * The __call verb methods (get/post/put/…), declared because Psalm cannot
+ * annotate __call.
  */
 class Client implements ClientInterface {
 

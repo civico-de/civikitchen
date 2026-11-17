@@ -10,15 +10,8 @@ if (!is_file($yamlAutoload)) {
 }
 
 /**
- * Template files civikitchen OWNS: identical in every conforming repo, safe to
- * overwrite on --update and compared on --check. Everything else in the
- * template is seeded once (composer.json, phpstan.neon.dist, the dev compose
- * file, .gitignore) and then belongs to the extension — repos edit those, so
- * ckinit never touches them again.
- *
- * A repo that must deviate on a managed file declares it in civikitchen.yaml:
- *
- *   policy.template_custom.paths: [.docker/docker-compose.ci.yml]
+ * Template files civikitchen owns: overwritten on --update, compared on --check.
+ * A repo deviates on one via policy.template_custom in civikitchen.yaml.
  */
 const MANAGED_FILES = [
   '.gitattributes',
@@ -36,10 +29,8 @@ const MANAGED_FILES = [
 ];
 
 /**
- * Seeded files, listed explicitly rather than "everything else": a template
- * file in neither list aborts every ckinit run. Without that, a new template
- * file would default to seeded — copied once, then never updated — which for
- * a workflow or bootstrap file is exactly the wrong silent default.
+ * Files copied once and then owned by the repo. A template file in neither
+ * list aborts every run, so a new file cannot silently default to seeded.
  */
 const SEEDED_FILES = [
   '.gitignore',
@@ -56,12 +47,8 @@ const SEEDED_FILES = [
 ];
 
 /**
- * Seeded files whose ABSENCE is never drift.
- *
- * A new repo gets them; an existing one is not made to. phpstan-tests.neon.dist
- * is an opt-in gate — its existence is the switch CI reads — so reporting it
- * missing would turn the drift check into the forced rollout the opt-in was
- * meant to avoid. --update therefore does not create these either.
+ * Seeded files whose absence is never drift, and which --update does not create:
+ * their existence is the opt-in switch CI reads.
  */
 const OPTIONAL_FILES = [
   'phpstan-tests.neon.dist',
@@ -183,8 +170,7 @@ foreach (array_slice($argv, 1) as $arg) {
 }
 
 if ($force && $mode !== 'seed') {
-  // --force means "overwrite files the repo owns"; combined with --update it
-  // would silently clobber composer.json and friends. Say what you mean.
+  // --force with --update would clobber composer.json and other seeded files.
   fwrite(STDERR, "ckinit: --force only applies to seeding, not --{$mode}\n");
   usage();
 }
@@ -249,19 +235,10 @@ if (preg_match('/^[a-z0-9]([a-z0-9_.-]*[a-z0-9])?$/', $vendor) !== 1) {
   $vendor = 'example';
 }
 
-// Template files the repo has declared custom, from civikitchen.yaml (same KEY=VALUE
-// format ckconform reads; first occurrence wins). The reason after ' -- ' is
-// mandatory — an unexplained exception is indistinguishable from a stale one.
-// For a MANAGED file, custom means "the content is this repo's own"; for a
-// SEEDED file it means the repo owns the file's whole existence — including
-// not having it (a repo with no PHP test suite and a declared tests policy
-// has no business carrying a phpunit.xml.dist, and --update must not keep
-// reseeding one). Names are validated against the full template inventory, so
-// a typo still fails loudly instead of disabling nothing.
-//
-// The parser is ckconform's, required straight out of the checkout: ckinit
-// runs on a bare runner with no image, so it cannot shell out to
-// `ckconform --policy-env` the way the ck* tools do, but it can use the class.
+// Template files declared custom in civikitchen.yaml, each with a mandatory
+// reason after ' -- '. A custom seeded file may also be absent; names are
+// validated against the template inventory. ckinit runs without the image, so
+// it loads ckconform's Policy class from the checkout.
 require_once $yamlAutoload;
 require_once dirname(__DIR__) . '/toolbelt/ckconform/src/Policy.php';
 
@@ -281,8 +258,7 @@ if (is_string($policyRaw)) {
   $releasesNothing = str_starts_with($policy['release'][0] ?? '', 'none');
   $onGitlab = ($policy['ci'][0] ?? '') === 'gitlab';
   $declared = $policy['template_custom'] ?? [];
-  // First occurrence wins; ckconform's policy-key check reports a second line
-  // that would silently do nothing.
+  // First occurrence wins; ckconform reports a second line.
   foreach (array_slice($declared, 0, 1) as $value) {
     if (preg_match('/\s--\s\S/', $value) !== 1) {
       fwrite(STDERR, "ckinit: policy.template_custom in civikitchen.yaml needs paths and a reason\n");
@@ -319,9 +295,8 @@ if (!is_array($composer)) {
 }
 $usesStrauss = isset($composer['extra']) && is_array($composer['extra']) && isset($composer['extra']['strauss']);
 
-// The Renovate preset the managed renovate.json extends. An organisation
-// sets it once in the CK_DEFAULT_CONFIG file rather than per repo, which is
-// why this goes through the layered view; the repo file can still override.
+// The Renovate preset, from the layered view so CK_DEFAULT_CONFIG can set it
+// organisation-wide; the repo file can still override.
 $renovatePreset = renovatePreset(is_string($policyRaw) ? $policyRaw : NULL);
 
 $iterator = new RecursiveIteratorIterator(
@@ -379,9 +354,7 @@ foreach ($iterator as $item) {
 }
 usort($files, static fn (array $a, array $b): int => strcmp($a[1], $b[1]));
 
-// The two lists must be an exact, disjoint inventory of the template. Checked
-// on every run so the mismatch surfaces on the developer machine that added
-// the file, not months later in some repo's CI.
+// The two lists must be an exact, disjoint inventory of the template.
 $unclassified = array_diff($inventory, MANAGED_FILES, SEEDED_FILES);
 $stale = array_diff(array_merge(MANAGED_FILES, SEEDED_FILES), $inventory);
 $overlap = array_intersect(MANAGED_FILES, SEEDED_FILES);
@@ -1009,10 +982,8 @@ function runRootPass(string $root, string $mode, bool $force, string $yamlAutolo
       continue;
     }
     if ($blocks !== [] && $repoBlocks !== []) {
-      // One block per extension directory, so a changed set is an added or
-      // removed extension: --update reconciles it, --check reports it.
-      // By name, not by position: a job appended by --update sits last whatever
-      // the directory sorts as, and job order in the workflow is cosmetic.
+      // A changed block set is an added or removed extension. Compared by name:
+      // --update appends new jobs last, and job order is cosmetic.
       $repoNames = array_keys($repoBlocks);
       $wantedNames = array_keys($blocks);
       sort($repoNames);
@@ -1178,8 +1149,7 @@ function managedSegments(string $content): array {
 function reconcileRootJobs(string $existing, array $templateBlocks, string $relative, bool $apply): ?string {
   [$leading, $segments] = managedSegments($existing);
   $present = array_column($segments, 'name');
-  // Without the header block the file's shape is unknown, and appending the
-  // template's header at the end would produce nonsense.
+  // Without the header block the file's shape is unknown.
   if (!in_array((string) array_key_first($templateBlocks), $present, TRUE)) {
     return NULL;
   }
@@ -1348,8 +1318,7 @@ foreach ($files as [$destination, $relative, $perms, $content]) {
     }
     continue;
   }
-  // Content plus the executable bit — the one mode bit git actually tracks,
-  // so comparing full permissions would drift with the checkout umask.
+  // Content plus the executable bit, the only mode bit git tracks.
   $sameExec = (($perms & 0111) !== 0) === ((fileperms($destination) & 0111) !== 0);
   $existing = (string) file_get_contents($destination);
   if (!$managed || ($existing === $content && $sameExec)) {

@@ -8,38 +8,15 @@ use PHPStan\Rules\IdentifierRuleError;
 use PHPStan\Rules\RuleErrorBuilder;
 
 /**
- * Table names in raw SQL, judged against the schema.
- *
- * Raw SQL is the one place in an extension where a name is never checked
- * until the statement runs: `DELETE FROM civicrm_civirules_rule` (the table
- * is called civirule_rule) is a clean parse, a clean phpstan run, a clean
- * unit test — and a fatal on a customer's site. The catalog makes the table
- * half of that checkable.
- *
- * The calibration is deliberately narrow, because the schema of a live site
- * is core plus whatever extensions are installed, and the analysis knows
- * only core plus this repo:
- *
- *  - only names starting with `civicrm_` are judged at all. That prefix is
- *    core's; an extension table called `civirule_rule` or `mailjet_event`
- *    is invisible to us and stays silent.
- *  - `civicrm_value_*` (custom groups), `civicrm_tmp_*` / `civicrm_temp*`
- *    (CRM_Utils_SQL_TempTable) and anything the repo's own schema declares
- *    are known by construction.
- *  - other extensions DO ship `civicrm_`-prefixed tables. A repo that
- *    queries one lists it in phpstan.neon under
- *    `parameters.civikitchen.sqlKnownTables`.
- *  - only literal SQL is read. A table name that arrives through a
- *    variable, `{$table}` or a `%1` placeholder is skipped without a word.
+ * Table names in literal SQL, judged against the schema. Only `civicrm_`
+ * names are judged; custom-value, temp and the repo's own tables are known,
+ * other extensions' go into `parameters.civikitchen.sqlKnownTables`.
  */
 final class SqlSchema
 {
     /**
-     * Table families that exist per site, not per release.
-     *
-     * Custom-value tables are named after a custom group, temp tables after
-     * a random suffix; both are `civicrm_`-prefixed and neither can be in
-     * any catalog.
+     * Table families that exist per site, not per release: custom-value and
+     * temp tables.
      */
     private const DYNAMIC_PREFIXES = ['civicrm_value_', 'civicrm_tmp_', 'civicrm_temp'];
 
@@ -167,11 +144,8 @@ final class SqlSchema
     }
 
     /**
-     * Is this a name we may have an opinion about?
-     *
-     * Anything carrying interpolation (`{$table}`, `%1`), a database
-     * qualifier (`otherdb.civicrm_contact`) or a prefix that is not core's
-     * is somebody else's business.
+     * Is this a name we may judge? Not with interpolation (`{$table}`, `%1`),
+     * a database qualifier or a prefix that is not core's.
      */
     private static function isPlainName(string $name): bool
     {
@@ -195,11 +169,8 @@ final class SqlSchema
     }
 
     /**
-     * Tables the analysed extension installs itself.
-     *
-     * Three declaration styles are read, because all three are in the field:
-     * the modern schema/*.entityType.php, civix's xml/schema/**\/*.xml, and
-     * the generated sql/auto_install.sql.
+     * Tables the analysed extension installs itself, from schema/*.entityType.php,
+     * xml/schema/**\/*.xml and sql/auto_install.sql.
      *
      * @return list<string>
      */

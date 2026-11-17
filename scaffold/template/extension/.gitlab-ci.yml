@@ -1,14 +1,6 @@
-# Thin caller for a repository hosted on GitLab (civikitchen.yaml: ci: gitlab):
-# the pipeline lives in civikitchen's shared ci/gitlab/extension-ci.yml (site
-# provisioned in the job container → ck ci → cklifecycle, plus Playwright when
-# the repo has a playwright.config.ts), defined once instead of copied per repo.
-#
-# The v1 ref is the versioned contract: this include, the image it runs and the
-# ck* tools move together. See civikitchen's docs/releases.md.
-#
-# Everything up to the END marker is template-managed; variables that override
-# the shared defaults (CK_DB_IMAGE, CK_LIFECYCLE) and further jobs go below it
-# and survive `ckinit --update`.
+# Thin caller of civikitchen's ci/gitlab/extension-ci.yml at the v1 contract.
+# Up to the END marker template-managed; variables (CK_DB_IMAGE, CK_LIFECYCLE)
+# and further jobs go below it.
 # BEGIN CIVIKITCHEN MANAGED caller
 include:
   - remote: https://raw.githubusercontent.com/civico-de/civikitchen/v1/ci/gitlab/extension-ci.yml

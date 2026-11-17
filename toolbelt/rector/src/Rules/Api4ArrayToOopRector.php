@@ -12,17 +12,10 @@ use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Scalar\String_;
 
 /**
- * Convert the api4 ARRAY form to the idiomatic OO builder — fully SAFE: same API
- * version, same semantics, same Result. Pure style.
+ * Convert the api4 array form to the OO builder, with the same semantics:
  *
  *   civicrm_api4('Contact', 'get', ['where' => [['x', '=', 1]], 'select' => ['id'], 'limit' => 5])
  *   -> \Civi\Api4\Contact::get()->addWhere('x', '=', 1)->addSelect('id')->setLimit(5)->execute()
- *
- * checkPermissions becomes the action() argument (api4 defaults TRUE in both
- * forms, so an absent value maps to no argument). AND/OR/NOT where rows become
- * addClause(). Bails on anything it doesn't model yet (join/having/chain/
- * groupBy-with-keys, non-literal entity/action/params, the $index argument, an
- * entity without its own Civi\Api4 class).
  */
 final class Api4ArrayToOopRector extends AbstractApiCallAssistRector {
 

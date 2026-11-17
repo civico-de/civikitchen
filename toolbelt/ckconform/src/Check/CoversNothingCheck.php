@@ -10,18 +10,8 @@ use CiviKitchen\Ckconform\PhpSource;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A test class annotated `@coversNothing`, which silently records zero coverage.
- *
- * `@coversNothing` tells PHPUnit that a test contributes to no code's coverage.
- * civix's generated headless test template carries it at the class level, so a
- * suite scaffolded from that template runs green while measuring 0%.
- *
- * ckcoverage catches the symptom once a floor is set, but only says "below the
- * floor", not why — and a repo still bringing its coverage up has no floor yet,
- * which is exactly when this bites. This names the annotation, so the 0% is not a
- * mystery. It is a warning, not a failure: `@coversNothing` is legal PHPUnit and
- * occasionally deliberate, but in a CiviCRM extension's headless suite it is
- * almost always the template footgun left in by accident.
+ * A test class annotated `@coversNothing`, which silently records zero coverage
+ * (civix's headless template carries it). A warning: the annotation is legal.
  */
 final class CoversNothingCheck implements Check
 {
@@ -49,9 +39,8 @@ final class CoversNothingCheck implements Check
     }
 
     /**
-     * The annotation in a docblock, where PHPUnit reads it, or the attribute
-     * in an attribute group; a plain comment mentioning it is neither.
-     * Lines are where the docblock or attribute group starts.
+     * Lines where a docblock carrying the annotation, or an attribute group with
+     * the attribute, starts; a plain comment mentioning it is neither.
      *
      * @return list<int>
      */

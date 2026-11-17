@@ -1,24 +1,8 @@
 <?php
 
 /**
- * CiviKitchen Joomla Identity Sync.
- *
- * CiviCRM-on-Joomla resolves permissions via $user->authorise(perm,
- * 'com_civicrm'), where $user is Joomla's *current identity*. In a headless
- * context — cv --user, or an authx api_key/jwt request — authx establishes the
- * CiviCRM logged-in contact but nothing sets Joomla's identity, so it stays the
- * guest user. Read paths happen to work (APIv4 applies contact-level ACLs via
- * the CiviCRM contact), but anything that calls CRM_Core_Permission::check() —
- * write actions, permission-checked seeds — is denied because Joomla evaluates
- * the guest.
- *
- * Fix: lazily, the first time a permission is checked while a CiviCRM contact is
- * logged in, load that contact's Joomla user as the application identity. This
- * runs on hook_civicrm_permission_check, which fires *inside*
- * CRM_Core_Permission::check() right before the Joomla authorise() — so the very
- * check that triggered it already sees the right user. It covers every headless
- * path (cv --user, authx api_key) with one mechanism, and is idempotent + a
- * no-op on a normal web request (identity already matches) and on other CMSs.
+ * On headless requests authx sets the CiviCRM contact but Joomla's identity
+ * stays guest; on the first permission check, load the contact's Joomla user.
  */
 
 function ckjoomlaidentity_civicrm_config(&$config) {

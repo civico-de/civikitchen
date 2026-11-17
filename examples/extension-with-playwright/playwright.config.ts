@@ -1,11 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// UI test starter for a CiviCRM extension. Boot the compose stack in this
-// directory (`docker compose up -d`), then `ck playwright npm run test:e2e`.
-//
-// The `setup` project logs in once and saves the session to `.auth/admin.json`.
-// The `chromium` project loads that storage state, so individual tests start
-// already authenticated — no per-test login boilerplate.
+// Boot the stack (`docker compose up -d`), then `ck playwright npm run test:e2e`.
+// `setup` logs in once to `.auth/admin.json`, which `chromium` tests reuse.
 
 export default defineConfig({
   testDir: "./tests",

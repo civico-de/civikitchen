@@ -6,16 +6,12 @@ export PATH="/home/buildkit/buildkit/bin:${PATH}"
 # Xdebug toggle (shared with standalone image).
 . /usr/local/share/civikitchen/xdebug-toggle.sh
 
-# DB connection. Uses the CIVICRM_DB_* prefix for symmetry with the
-# standalone image. CIVICRM_DB_ROOT_PASSWORD is the *admin* password (not
-# the runtime app password) — civibuild creates a per-site user during
-# `civibuild create site`, so the entrypoint needs GRANT-level access.
+# CIVICRM_DB_ROOT_PASSWORD is the admin password: civibuild creates the
+# per-site users.
 export CIVICRM_DB_HOST="${CIVICRM_DB_HOST:-db}"
 export CIVICRM_DB_PORT="${CIVICRM_DB_PORT:-3306}"
 export CIVICRM_DB_ROOT_PASSWORD="${CIVICRM_DB_ROOT_PASSWORD:-root}"
-# Default site type comes from the build arg DEFAULT_SITE_TYPE — each published
-# CMS tag sets its own civibuild template. Users can override at runtime by
-# setting CIVICRM_SITE_TYPE.
+# The build arg DEFAULT_SITE_TYPE, overridable with CIVICRM_SITE_TYPE.
 CIVICRM_SITE_TYPE="${CIVICRM_SITE_TYPE:-${CIVICRM_SITE_TYPE_DEFAULT:-drupal10-demo}}"
 
 # Legacy name: SITE_URL was renamed to CIVIKITCHEN_SITE_URL (kitchen-owned
@@ -25,11 +21,7 @@ if [[ -z "${CIVIKITCHEN_SITE_URL+x}" && -n "${SITE_URL+x}" ]]; then
     export CIVIKITCHEN_SITE_URL="${SITE_URL}"
 fi
 
-# CIVIKITCHEN_SITE_URL is the URL the browser uses to reach this container.
-# Must match the external port from your Docker port mapping (-p flag).
-# Examples:
-#   docker run -p 8080:80  →  CIVIKITCHEN_SITE_URL=http://localhost:8080
-#   docker run -p 80:80    →  CIVIKITCHEN_SITE_URL=http://localhost (default)
+# Must match the published host port: -p 8080:80 → http://localhost:8080.
 if [[ -z "${CIVIKITCHEN_SITE_URL}" ]]; then
     HTTPD_DOMAIN="${HTTPD_DOMAIN:-localhost}"
     HTTPD_PORT="${HTTPD_PORT:-80}"
@@ -46,9 +38,7 @@ echo "CiviCRM Dev Image (${CIVICRM_SITE_TYPE})"
 echo "=========================================="
 echo "Site URL: ${CIVIKITCHEN_SITE_URL}"
 
-# Wait for the database via PHP mysqli — same probe the standalone image
-# uses. mysqli (mysqlnd) sidesteps the TLS-enforcement default that newer
-# mariadb-client builds apply to plain dev sidecars.
+# Probe through PHP mysqli, which does not enforce TLS like newer mariadb-client.
 echo "Waiting for database at ${CIVICRM_DB_HOST}:${CIVICRM_DB_PORT}..."
 attempt=0
 until ck internal database-ready root 2>/dev/null; do
@@ -61,17 +51,10 @@ until ck internal database-ready root 2>/dev/null; do
 done
 echo "Database is ready."
 
-# First boot: re-install the BAKED site against the external DB. The codebase
-# (CMS + CiviCRM) was baked at image-build time, so this is a fast `civibuild
-# reinstall` (~60s) — it recreates the DBs on the external host and regenerates
-# the settings + isolated test DB for it, without re-downloading anything.
+# First boot: `civibuild reinstall` (~60s) of the baked site against the external DB.
 if [[ ! -f "${MARKER_FILE}" ]]; then
-    # The marker lives in the container filesystem; the DB may live on a
-    # persistent volume. A recreated container (image update + pull_policy:
-    # always, docker rm) loses the marker — and `civibuild reinstall` DROPS
-    # the site databases. Refuse to wipe data that survived us: a sentinel
-    # row written after every successful install marks the external DB as
-    # carrying a civikitchen site.
+    # A recreated container loses the marker but not the database volume, and
+    # the reinstall drops the site databases: a sentinel row refuses that.
     if [[ "${CIVIKITCHEN_REINSTALL:-0}" != "1" ]]; then
         sentinel_rc=0
         ck internal database-sentinel-exists || sentinel_rc=$?
@@ -110,13 +93,8 @@ MYCNF
 
     bk "export PATH=$(printf '%q' "${PATH}") && amp config:set --mysql_type=mycnf --httpd_type=none --perm_type=none"
 
-    # The site was baked against a throwaway MariaDB on 127.0.0.1 (see bake.sh),
-    # so the civibuild build config + amp instance registry still point there.
-    # Repoint them at the external DB host before reinstall — civibuild's
-    # `amp create -f` (run by reinstall via amp_install) then re-creates the
-    # per-site DBs + users on ${CIVICRM_DB_HOST}. Without this, drush/cv dial
-    # 127.0.0.1 inside the container and get "[2002] Connection refused".
-    # Escape sed-replacement metacharacters in the host (/, &, \).
+    # The build config and amp registry still point at the bake's 127.0.0.1;
+    # repoint them at the external host, escaping sed metacharacters (/, &, \).
     DB_HOST_SED=$(printf '%s' "${CIVICRM_DB_HOST}" | sed 's/[\/&\\]/\\&/g')
     bk "sed -i 's/127\.0\.0\.1/${DB_HOST_SED}/g' \
         /home/buildkit/buildkit/build/*.sh \
@@ -127,15 +105,7 @@ MYCNF
     # external host, regenerate settings for ${CIVIKITCHEN_SITE_URL}.
     bk "export PATH=$(printf '%q' "${PATH}") && civibuild reinstall site --url $(printf '%q' "${CIVIKITCHEN_SITE_URL}")"
 
-    # joomla-demo's civibuild install is deliberately incomplete (component
-    # registration left as a #fixme, only civi_contribute enabled). The demo
-    # image bakes the finish into its embedded DB; the dev image rebuilds the
-    # site from that incomplete install on every first boot (the reinstall above)
-    # and discards the baked DB — so re-run the same finish here, or the dev
-    # :joomla image's option=com_civicrm route (admin UI + api_key API) and the
-    # extra component extensions are missing. Idempotent + Joomla-only (the
-    # script self-guards); runs as buildkit, before the profile apply in
-    # entrypoint-common.sh below.
+    # The reinstall above recreates civibuild's incomplete Joomla install.
     if [[ "${CIVICRM_SITE_TYPE}" == joomla* ]]; then
         bk "export PATH=$(printf '%q' "${PATH}") && bash /usr/local/share/civikitchen/joomla-finish.sh"
     fi
@@ -151,9 +121,7 @@ else
     echo "Site already installed (skipping)."
 fi
 
-# Shared first-boot provisioning (SMTP, CIVIKITCHEN_PROFILE,
-# extension knobs, init.d hooks, readiness marker) — identical for the dev and
-# demo images, so it lives in entrypoint-common.sh.
+# Shared first-boot provisioning of the dev and demo images.
 . /usr/local/share/civikitchen/entrypoint-common.sh
 
 # Docker lets the image user bind port 80 (ip_unprivileged_port_start=0).

@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
-# The managed test bootstrap's ck_headless() installs the extension's info.xml
-# <requires>, transitively and one per install(), before the extension itself,
-# touching the extension system only once its step runs; it restores the core foreign keys its own signing drops before 6.20, signs
-# a step with the extension's install files, and drains the status messages the
-# build queues. Civi is stubbed: what is under test is the
-# info.xml reader and the calls the builder receives.
+# ck_headless() installs info.xml <requires> transitively before the extension,
+# restores the core foreign keys signing drops before 6.20, signs with the
+# install files and drains queued status messages. Civi is stubbed.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

@@ -9,21 +9,9 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A container service definition pointing at a class the extension does not
- * ship.
- *
- * This is the worst member of the dangling-class family. A missing Page class
- * breaks one URL; a missing service class breaks the container compile, and the
- * container is built before anything else can run — every page, every API call,
- * every cron job dies, and the site cannot even be reached to disable the
- * extension. Renaming a subscriber and forgetting the hook_civicrm_container
- * registration (or a services.yml `class:`) does exactly that.
- *
- * Only literal class names are judged — a string literal or Foo\Bar::class.
- * Dynamic expressions ($class, concatenation, variables) are unresolvable
- * statically and are skipped rather than guessed at, and foreign classes are
- * passed over in silence because they may legitimately live in core or a
- * dependency.
+ * A container service definition naming an own class the extension does not
+ * ship, which breaks the container compile and so the whole site. Only literal
+ * names are judged; foreign classes are passed over.
  */
 final class ContainerServiceReferenceCheck implements Check
 {
@@ -95,9 +83,8 @@ final class ContainerServiceReferenceCheck implements Check
     }
 
     /**
-     * `class: Civi\Foo\Bar` from a services.yml. A line parser, not a YAML
-     * parser: no Symfony YAML component ships in this image, and the one key
-     * that matters here is unambiguous on its own line.
+     * `class: Civi\Foo\Bar` from a services.yml, by line: no YAML component
+     * ships in this image.
      *
      * @return list<string>
      */

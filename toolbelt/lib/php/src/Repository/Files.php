@@ -111,10 +111,8 @@ final class Files
     }
 
     /**
-     * The worktree root around the cwd, which git must be told to trust: the cwd
-     * itself, in an extension subdirectory, would leave dubious ownership standing.
-     * Walked rather than asked, because `rev-parse --show-toplevel` is itself
-     * refused under it; the cwd stands in when nothing above is a checkout.
+     * The worktree root around the cwd, for safe.directory; walked, because
+     * `rev-parse --show-toplevel` is refused under dubious ownership.
      */
     public static function worktreeRoot(): string
     {

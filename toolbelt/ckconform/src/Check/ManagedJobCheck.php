@@ -10,33 +10,9 @@ use CiviKitchen\Ckconform\Reporter;
 use CiviKitchen\Ckconform\Scalar;
 
 /**
- * A managed Job is scheduled config that nobody looks at again: it either runs
- * silently every hour or it silently never runs. The failure classes here all
- * look fine in the file.
- *
- * A Job without api_entity/api_action is created happily and then throws on
- * every cron pass, so the scheduled-job log fills with errors nobody reads. An
- * unknown run_frequency is not in the option list, so the job never matches a
- * cron window at all. A non-string `parameters` breaks Civi's line-based
- * parser (it splits the value on newlines and `=`), so the job runs with
- * missing arguments — a nightly sync that silently syncs nothing. A malformed
- * line in a string `parameters` is worse: the parser throws before the API is
- * called, so the job never runs at all.
- *
- * The reactivation trap is the expensive one: a managed Job with
- * `is_active => TRUE` and update `always` (the default) is re-enabled by every
- * upgrade and reconcile, so a job an admin deliberately switched off comes back
- * — and starts sending mail or writing to a remote system again.
- *
- * A Job pointing at an API of this extension that the repo does not ship is a
- * warning: it may come from a dependency, but far more often it is a rename
- * that the mgd file did not follow.
- *
- * The runner calls civicrm_api($entity, $action, $params) with the parameters
- * CRM_Core_BAO_Job::parseParameters() produced, and that defaults key=value
- * text to version => 3. A job whose entity exists only under Civi/Api4/ then
- * dies on "API does not exist" on every cron pass unless its parameters say
- * version=4.
+ * Managed Job defects: missing api_entity/api_action, unknown run_frequency,
+ * malformed `parameters`, `is_active => TRUE` with update `always` (re-enables
+ * on every reconcile), an APIv4-only entity without version=4, an unshipped own API.
  */
 final class ManagedJobCheck implements Check
 {
@@ -174,12 +150,8 @@ final class ManagedJobCheck implements Check
     }
 
     /**
-     * Everything CRM_Core_BAO_Job::parseParameters() rejects, in its own
-     * terms. Core throws 'Malformed API parameters in scheduled job' (and a
-     * 'Job parameters error' for unparseable JSON) before the API is ever
-     * called, so the job never runs — a silent failure the mgd file does not
-     * show. Its acceptance rules are mirrored exactly, including that a blank
-     * line is malformed too.
+     * Everything CRM_Core_BAO_Job::parseParameters() rejects, in its own terms
+     * (a blank line too); core throws before the API is called.
      *
      * @return list<string>
      */
@@ -209,10 +181,8 @@ final class ManagedJobCheck implements Check
     }
 
     /**
-     * APIv4's setCheckPermissions() takes a bool and core calls it from
-     * non-strict files, so PHP coerces: 0, '0' and false turn the check off,
-     * while the non-empty strings 'false'/'FALSE' coerce to TRUE and leave it
-     * on.
+     * Whether the value turns setCheckPermissions() off under PHP coercion: 0, '0'
+     * and false do; the strings 'false'/'FALSE' coerce to TRUE.
      */
     private static function disablesPermissions(mixed $value): bool
     {
@@ -236,9 +206,8 @@ final class ManagedJobCheck implements Check
     }
 
     /**
-     * CRM_Core_BAO_Job::parseParameters(): a value starting with '{' is JSON,
-     * anything else is key=value lines defaulting to version 3. Malformed
-     * input is reported by parameterErrors() and skipped here.
+     * CRM_Core_BAO_Job::parseParameters(): '{' starts JSON, anything else is
+     * key=value lines defaulting to version 3. Malformed input is skipped here.
      *
      * @return array<string, mixed>
      */

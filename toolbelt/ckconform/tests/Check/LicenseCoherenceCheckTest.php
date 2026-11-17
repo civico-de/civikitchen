@@ -86,10 +86,6 @@ final class LicenseCoherenceCheckTest extends CheckTestCase
     }
 
     /**
-     * SPDX allows a disjunctive array. json_decode sees it; the bash regex did
-     * not, and neither shape may be compared against a plain string.
-     */
-    /**
      * SPDX disjunctive licensing is allowed, and satisfied when the expected
      * licence is one of the members.
      */
@@ -104,8 +100,7 @@ final class LicenseCoherenceCheckTest extends CheckTestCase
     }
 
     /**
-     * Permitted is not unchecked: before this, an array read as unset and
-     * skipped the policy, which made it the way to bypass every licence rule.
+     * Permitted is not unchecked: a list without the expected licence fails.
      */
     public function testADisjunctiveListWithoutTheExpectedLicenceFails(): void
     {

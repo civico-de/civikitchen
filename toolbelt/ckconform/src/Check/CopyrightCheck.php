@@ -9,12 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * The copyright holder named in `civikitchen.yaml` must actually appear in LICENSE.txt.
- * A relicensing that edits info.xml but leaves the licence file naming the
- * previous holder is the failure mode.
- *
- * The match is a literal substring, case-sensitive — a holder's legal name is
- * not a thing to be lenient about.
+ * The copyright holder named in `civikitchen.yaml` must appear in LICENSE.txt,
+ * as a literal, case-sensitive substring.
  */
 final class CopyrightCheck implements Check
 {

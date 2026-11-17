@@ -9,13 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * The template runs phpstan at level 10 with no baseline: a baseline freezes the
- * debt it was generated from, and a lower level makes the run look green while
- * whole classes of error are never asked about.
- *
- * phpstan.neon is NEON, so there is no structured parser to reach for here.
- * Comments are stripped before matching, and the level is matched as a whole
- * token so `level: 100` is not mistaken for level 10.
+ * phpstan.neon must run level 10 with no baseline, and scan no path outside the
+ * repo. Comments are stripped and the level matched as a whole token.
  */
 final class PhpstanConfigCheck implements Check
 {
@@ -68,20 +63,15 @@ final class PhpstanConfigCheck implements Check
     }
 
     /**
-     * scanFiles / scanDirectories entries that climb out of the repo with `..`.
-     *
-     * A `../sibling` scan path is real on a developer machine and absent in CI,
-     * so phpstan never runs there. The honest forms are a fixed container path
-     * (/var/www/html/ext/<key>) or no cross-repo type edge at all.
+     * scanFiles / scanDirectories entries that climb out of the repo with `..`,
+     * absent in CI; use a fixed container path (/var/www/html/ext/<key>).
      *
      * @return list<string>
      */
     private function escapingScanPaths(string $config): array
     {
-        // Only list items INSIDE a scanFiles:/scanDirectories: block count —
-        // a `- ../` under e.g. excludePaths: is harmless (phpstan ignores
-        // nonexistent excludes) and must not fail with a scan-path message.
-        // NEON quotes are optional; strip them if present.
+        // Only items inside a scanFiles:/scanDirectories: block count (phpstan
+        // ignores nonexistent excludes). NEON quotes are optional.
         $escaping = [];
         $scanIndent = null;
         foreach (preg_split('/\R/', $config) ?: [] as $line) {
@@ -108,9 +98,7 @@ final class PhpstanConfigCheck implements Check
     }
 
     /**
-     * NEON comments run from an unquoted '#' to the end of the line. Only the
-     * plain cases matter here — a '#' inside a quoted phpstan option is not a
-     * thing that occurs in these configs.
+     * NEON comments run from an unquoted '#' to the end of the line.
      */
     private function stripComments(string $config): string
     {

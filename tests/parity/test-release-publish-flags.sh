@@ -6,9 +6,8 @@ flags="$root/.github/scripts/release-publish-flags.sh"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-# A repo whose newest plain release is v0.10.0: numeric, not lexical, order
-# (v0.9.0 < v0.10.0), plus a moving major tag, a four-part tag and a
-# leading-zero tag that must not count as versions.
+# Newest release v0.10.0 by numeric order; the major, four-part and
+# leading-zero tags must not count as versions.
 cat > "$work/tags" <<'TAGS'
 refs/tags/v0.0.0
 refs/tags/v0.3.0

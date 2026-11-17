@@ -10,23 +10,9 @@ use CiviKitchen\Ckconform\PermissionCatalog;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A permission string that is never defined anywhere.
- *
- * CRM_Core_Permission::check() on an unknown string is not an error — it is
- * simply false, forever. A menu item guarded by 'acces CiviFoo' or
- * 'administer civifoo' (when the extension defines 'administer CiviFoo')
- * therefore becomes a silent always-no: the page 404s, the API action refuses,
- * and nothing anywhere says why. Nobody notices until a user complains that
- * they cannot see a screen that was supposed to be theirs.
- *
- * The check closes the loop over the strings the repo *uses* (menu XML,
- * ::check() literals, 'permission'/'permissions' specs, APIv4 permissions(),
- * aff.json) against the ones it
- * *defines* (hook_civicrm_permission) plus core's own (PermissionCatalog,
- * generated from core). A near-miss on an own permission is a provable typo and fails; a
- * completely unknown string may legitimately come from a dependency and only
- * warns. Defined-but-unused is not reported: a permission an extension only
- * hands to ACLs or to a downstream repo is perfectly normal.
+ * A permission string used in the repo but never defined by it or core
+ * (::check() on an unknown string is false forever). A near-miss on an own
+ * permission fails; an unknown string may come from a dependency and warns.
  */
 final class PermissionClosureCheck implements Check
 {
@@ -100,10 +86,8 @@ final class PermissionClosureCheck implements Check
     }
 
     /**
-     * A defined permission that the used string was almost certainly meant to
-     * be. Case-only drift counts however long the string is; a Levenshtein
-     * distance of up to 3 needs the string to be long enough that three edits
-     * cannot turn it into something genuinely different.
+     * The defined permission the used string was almost certainly meant to be:
+     * case-only drift at any length, Levenshtein up to 3 only on long strings.
      *
      * @param  list<string> $defined
      */
@@ -160,9 +144,8 @@ final class PermissionClosureCheck implements Check
             }
 
             foreach ($permissions as $permission) {
-                // CiviCRM accepts comma/semicolon permission expressions in
-                // more than menu XML (notably API action metadata). Closure is
-                // about every leaf permission, independent of AND/OR shape.
+                // Every leaf of a comma/semicolon expression must exist,
+                // whatever its AND/OR shape.
                 foreach (preg_split('/[;,]/', $permission) ?: [] as $part) {
                     $part = trim($part);
                     if ($part === '') {
@@ -206,11 +189,8 @@ final class PermissionClosureCheck implements Check
             }
         }
 
-        // A hook or provider that returns the whole map at once. Scanned
-        // only inside the function body: a .php file with a dozen hooks in
-        // it would otherwise donate every unrelated string with a space to
-        // the definition set, and an over-wide definition set is what turns
-        // a warning into a false FAIL.
+        // Only inside the function body: a wider scan would donate unrelated
+        // strings to the definition set and turn a warning into a false FAIL.
         foreach (['/^\w*_civicrm_permission$/i', '/^getPermissions$/i'] as $name) {
             array_push($defined, ...$this->arrayKeyLiterals($this->functionBodies($tokens, $name)));
         }
@@ -219,10 +199,8 @@ final class PermissionClosureCheck implements Check
     }
 
     /**
-     * The `{ … }` tokens of every function with a body whose name matches
-     * $name, one after the other. Braces inside strings and comments are not
-     * tokens and do not count; a missing closing brace yields the rest of the
-     * file.
+     * The `{ … }` tokens of every function body named $name, concatenated; a
+     * missing closing brace yields the rest of the file.
      *
      * @param  list<\PhpToken> $tokens
      * @return list<\PhpToken>
@@ -277,9 +255,7 @@ final class PermissionClosureCheck implements Check
     }
 
     /**
-     * <access_arguments> holds a list: ';' is AND, ',' is OR, and both may be
-     * mixed. For closure purposes every element has to exist, so the structure
-     * does not matter — only the strings do.
+     * Every element of <access_arguments> (';' is AND, ',' is OR) must exist.
      *
      * @return list<string>
      */
@@ -301,9 +277,8 @@ final class PermissionClosureCheck implements Check
     }
 
     /**
-     * ::check() literals and 'permission' => … specs (mgd records, APIv4
-     * actions, Afform metadata in PHP). Only literals: a variable or a constant
-     * cannot be resolved statically, and guessing would produce noise.
+     * ::check() literals and 'permission' => … specs (mgd records, APIv4 actions,
+     * Afform metadata in PHP). Variables and constants are not resolved.
      *
      * @param  list<\PhpToken> $tokens
      * @return list<string>
@@ -353,9 +328,8 @@ final class PermissionClosureCheck implements Check
     }
 
     /**
-     * `'permission' => 'x'`, `'permissions' => ['x', ['y', 'z']]` and the action
-     * map of an APIv4 permissions(): a string or a list nested to any depth. An array with a key anywhere
-     * inside is a field or config definition named `permission`, not a spec.
+     * `'permission' => 'x'`, `'permissions' => ['x', ['y', 'z']]` and an APIv4
+     * permissions() map, nested to any depth; an array with a key is not a spec.
      *
      * @param  list<\PhpToken> $tokens
      * @return list<string>
@@ -425,10 +399,8 @@ final class PermissionClosureCheck implements Check
     }
 
     /**
-     * The string leaves of the list literal opening at $start. Subscripts,
-     * calls, closures, arrow functions and attributes inside it are skipped
-     * whole, and so is a string that is only part of an element; a key
-     * anywhere, or a list that never closes, yields nothing.
+     * The string leaves of the list literal opening at $start, skipping nested
+     * calls, closures and partial elements; a key or an unclosed list yields none.
      *
      * @param  list<\PhpToken> $tokens
      * @return list<string>

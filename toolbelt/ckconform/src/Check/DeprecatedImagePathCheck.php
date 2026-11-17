@@ -9,13 +9,9 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * The image mirrors the checkout below /opt/civikitchen; the v1 paths
- * /opt/civikitchen-<tool> and /usr/local/share/civikitchen/profiles are links
- * into it that v2 removes. A config, script, workflow or compose mount still
- * naming one keeps working until then and breaks on the upgrade.
- *
- * Prose is not read: a changelog or README naming an old path is history, not
- * something that breaks. Only the first hit per file is reported.
+ * A config, script, workflow or compose mount naming a v1 link path
+ * (/opt/civikitchen-<tool>, /usr/local/share/civikitchen/profiles) that v2
+ * removes. Prose is not read; first hit per file only.
  */
 final class DeprecatedImagePathCheck implements Check
 {

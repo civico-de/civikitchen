@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace CiviKitchen\Ckconform;
 
 /**
- * PSR-4 autoloading without composer: the tool ships inside an image and must
- * not carry a vendor/ directory that someone has to keep current.
+ * PSR-4 autoloading without composer, so the tool carries no vendor/.
  */
 final class Autoloader
 {

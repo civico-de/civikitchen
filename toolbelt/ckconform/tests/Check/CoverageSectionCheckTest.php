@@ -40,9 +40,7 @@ final class CoverageSectionCheckTest extends CheckTestCase
     }
 
     /**
-     * The tightening over bash: `grep '<coverage'` matched the commented-out
-     * section too, so a repo that had switched coverage off still reported that
-     * it declared sources.
+     * A commented-out `<coverage>` section declares no sources.
      */
     public function testACommentedOutSectionIsNotEnough(): void
     {

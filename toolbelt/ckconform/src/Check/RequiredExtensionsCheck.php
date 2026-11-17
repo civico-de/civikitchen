@@ -9,17 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * Declared dependencies versus what the code actually uses.
- *
- * A missing <ext> only bites on a fresh site: the extension installs, then
- * fatals on a SearchKit entity that isn't there — so nothing catches it during
- * normal development, where the dependency happens to be installed anyway.
- *
- * The <requires><ext> children are read via SimpleXML and compared as exact,
- * trimmed keys: a substring match is too loose (a key that is a prefix of
- * another satisfies it), a regex misses an element carrying an attribute.
- *
- * Only failures are reported — a satisfied dependency is silent.
+ * Extensions the code uses (SearchKit, Afform) but info.xml's <requires> does
+ * not declare, compared as exact keys; satisfied dependencies are silent.
  */
 final class RequiredExtensionsCheck implements Check
 {

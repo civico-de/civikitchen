@@ -1,14 +1,7 @@
 #!/bin/bash
-# Boot test for the single-container DEMO images (civikitchen:*-demo). Unlike
-# tests/images/boot-test.sh (which spins up an external MariaDB sidecar), the
-# demo image is self-contained: `docker run` it, wait for the HEALTHCHECK, and
-# assert the baked site + embedded DB come up. This guards the build-time bake
-# of the embedded DB and the demo entrypoint. An optional second argument
-# boots with CIVIKITCHEN_PROFILE=<profile>[,<profile>...] and additionally
-# asserts the runtime profile apply worked (every enabled dependency of each
-# profile and its includes installed, no credentials in the logs, one credentials line per apiUser even
-# when combined profiles share usernames), then runs each applied profile's
-# browser suite from tests/e2e/profiles through `scaffold/ck playwright`.
+# Boot test for the self-contained demo images (civikitchen:*-demo): baked site
+# and embedded DB come up. With profiles, also asserts the runtime profile apply
+# and runs each profile's suite from tests/e2e/profiles.
 #
 # Usage:
 #   bash tests/images/boot-test-demo.sh <image> [profile[,profile...]]
@@ -21,8 +14,7 @@ set -euo pipefail
 IMAGE="${1:?usage: boot-test-demo.sh <image> [profile]}"
 PROFILE="${2:-}"
 
-# Same name-length cap as boot-test.sh: keep container names DNS-label-safe
-# (<63 chars) even with a 40-char sha in the CI image tag.
+# Keep container names DNS-label-safe (<63 chars) even with a 40-char sha tag.
 RAW="$(echo "${IMAGE}${PROFILE:+-${PROFILE}}" | tr -c 'a-z0-9' '-')"
 SLUG="demotest-$(echo "${RAW}" | cut -c1-32)$(echo "${RAW}" | cksum | cut -d' ' -f1)"
 APP="${SLUG}-app"
@@ -45,10 +37,8 @@ echo "==> waiting for healthy (embedded MariaDB + provisioning)..."
 wait_healthy "${APP}" "${HEALTH_TIMEOUT}" || exit 1
 
 
-# CiviCRM's HTTP API entry differs per CMS: Standalone/Drupal/WP expose the
-# clean /civicrm route, but on Joomla CiviCRM has no clean URL — requests go
-# through Joomla's component router (index.php?option=com_civicrm&task=...).
-# Detect the framework so the api-auth checks below hit the right endpoint.
+# Joomla has no clean /civicrm route; the API goes through its component
+# router (index.php?option=com_civicrm&task=...).
 WEB=/home/buildkit/buildkit/build/site/web
 UF=$(docker exec -u buildkit -w "${WEB}" "${APP}" \
     bash -lc 'export PATH=/home/buildkit/buildkit/bin:$PATH; cv ev "echo CIVICRM_UF;" 2>/dev/null' | tr -d '[:space:]' || true)
@@ -74,9 +64,8 @@ contacts=$(docker exec -u buildkit -w /home/buildkit/buildkit/build/site/web "${
     | grep -c '"id"' || true)
 check "demo data present (${contacts} contacts)" "[ '${contacts:-0}' -gt 1 ]"
 
-# Snapshot the container logs once for the log-based checks below: piping
-# `docker logs` straight into `grep -q` dies of SIGPIPE under pipefail when
-# grep exits on an early match, turning real matches into false negatives.
+# Snapshot the logs once: `docker logs | grep -q` SIGPIPEs under pipefail on
+# an early match.
 LOGFILE="$(mktemp)"
 docker logs "${APP}" >"${LOGFILE}" 2>&1
 
@@ -89,12 +78,9 @@ fi
 check "debian-start reaches root over the socket (no ERROR 1045)" \
     "! grep -qF \"Access denied for user 'root'@'localhost'\" '${LOGFILE}'"
 
-# 5+6) Runtime profile apply worked, per profile in the (possibly
-# comma-separated) list and per included profile: every enabled dependency not
-# skipped on this UF is installed. Across all of them: credentials stayed out of
-# the logs, and the credentials file has exactly one line per declared apiUser
-# — combined profiles sharing a username (e.g. "readonly") must upsert, not
-# duplicate or drop.
+# 5+6) Per profile and included profile, every enabled dependency for this UF
+# is installed; credentials stay out of the logs, and the credentials file has
+# one line per apiUser even when combined profiles share a username.
 check_profile_deps() {
     local prof="$1" json="/opt/civikitchen/docker/profiles/$1/profile.json" ext_key
     if ! docker exec "${APP}" test -f "${json}"; then
@@ -151,33 +137,23 @@ if [ -n "${PROFILE}" ]; then
         done < <(docker exec "${APP}" jq -r '.apiUsers[].username' \
             "/opt/civikitchen/docker/profiles/${prof}/profile.json" 2>/dev/null || true)
     done
-    # A script failure aborts provisioning and therefore prevents a healthy
-    # container. Keep the log assertion as defense in depth against a future
-    # driver accidentally swallowing the error again.
+    # A script failure already prevents a healthy container; this catches a
+    # driver that swallows it.
     if grep -q 'ERROR: profile script failed:' "${LOGFILE}"; then
         echo "  ✗ profile script failure in logs:"; grep 'ERROR: profile script failed:' "${LOGFILE}"; fail=1
     else
         echo "  ✓ no profile script failures in logs"
     fi
 
-    # 7) An API user can actually authenticate and call the API (authx basic
-    # auth). This exercises the per-CMS user/role/permission wiring end to
-    # end — an install-only check can't see a broken permission mapping.
+    # 7) An API user authenticates and calls the API: the per-CMS
+    # user/role/permission wiring end to end.
     cred=$(docker exec "${APP}" cat /home/buildkit/api-credentials.txt 2>/dev/null | head -n 1 || true)
     api_user="${cred%%:*}"
     api_pass="$(echo "${cred}" | cut -d: -f2)"
     if [ -n "${api_user}" ] && [ -n "${api_pass}" ]; then
-        # Each call asserts BOTH the body and the HTTP status. The body alone
-        # is not enough: a fatal during request shutdown (e.g. the standalone
-        # session writer failing after output was sent, as an extension that
-        # replaces the civicrm_session table causes on Standalone) still produces
-        # a complete JSON body, but with HTTP 500 on every request. A
-        # body-only grep shipped that breakage as a green test.
-        #
-        # api_key (X-Civi-Auth: Bearer) is the canonical credential and works on
-        # every flavor, Joomla included. It also has its own failure mode
-        # (civicrm_contact.api_key is varchar(32) — an oversized generated key
-        # gets mangled on save and only this check would catch it).
+        # Assert body and status: a fatal at request shutdown (e.g. the session
+        # writer) still sends a full JSON body, with HTTP 500.
+        # api_key works on every flavor; civicrm_contact.api_key is varchar(32).
         api_key="$(echo "${cred}" | cut -d: -f3)"
         key_out=$(docker exec "${APP}" curl -s -w '\n%{http_code}' -X POST "${API_URL}" \
             -H "X-Civi-Auth: Bearer ${api_key}" \
@@ -190,9 +166,8 @@ if [ -n "${PROFILE}" ]; then
         check "api_key API call returns HTTP 200 (got ${key_code})" \
             "[ '${key_code}' = '200' ]"
 
-        # Basic/password auth: authx's password flow needs the CMS's full auth
-        # stack, which Joomla doesn't run for a headless API request, so it only
-        # works on Standalone/Drupal/WP. (api_key above is Joomla's path.)
+        # authx's password flow needs the CMS auth stack, which Joomla does not
+        # run for a headless API request.
         if [ "${UF}" != Joomla ]; then
             auth_out=$(docker exec "${APP}" curl -s -w '\n%{http_code}' -X POST "${API_URL}" \
                 --user "${api_user}:${api_pass}" \
@@ -211,8 +186,7 @@ if [ -n "${PROFILE}" ]; then
         echo "  ✗ no API credentials file in the container"; fail=1
     fi
 
-    # 8) What each applied profile promises, in a real browser: its pages,
-    # public forms and extension workflows (tests/e2e/profiles). The browser
+    # 8) Each applied profile's browser suite (tests/e2e/profiles); the browser
     # shares the app's network namespace, so http://localhost is the site.
     echo "==> profile e2e (Playwright)"
     if (cd "$(dirname "$0")/../.." && CIVICRM_BASE_URL=http://localhost CIVIKITCHEN_E2E_CONTAINER="${APP}" \
@@ -223,12 +197,8 @@ if [ -n "${PROFILE}" ]; then
     fi
 fi
 
-# 9) CIVIKITCHEN_SITE_URL rewrite (no-profile runs only): the demo must also
-# work on a non-80 host port when CIVIKITCHEN_SITE_URL is set — the entrypoint
-# rewrites the baked http://localhost base at boot. This must be asserted from
-# the HOST side (the in-container checks above always see port 80), so a second
-# container runs with a mapped port. Opt out with CK_SKIP_SITE_URL_TEST=1
-# (e.g. when testing an image that predates the rewrite).
+# 9) CIVIKITCHEN_SITE_URL rewrite, checked from the host on a non-80 port in a
+# second container (no-profile runs only). Opt out: CK_SKIP_SITE_URL_TEST=1.
 if [ -z "${PROFILE}" ] && [ "${CK_SKIP_SITE_URL_TEST:-0}" != "1" ]; then
     echo "==> site-url leg: boot with CIVIKITCHEN_SITE_URL on a non-80 host port"
     # Find a free host port; a connect on /dev/tcp succeeding means taken.
@@ -239,14 +209,8 @@ if [ -z "${PROFILE}" ] && [ "${CK_SKIP_SITE_URL_TEST:-0}" != "1" ]; then
     if [ -z "${URLPORT}" ]; then
         echo "  ✗ no free host port in 8180-8199 for the site-url leg"; fail=1
     else
-        # Use 127.0.0.1 (not localhost) end-to-end for this leg. Two reasons:
-        #  - docker -p publishes on IPv4 (0.0.0.0) by default; on a runner where
-        #    `localhost` resolves to ::1 first, `curl localhost:PORT` hits an
-        #    unbound IPv6 address and fails (000). 127.0.0.1 is always the IPv4
-        #    publish, and matches the free-port probe above (/dev/tcp/127.0.0.1).
-        #  - the base URL must match the request Host, or WordPress issues a
-        #    canonical 301 to its configured host — a curl -L to that would then
-        #    chase the very ambiguity we are avoiding.
+        # 127.0.0.1 throughout: docker -p publishes on IPv4 while `localhost` may
+        # resolve to ::1, and WordPress 301s when the Host differs from the base URL.
         docker run -d --name "${APP}-url" -p "${URLPORT}:80" \
             -e "CIVIKITCHEN_SITE_URL=http://127.0.0.1:${URLPORT}" \
             "${IMAGE}" >/dev/null
@@ -265,9 +229,7 @@ if [ -z "${PROFILE}" ] && [ "${CK_SKIP_SITE_URL_TEST:-0}" != "1" ]; then
             done
             check "entrypoint rewrote the base URL" "[ '${rewrote}' = 0 ]"
             URLPAGE="$(mktemp)"
-            # Healthy != reachable from the host: the published-port forward can
-            # lag the container healthcheck by a few seconds (seen on GH
-            # runners as an immediate 000/connection refused). Retry briefly.
+            # The published-port forward can lag the healthcheck by seconds.
             url_code=000
             for _ in 1 2 3 4 5 6; do
                 url_code=$(curl -s -o "${URLPAGE}" -w '%{http_code}' -L "http://127.0.0.1:${URLPORT}/" 2>/dev/null) || url_code=000
@@ -276,8 +238,7 @@ if [ -z "${PROFILE}" ] && [ "${CK_SKIP_SITE_URL_TEST:-0}" != "1" ]; then
             done
             check "site serves HTTP 200 on the mapped port (got ${url_code})" \
                 "[ '${url_code}' = '200' ]"
-            # Any http://localhost/ (old base) left in the page means some URL
-            # was still composed from the bake-time base — assets would 404.
+            # A leftover http://localhost/ is a URL built from the baked base.
             if grep -Eq "http://localhost(/|[\"'])" "${URLPAGE}"; then
                 echo "  ✗ page still references the baked base URL:"
                 grep -Eo "http://localhost[^\"' ]*" "${URLPAGE}" | head -3

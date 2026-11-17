@@ -1,24 +1,7 @@
 #!/bin/bash
-# Shared profile driver: apply a demo profile (extensions + seed data + API
-# users) to a site. Runs at FIRST BOOT as the web user, invoked by
-# provision.sh's ck_apply_profile when CIVIKITCHEN_PROFILE=<name> is set —
-# works on every flavor (standalone, drupal10, drupal11, wordpress, joomla, backdrop),
-# on demo images (embedded DB) and dev images (external DB) alike. Needs network
-# and takes a few minutes; it is marker-gated by the caller, so it applies
-# exactly once per container.
-#
-# Entirely driven by profile.json, applied as dependencies -> config -> seed ->
-# scripts (or a seed snapshot restore in their place), so every profile shares
-# this one script; a profile may ship its own apply.sh to override it. The `deps` phase fetches and enables dependencies,
-# `content` applies config, seed, scripts and API users; `all` runs both. Each dependency in profile.json names one of three sources:
-#   "repo": <git url>     cloned at "version" into the site's ext dir
-#   "registry": true      cv ext:download (packaged release incl. built assets); its <requires>
-#                         take the mounted extensions' pins and CK_DEP_ARCHIVE_DIR's staged releases
-#   neither               bundled with core (e.g. flexmailer), enable only
-# `ck internal provision-profile` fetches and enables them.
-# The full, canonical profile.json shape is packages/civicrm-profile-schema/
-# profile.schema.json (draft 2020-12, enforced in CI; published as
-# @civico-de/civicrm-profile-schema).
+# Profile driver, run at first boot as the web user by ck_apply_profile. Phase
+# `deps` fetches and enables dependencies, `content` applies config, seed,
+# scripts and API users; `all` runs both. Format: packages/civicrm-profile-schema.
 #
 #   apply.sh <profile-dir> [all|deps|content]   # e.g. /opt/civikitchen/docker/profiles/common
 set -euo pipefail
@@ -86,11 +69,7 @@ if [ "${PHASE}" != content ] && [ -f "${REPLACED_STATE}" ]; then
     REPLACED_KEPT=$(($(wc -l < "${REPLACED_STATE}")))
 fi
 
-# The UF (CMS framework) this site runs on — "Standalone", "WordPress",
-# "Drupal8", ... A dependency may declare `"skipUf": ["Standalone"]` (values
-# compared against CIVICRM_UF verbatim) plus an optional human "skipUfReason";
-# it is then neither fetched nor enabled on that framework. This exists
-# because an extension can be structurally incompatible with one flavor.
+# A dependency's `skipUf` list is compared against CIVICRM_UF verbatim.
 UF="$(cv ev 'echo CIVICRM_UF;')"
 
 if [ "${PHASE}" != content ]; then
@@ -130,16 +109,14 @@ if [ "${PHASE}" = deps ]; then
     exit 0
 fi
 
-# On Joomla, civibuild's install doesn't link the CMS admin to a CiviCRM contact
-# (Drupal/WordPress/Standalone do at install time), so cv --user=admin below
-# can't resolve a contact. Create the link the way CiviCRM does (idempotent).
+# civibuild's Joomla install does not link the CMS admin to a contact, which
+# cv --user=admin below needs.
 if [ "${UF}" = "Joomla" ]; then
     cv scr "$(dirname "$0")/joomla-link-admin.php"
 fi
 
-# Content and scripts run as the admin CMS user. civibuild sites always have
-# one; the standalone dev image only after an auto-install with a demo admin —
-# fail with a hint instead of a cryptic cv error.
+# Content and scripts run as the admin CMS user; standalone has one only with a
+# demo admin.
 if ! cv ev --user=admin 'echo "ok";' >/dev/null 2>&1; then
     echo "apply.sh: no 'admin' user on this site — profiles need one." >&2
     echo "apply.sh: on the standalone dev image set CIVICRM_AUTO_INSTALL=1 and CIVIKITCHEN_DEMO_USER=admin." >&2
@@ -153,11 +130,8 @@ CK_SEED_TODAY="$("${CK_PROFILE_CLI}" seed today)"
 CK_SEED_SIZE="${CK_SEED_SIZE:-demo}"
 export CK_SEED_TODAY CK_SEED_SIZE
 
-# The selected profiles that have a `snapshot` block are generated once and
-# stored as one snapshot; later fresh databases restore it with shifted dates
-# at the first of them and skip every profile it holds. The restore replaces
-# the whole database, so only on one not provisioned yet (CK_SEED_FRESH=1),
-# and only on an image with a snapshot store (CK_SEED_SNAPSHOTS=1).
+# Profiles with a `snapshot` block are generated once and restored with shifted
+# dates; the restore replaces the whole database, so only when CK_SEED_FRESH=1.
 SNAPSHOT=apply
 if [ "${CK_SEED_SNAPSHOTS:-0}" = 1 ] && [ "${CK_SEED_FRESH:-0}" = 1 ]; then
     SNAPSHOT=generate
@@ -182,10 +156,8 @@ if [ "${SNAPSHOT}" != restored ]; then
     # anchor. A missing prerequisite (component, financial type, group) fails here.
     CK_PROFILE_JSON="${JSON}" cv scr --user=admin "$(dirname "$0")/apply-content.php"
 
-    # Scripts are PHP run with a booted CiviCRM (cv scr) after the declarative part,
-    # in profile order, as the admin CMS user — extensions like CiviSEPA re-check
-    # permissions in internal API calls. A failed script aborts the apply so the
-    # caller writes no provisioning marker and the next boot retries the profile.
+    # Scripts run as the admin CMS user (CiviSEPA re-checks permissions); a
+    # failed one aborts the apply, so the next boot retries.
     while IFS= read -r script; do
         [ -n "${script}" ] || continue
         echo "==> [${PROFILE_NAME}] script $(basename "${script}")"
@@ -205,10 +177,8 @@ fi
 
 if "${CK_PROFILE_CLI}" internal profile-api-users-declared "${JSON}"; then
     echo "==> [${PROFILE_NAME}] preparing API users + AuthX"
-    # authx powers the api_key / basic-auth the API users rely on. It ships with
-    # core but isn't enabled on every CMS build (civibuild's joomla-demo leaves
-    # it uninstalled), so enable it here — in its own process, before the script
-    # below uses it. Idempotent, and a no-op where it is already on.
+    # The API users need authx, which joomla-demo leaves off; enabled in its own
+    # process before the script below uses it.
     cv ext:enable authx
     # PHP via cv scr: cv boots CiviCRM + the host CMS, so user/role creation
     # uses the native CMS APIs on every flavor (no drush/wp-cli dependency).

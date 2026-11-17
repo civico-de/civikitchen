@@ -1,17 +1,8 @@
 <?php
 
 /**
- * Taint SOURCES: the CiviCRM way of reading request input.
- *
- * $_GET/$_POST/$_REQUEST/$_COOKIE are already sources in Psalm itself; almost
- * no extension touches them directly, it goes through CRM_Utils_Request.
- *
- * retrieve() does run the value through CRM_Utils_Type::validate($type), so a
- * 'Positive'/'Integer' retrieval is in fact safe — but the type arrives as a
- * runtime string, and Psalm cannot make a taint decision per argument value.
- * Tainting unconditionally is the honest choice: it over-reports the typed
- * retrievals rather than under-reporting the 'String' ones, which are the
- * dangerous majority. See docs/extension-standards.md for how to dismiss one.
+ * Taint SOURCES: CRM_Utils_Request. Tainted regardless of $type, since Psalm
+ * cannot decide per argument value, so a 'Positive' retrieval is over-reported.
  *
  * Signatures verified against CiviCRM 6.18.0 (CRM/Utils/Request.php).
  */

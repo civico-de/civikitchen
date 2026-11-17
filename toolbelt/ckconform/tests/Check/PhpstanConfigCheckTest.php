@@ -63,8 +63,7 @@ final class PhpstanConfigCheckTest extends CheckTestCase
     }
 
     /**
-     * The bash version grepped the raw file, so a commented-out level line was
-     * enough to claim level 10.
+     * A commented-out level line does not claim level 10.
      */
     public function testACommentedLevelIsNotEnough(): void
     {

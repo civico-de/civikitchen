@@ -1,10 +1,7 @@
 # ckcommon.sh — the plumbing every ck* tool needs, defined once.
 #
-# Sourced from ../lib relative to the tool's real path: the image carries the
-# toolbelt at /opt/civikitchen/toolbelt and only links the tools into PATH.
-#
-# Shell plumbing only. Anything with a structure is parsed elsewhere —
-# `civikitchen.yaml` by ckconform, XML and JSON by php.
+# Sourced from ../lib relative to the tool's real path. Structured files are
+# parsed elsewhere: `civikitchen.yaml` by ckconform, XML and JSON by php.
 #
 # shellcheck shell=bash
 
@@ -24,15 +21,9 @@ ck_require_extension_root() {
     [ -f info.xml ] || ck_die "no info.xml here — run from the extension root."
 }
 
-# safe.directory per call: in CI the checkout is owned by the runner's uid while
-# the tool runs as www-data, and git calls that mismatch dubious ownership —
-# `ls-files` then silently reports NOTHING, which every caller here would
-# misread as "this repo has no files of that kind".
-#
-# The value is the WORKTREE ROOT, not the cwd: an extension subdirectory of a
-# multi-extension repo is not the directory git refuses. Walked rather than
-# asked, because `rev-parse --show-toplevel` is itself refused under dubious
-# ownership; `.git` is a file in a linked worktree and a directory otherwise.
+# safe.directory per call, set to the worktree root: under dubious ownership
+# `ls-files` silently reports nothing. Walked, because `rev-parse
+# --show-toplevel` is refused too; `.git` is a file in a linked worktree.
 ck_git_root() {
     local dir="$PWD"
     while [ -n "$dir" ]; do

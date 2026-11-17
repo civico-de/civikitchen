@@ -1,23 +1,9 @@
-# The CiviKitchen mago baseline, shipped in the image — the same deal as the
-# ESLint baseline. A repo that commits its own mago.toml wins outright; ckfmt
-# and cklint then drop this file, and the repo's file extends it to keep it.
-#
-# [formatter] owns layout; [linter] carries no layout rule, so code formatted
-# here is clean under cklint and --fix and --check never chase each other.
-# The image tests assert this on overlong-line fixtures.
-#
-# [linter] is cklint's engine: mago's defaults plus the CiviKitchen rules from
-# toolbelt/mago-ext, minus anything that overlaps another gate or fights the
-# CiviCRM house idiom, one tool per question. Single deliberate deviations in
-# code are `// @mago-expect lint:<rule>` lines, visible in the diff.
-#
-# No [source] section on purpose: mago's own file discovery finds nothing
-# without configured paths, so ckfmt/cklint always pass an explicit file list —
-# which is also where vendored and generated code gets filtered out.
+# The CiviKitchen mago baseline; a repo's own mago.toml replaces it (and may
+# `extends` it). [linter] carries no layout rule, so [formatter] output is lint-clean.
+# No [source]: ckfmt and cklint pass an explicit file list.
 
-# Fleet floor. Without this the formatter happily rewrites `(new X())->m()` to
-# the PHP-8.4-only `new X()->m()` — a parse error on every declared 8.1–8.3
-# floor, and the PHP-8.4 container's `php -l` cannot catch it.
+# Without it the formatter emits the PHP-8.4-only `new X()->m()`, which the
+# PHP-8.4 container's `php -l` cannot catch.
 php-version = "8.1"
 
 [formatter]
@@ -34,14 +20,10 @@ space-around-assignment-in-declare = true
 minimum-fail-level = "note"
 
 [linter.rules]
-# Turning a rule off retires its suppressions too: mago reports a disabled
-# rule's leftover `@mago-expect lint:<rule>` line as `unfulfilled-expect`
-# (warning), which this minimum-fail-level makes a failure. Rule out ⇒ its
-# expect lines out, same commit.
+# A disabled rule's leftover `@mago-expect lint:<rule>` lines fail as
+# `unfulfilled-expect`: remove them in the same commit.
 #
-# Formatting and layout: ckfmt owns these; a second opinion here could only
-# agree or contradict. Naming follows CiviCRM's mixed idiom (CRM_Foo_BAO,
-# hook_civicrm_*, camelCase APIv4), which no naming rule here describes.
+# Layout belongs to ckfmt; CiviCRM's mixed naming idiom fits no naming rule.
 array-style = { enabled = false }
 class-name = { enabled = false }
 constant-name = { enabled = false }
@@ -59,14 +41,10 @@ no-short-opening-tag = { enabled = false }
 no-trailing-space = { enabled = false }
 trait-name = { enabled = false }
 
-# declare(strict_types = 1) per file: without it the declared types are enforced
-# by nothing at runtime. The test bootstrap eval()s core's boot code, and eval()
-# inherits the calling file's strict_types — that would arm it inside CiviCRM.
+# The test bootstrap eval()s core's boot code, which would inherit strict_types.
 strict-types = { enabled = true, exclude = ["tests/phpunit/bootstrap.php", "**/tests/phpunit/bootstrap.php"] }
 
-# Covered by another gate already: the Rector rule + the extension's
-# name-boolean-arguments own named-argument policy, cktaint owns taint
-# analysis, spaze/disallowed-calls owns banned functions.
+# Covered by other gates: name-boolean-arguments, cktaint, spaze/disallowed-calls.
 literal-named-argument = { enabled = false }
 tainted-data-to-sink = { enabled = false }
 no-debug-symbols = { enabled = false }
@@ -89,25 +67,17 @@ tagged-fixme = { enabled = false }
 # the rewrite this rule asks for evaluates the left-hand call twice.
 no-shorthand-ternary = { enabled = false }
 
-# A method count is a maintainability signal for production classes only — a
-# PHPUnit case with 30 test methods is the point, and an upgrader gains one per
-# upgrade step by contract. Prod keeps cyclomatic-complexity.
+# Production classes only: test cases and upgraders grow methods by design.
 too-many-methods = { enabled = true, exclude = ["tests/**", "**/tests/**", "CRM/*/Upgrader.php"] }
 
 # A test that drives a real preProcess() has to simulate the request that
 # CRM_Utils_Request::retrieve() reads; production code keeps the rule.
 no-request-variable = { enabled = true, exclude = ["tests/**", "**/tests/**"] }
 
-# CiviKitchen's own rules (toolbelt/mago-ext): bare ts(), standard-hook mixins,
-# the @required trap, file length, positional booleans, unserialize,
-# tautological assertions, TLS verification, raw client address, case fall-through. Codes are civikitchen/<rule>. A repo deviates with
-# its own mago.toml: `extends` this file and repeat this table with worker
-# options — --disable=<code>,… --exclude=<code>:<glob>,… --max-lines=<n>
-# --external-actions=<ActionClass>,… (docs/extension-standards.md).
-# cklint exports CK_MAGO_WORKSPACE, the repo root the rules resolve paths from.
-# Every reported level fails, so name-boolean-arguments (fixing it takes judgement
-# per call site) starts disabled; a repo arms it by repeating the table without it.
-# Tests read REMOTE_ADDR to save and restore the request they fake.
+# CiviKitchen's own rules (toolbelt/mago-ext), codes civikitchen/<rule>. A repo
+# `extends` this file and repeats this table with worker options: --disable=<code>,…
+# --exclude=<code>:<glob>,… --max-lines=<n> --external-actions=<ActionClass>,…
+# name-boolean-arguments starts disabled; tests may read REMOTE_ADDR.
 [extension-hosts.civikitchen]
 command = ["php", "/opt/civikitchen/toolbelt/mago-ext/worker.php", "--disable=civikitchen/name-boolean-arguments",
   "--exclude=civikitchen/remote-address:tests/**,civikitchen/remote-address:**/tests/**"]

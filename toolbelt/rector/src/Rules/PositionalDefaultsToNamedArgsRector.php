@@ -34,15 +34,9 @@ use Rector\VersionBonding\Contract\MinPhpVersionInterface;
  *   CRM_Utils_Request::retrieve('delete', 'String', NULL, FALSE, NULL, 'POST')
  *   CRM_Utils_Request::retrieve('delete', 'String', method: 'POST')
  *
- * Signatures come from reflection where the callee is autoloadable (the
- * extension's own code) and otherwise from the SIGNATURES map below — an
- * extension's rector run has no CiviCRM core on its autoloader, so the core
- * offenders have to be declared. Extend it per project via configure().
- *
- * Named arguments and omitted defaults bind to the callee that runs, so a
- * reflected callee must be the only one that can: a user function, or a
- * declared method that no subclass or implementation can replace. Callees
- * that read func_get_args()/func_num_args() see the dropped arguments.
+ * Signatures come from reflection, else from SIGNATURES (extend via configure()).
+ * A reflected callee must be the only one that can run: a user function or a
+ * method nothing can override; callees reading func_get_args() bail.
  */
 final class PositionalDefaultsToNamedArgsRector extends AbstractRector implements ConfigurableRectorInterface, MinPhpVersionInterface {
 

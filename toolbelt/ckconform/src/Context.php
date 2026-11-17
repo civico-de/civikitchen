@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace CiviKitchen\Ckconform;
 
 /**
- * Everything a check may want to know about the extension under inspection,
- * parsed once and parsed properly: structured formats through structured
- * parsers, files found recursively — a sed or a fixed-depth glob makes a
- * check pass silently.
+ * What a check may know about the extension under inspection, parsed once:
+ * structured formats through real parsers, files found recursively.
  */
 final class Context
 {
@@ -116,10 +114,7 @@ final class Context
         return $key === '' ? null : $key;
     }
 
-    /**
-     * The extension's own CamelCase-ish name: the last dot-segment of the key
-     * (`org.example.myext` -> `myext`), used only as an "is this ours" hint.
-     */
+    /** The key's last dot-segment (`org.example.myext` -> `myext`), an "is this ours" hint. */
     public function shortName(): ?string
     {
         $key = $this->extensionKey();
@@ -184,8 +179,7 @@ final class Context
     }
 
     /**
-     * Raw mixin declarations from info.xml, e.g. 'mgd-php@1.0.0'. Callers that
-     * want bare names strip the '@' suffix themselves.
+     * Raw mixin declarations from info.xml, e.g. 'mgd-php@1.0.0'.
      *
      * @return list<string>
      */
@@ -207,11 +201,8 @@ final class Context
     }
 
     /**
-     * The <ext> children of info.xml's <requires>, as trimmed extension keys.
-     * Read via SimpleXML because attributes are legal on the element
-     * (`<ext version="3.32">org.civicoop.civirules</ext>`), and
-     * empty/whitespace-only elements are dropped: '' is not a key, and letting
-     * it through makes an in_array() dependency test silently unmatchable.
+     * The <ext> children of info.xml's <requires>, as trimmed keys; the element
+     * may carry attributes, and empty elements are dropped.
      *
      * @return list<string>
      */
@@ -236,11 +227,8 @@ final class Context
     public const EXT_DIR = '/var/www/html/ext';
 
     /**
-     * Where a dependency sits in the image: the extension directory — CK_EXT_DIR
-     * when the environment names another one — over the extension KEY. That is
-     * where the template's phpstan bootstrap resolves a `<requires>` and where
-     * the shared CI mounts a sibling; an extension's own `<file>` names only its
-     * own mount.
+     * Where a dependency sits in the image: the extension directory (CK_EXT_DIR
+     * if set) plus the extension key, not its `<file>`.
      */
     public function installPath(string $key): string
     {
@@ -248,20 +236,15 @@ final class Context
     }
 
     /**
-     * Where a required extension's code is, for the checks that read a
-     * dependency rather than this repo: under the image's extension directory
-     * (CK_EXT_DIR, the entrypoint's convention — every <requires> is there once
-     * the site booted), else another extension of this repository, else as a
-     * sibling checkout next to this repo. Only dependencies actually present
-     * are returned; a missing one is not an error here, the check that needs it
-     * says what it could not judge.
+     * Where each required extension's code is: the image's extension directory,
+     * else another extension of this repository, else a sibling checkout.
+     * Only dependencies actually present are returned.
      *
      * @return array<string, string> extension key => directory
      */
     public function requiredExtensionDirs(): array
     {
-        // A neighbour's directory name is free, so the key it declares is what
-        // identifies it, not the path.
+        // A neighbour is identified by the key it declares, not its directory.
         $neighbours = [];
         foreach ($this->isMonorepo() ? $this->repositoryExtensions() : [] as $directory => $info) {
             $neighbourKey = trim((string) ($info['key'] ?? ''));
@@ -303,10 +286,8 @@ final class Context
     }
 
     /**
-     * Repo policy from civikitchen.yaml over the organisation-wide defaults
-     * file CK_DEFAULT_CONFIG names.
-     * The mechanism is public (it ships in this image), the values are not —
-     * they live in the consuming repo, so a private licence policy stays private.
+     * Repo policy from civikitchen.yaml over the defaults file CK_DEFAULT_CONFIG
+     * names; the values live in the consuming repo, never in this image.
      *
      * @return array<string, string>
      */
@@ -326,13 +307,8 @@ final class Context
     private array $skippedChecks = [];
 
     /**
-     * The checks this run never executed, because `ignore_checks=` in the
-     * policy skipped them. Set by the runner, since only it knows the outcome
-     * of that parse.
-     *
-     * SuppressionHygieneCheck needs it: an inline ignore for a skipped check
-     * cannot be called unused, because nothing ever looked for the finding it
-     * would have silenced.
+     * The checks `ignore_checks=` skipped, set by the runner. An inline ignore
+     * for a skipped check cannot be called unused.
      *
      * @param list<string> $names
      */
@@ -366,9 +342,8 @@ final class Context
     }
 
     /**
-     * Git-tracked files under the extension directory, relative to it. Tracked
-     * rather than on-disk on purpose:
-     * an untracked file cannot break anyone else's build.
+     * Git-tracked files under the extension directory, relative to it; an
+     * untracked file cannot break anyone else's build.
      *
      * @return list<string>
      */
@@ -410,14 +385,8 @@ final class Context
     }
 
     /**
-     * Git-tracked files under a directory, by extension — the tracked-only twin
-     * of findFiles().
-     *
-     * findFiles() walks the disk, which contradicts the rule the rest of this
-     * class follows: an untracked local file cannot break anyone else's build,
-     * so it must not decide a check. A repo check that asks "does this repo ship
-     * X" has to read what the repo ships, i.e. what is committed. An empty
-     * directory string means the whole tree.
+     * Git-tracked files under a directory, by suffix: the tracked-only twin of
+     * findFiles(). An empty directory means the whole tree.
      *
      * @param  list<string> $extensions
      * @return list<string>
@@ -451,25 +420,17 @@ final class Context
 
     /**
      * The shared reusable CI workflow, by the filename repos name in `uses:`.
-     * A repo whose workflow delegates to it is running everything that workflow
-     * runs — cklint, ckconform, phpstan, phpunit under ckcoverage — even though
-     * none of those tokens appears in the repo's own thin caller.
+     * A caller runs all its tools although none appears in the caller's text.
      */
     public const SHARED_CI = 'extension-ci.yml';
 
-    /**
-     * The shared GitLab pipeline a `.gitlab-ci.yml` includes — the GitLab
-     * counterpart to SHARED_CI, run inside the image instead of a compose stack.
-     */
+    /** The shared GitLab pipeline a `.gitlab-ci.yml` includes, counterpart to SHARED_CI. */
     public const SHARED_GITLAB_CI = 'ci/gitlab/extension-ci.yml';
 
     /** The GitLab pipeline file; GitLab reads it from the repository root only. */
     public const GITLAB_PIPELINE = '.gitlab-ci.yml';
 
-    /**
-     * The shared reusable release workflow, by the filename repos name in
-     * `uses:` — the release-side counterpart to SHARED_CI.
-     */
+    /** The shared reusable release workflow, by the filename repos name in `uses:`. */
     public const SHARED_RELEASE = 'extension-release.yml';
 
     /**
@@ -531,12 +492,8 @@ final class Context
     }
 
     /**
-     * The newest `v*` tag reachable from HEAD, null when there is none.
-     *
-     * Reachable, not "newest by version": what the release checks compare
-     * against is the last release cut on this line of history. A checkout made
-     * without tags answers null too, so callers ask isShallowClone() and treat
-     * a bare null as "cannot tell" rather than "never released".
+     * The newest `v*` tag reachable from HEAD, null when there is none. A
+     * checkout without tags also answers null; callers ask isShallowClone().
      */
     public function newestTag(): ?string
     {
@@ -546,9 +503,7 @@ final class Context
     }
 
     /**
-     * Every `v*` tag in the checkout, unordered. The release-tags rule asks
-     * whether a given version was ever tagged, which is a set question, not
-     * the "last release on this line of history" newestTag() answers.
+     * Every `v*` tag in the checkout, unordered.
      *
      * @return list<string>
      */
@@ -585,12 +540,8 @@ final class Context
     }
 
     /**
-     * The distinct `<version>` values info.xml has carried, oldest first.
-     *
-     * Ordered by history, not by version_compare: what a release rule needs to
-     * know is which numbers this repo actually published its way through. Each
-     * historical blob is parsed as XML, because a diff-scraping variant reads a
-     * `<version>` out of a comment or a neighbouring element.
+     * The distinct `<version>` values info.xml has carried, in history order
+     * (oldest first), each blob parsed as XML.
      *
      * @return list<string>
      */
@@ -617,8 +568,7 @@ final class Context
     /** info.xml's `<version>` at one commit, null when it is absent or unparsable. */
     private function versionAt(string $hash): ?string
     {
-        // ./info.xml, not info.xml: a blob path is repo-root-relative unless it
-        // is explicitly relative to the working directory, which a monorepo
+        // ./info.xml: a bare blob path is repo-root-relative, which a monorepo
         // extension root is not.
         $raw = $this->git(['show', $hash . ':./info.xml']);
         if ($raw === null) {
@@ -636,9 +586,8 @@ final class Context
     }
 
     /**
-     * A clone whose history is truncated — `actions/checkout` makes one by
-     * default (depth 1). Anything reasoning about commits since a tag reports
-     * itself unevaluated here instead of finding nothing.
+     * A clone with truncated history (`actions/checkout` default); commit-based
+     * checks report themselves unevaluated here.
      */
     public function isShallowClone(): bool
     {
@@ -646,24 +595,15 @@ final class Context
     }
 
     /**
-     * Commits in `<ref>..HEAD`, newest first, with committer date and the files
-     * each touched. Null when git could not answer at all — an unreadable
-     * history is not an empty one.
-     *
-     * Merge commits carry no file list (`--name-only` shows no diff for them),
-     * which is right: the commits they merge are listed in their own right.
-     *
-     * Scoped to the extension directory: where a repository holds several
-     * extensions, a commit to a neighbour changes nothing about this one.
-     * `--relative` also reports the paths relative to that directory, which is
-     * what every caller compares against.
+     * Commits in `<ref>..HEAD` touching the extension directory, newest first,
+     * with committer date and files relative to that directory. Null when git
+     * could not answer. Merge commits carry no file list.
      *
      * @return list<array{hash: string, date: string, files: list<string>}>|null
      */
     public function commitsSince(string $ref): ?array
     {
-        // Record-separated rather than one commit per line: a commit's file
-        // list is lines too, and \x1e occurs in neither.
+        // Record-separated: a commit's file list is lines too.
         $output = $this->git([
             '-c', 'core.quotePath=false',
             'log', '--format=%x1e%H %cI', '--name-only', '--relative', $ref . '..HEAD', '--', '.',
@@ -699,9 +639,8 @@ final class Context
     }
 
     /**
-     * Is the committed (index) version of this file a Git LFS pointer? Read
-     * from the index because the work tree holds the pointer or the real file
-     * depending on whether the checkout ran git-lfs.
+     * Is the index version of this file a Git LFS pointer? The work tree's
+     * copy depends on whether the checkout ran git-lfs.
      */
     public function isLfsPointer(string $relative): bool
     {
@@ -723,10 +662,7 @@ final class Context
         return $output === null ? 'unspecified' : (explode("\0", $output)[2] ?? 'unspecified');
     }
 
-    /**
-     * Does the repo ship this file? Tracked when in git (repo principle: an
-     * uncommitted local file must not sway a verdict), on disk otherwise.
-     */
+    /** Does the repo ship this file? Tracked when in git, on disk otherwise. */
     public function ships(string $relative): bool
     {
         return $this->isGitRepo() ? $this->isTracked($relative) : $this->exists($relative);
@@ -747,10 +683,7 @@ final class Context
         return false;
     }
 
-    /**
-     * Does the repo ship anything under this directory? Tracked files when in
-     * git; outside git (tarball, exported build) whatever is on disk.
-     */
+    /** Does the repo ship anything under this directory? Tracked in git, on disk otherwise. */
     public function hasShippedUnder(string $directory): bool
     {
         return $this->isGitRepo()
@@ -765,10 +698,8 @@ final class Context
     }
 
     /**
-     * Whether git would ignore this path — asked of git, not guessed from
-     * .gitignore. git resolves patterns, precedence, negation and nested
-     * .gitignore files; nothing else does. Outside a git repo (exit 128) the
-     * answer is "not ignored".
+     * Whether git would ignore this path, asked of git rather than parsed from
+     * .gitignore. Outside a git repo the answer is "not ignored".
      */
     public function isIgnored(string $relative): bool
     {
@@ -776,10 +707,8 @@ final class Context
     }
 
     /**
-     * Shipped source files: tracked (or, outside git, on-disk) files under a
-     * directory, by suffix, minus tests/, vendor/ and node_modules/ at any
-     * depth — code that never runs on an install must not decide a check.
-     * A subdirectory with its own info.xml is another extension and is left out.
+     * Shipped source files under a directory, by suffix, minus tests/, vendor/,
+     * node_modules/ at any depth and subdirectories with their own info.xml.
      *
      * @param  list<string>                $extensions
      * @param  callable(string): bool|null $filter
@@ -820,8 +749,7 @@ final class Context
     }
 
     /**
-     * The compose stacks the repo ships, tracked only: an untracked local
-     * override is nobody else's problem.
+     * The compose stacks the repo ships, tracked only.
      *
      * @return list<string>
      */
@@ -851,11 +779,8 @@ final class Context
             return [];
         }
         $found = [];
-        // Pruned even in fallback mode: .git is never repo content, and
-        // .civikitchen-siblings/ is where the shared CI checks out a sibling
-        // extension — foreign code with its own CI, whose hooks and files must
-        // not be judged as this repo's (CiviCRM's own scanner skips
-        // dot-directories for the same reason).
+        // .civikitchen-siblings/ holds sibling extensions the shared CI checks
+        // out; foreign code that must not be judged as this repo's.
         $directoryIterator = new \RecursiveDirectoryIterator($base, \FilesystemIterator::SKIP_DOTS);
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveCallbackFilterIterator(
@@ -946,10 +871,8 @@ final class Context
     }
 
     /**
-     * The extension's directory relative to the repository root, '.' when the
-     * extension is the repository root itself. Both sides are resolved through
-     * realpath: a root reached through a symlink would otherwise measure
-     * against a differently spelled repository root.
+     * The extension's directory relative to the repository root, '.' at the
+     * root. Both sides go through realpath so a symlinked root still matches.
      */
     public function extensionDirectory(): string
     {
@@ -963,11 +886,9 @@ final class Context
     }
 
     /**
-     * The part of each workflow that judges THIS extension: the whole file
-     * where the extension is the repository root, and in a monorepo the caller
-     * job whose `with.working_directory` names the extension's directory — a
-     * neighbour's job says nothing about this extension. Keyed by a label for
-     * messages: the workflow path, plus the job name where one was selected.
+     * The part of each workflow that judges this extension: the whole file, or
+     * in a monorepo the jobs whose working directory is the extension's.
+     * Keyed by the workflow path, plus `:<job>` where a job was selected.
      *
      * @return array<string, string>
      */
@@ -988,11 +909,8 @@ final class Context
     }
 
     /**
-     * Why no CI job judges this extension, null when one does. Three causes,
-     * each named: a workflow the parser could not read at all, a job that names
-     * this directory but is written in a form the text-reading checks cannot
-     * split, and the plain case of no job naming the directory. A single
-     * catch-all message would send the operator after the wrong thing.
+     * Why no CI job judges this extension, null when one does: an unparsable
+     * workflow, a matching job whose text cannot be split, or no matching job.
      */
     public function workflowScopeFailure(): ?string
     {
@@ -1015,9 +933,8 @@ final class Context
     }
 
     /**
-     * The scoped workflow texts and, where a workflow yielded none, why.
-     * `unparsed` names files the parser could not read, `unreadable` the jobs
-     * that do name this extension but whose text could not be split out.
+     * The scoped workflow texts plus the unparsable files and the matching jobs
+     * whose text could not be split out.
      *
      * @return array{scoped: array<string, string>, jobs: array<string, array<mixed>>, unparsed: list<string>, unreadable: list<string>}
      */
@@ -1061,10 +978,7 @@ final class Context
         return $this->workflowScope = $scope;
     }
 
-    /**
-     * The repository's GitLab pipeline, when it ships one and the extension is
-     * the repository root — a monorepo's GitLab pipeline is not supported.
-     */
+    /** The shipped GitLab pipeline; null in a monorepo, which is not supported. */
     public function gitlabPipeline(): ?string
     {
         if ($this->isMonorepo() || !$this->ships(self::GITLAB_PIPELINE)) {
@@ -1104,11 +1018,7 @@ final class Context
         return false;
     }
 
-    /**
-     * Whether this extension's CI delegates to a shared civikitchen pipeline,
-     * GitHub's reusable workflow or the GitLab include — and so runs cklint,
-     * ckconform, phpstan and phpunit under ckcoverage.
-     */
+    /** Whether this extension's CI delegates to a shared pipeline (GitHub or GitLab). */
     public function runsSharedCi(): bool
     {
         return $this->scopedJobsCalling(self::SHARED_CI) !== [] || $this->includesSharedGitlabCi();
@@ -1151,12 +1061,8 @@ final class Context
     }
 
     /**
-     * A workflow body split into its jobs, name => raw text.
-     *
-     * Indentation-based, and text rather than the parsed document on purpose:
-     * the checks that judge a job read its steps, their `if:` and their `run:`
-     * as written. GitHub Actions fixes this layout, so a plain reader is enough;
-     * which job to judge is decided on the parsed YAML instead.
+     * A workflow body split into its jobs by indentation, name => raw text;
+     * checks read a job's steps as written.
      *
      * @return array<string, string>
      */
@@ -1177,9 +1083,8 @@ final class Context
             if (!$inJobs) {
                 continue;
             }
-            // A comment-only line carries no structure: ckinit's managed markers
-            // sit at column 0 and between a job's lines, so ending the section or
-            // starting a job on one loses every job of a generated root workflow.
+            // Comment lines carry no structure: ckinit's markers sit at column 0
+            // between a job's lines and must not end the jobs section.
             if (str_starts_with(ltrim($line), '#')) {
                 if ($current !== null) {
                     $buffer[] = $line;
@@ -1265,10 +1170,8 @@ final class Context
     }
 
     /**
-     * Every extension of the repository: each direct subdirectory of the
-     * repository root that carries an info.xml, directory name => parsed
-     * info.xml. Unparsable XML is dropped — the check that needs the file is
-     * the one that reports it.
+     * Each direct subdirectory of the repository root with an info.xml,
+     * directory name => parsed info.xml; unparsable XML is dropped.
      *
      * @return array<string, \SimpleXMLElement>
      */
@@ -1295,11 +1198,7 @@ final class Context
         return $this->repositoryExtensions;
     }
 
-    /**
-     * A repository that is no extension itself but holds several: the layout
-     * the monorepo checks apply to. Detected from the filesystem, because
-     * nothing declares it.
-     */
+    /** A repository that is no extension itself but holds several. */
     public function isMonorepo(): bool
     {
         return !is_file($this->repositoryRoot() . '/info.xml') && $this->repositoryExtensions() !== [];
@@ -1322,11 +1221,8 @@ final class Context
 
     private function git(array $args): ?string
     {
-        // safe.directory: in CI the checkout is owned by the runner user while
-        // the tools run as www-data, and git then refuses the repo ("dubious
-        // ownership") — which silently degraded every tracked-files check to
-        // the disk-walk fallback. This tool only ever READS the repo, so
-        // trusting the one directory it was pointed at is sound.
+        // In CI the checkout belongs to the runner user and the tools run as
+        // www-data; without safe.directory git refuses the repo ("dubious ownership").
         $command = 'git -c ' . escapeshellarg('safe.directory=' . $this->repositoryRoot())
             . ' -C ' . escapeshellarg($this->root);
         foreach ($args as $arg) {

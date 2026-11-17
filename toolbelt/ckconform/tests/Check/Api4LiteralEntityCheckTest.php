@@ -59,8 +59,8 @@ final class Api4LiteralEntityCheckTest extends CheckTestCase
     }
 
     /**
-     * The whole point: another extension's entity shares no leading word with
-     * ours, so calling civirules from widget must not be flagged.
+     * Another extension's entity shares no leading word with ours, so calling
+     * civirules from widget must not be flagged.
      */
     public function testAnotherExtensionsEntityIsLeftAlone(): void
     {

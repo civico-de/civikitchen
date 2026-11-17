@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# Diff the regenerated catalogs beyond the version lines. -I twice: the
-# release is embedded as CORE_VERSION and in "Generated from" headers, and a
-# diff of only those lines is a release with nothing catalog-relevant in it.
-# Fails (with a job-summary report on $LATEST vs $PINNED) when a bump is due.
+# Diff the regenerated catalogs, ignoring the CORE_VERSION and "Generated from"
+# lines. Fails (with a job summary on $LATEST vs $PINNED) when a bump is due.
 set -euo pipefail
 
 if git diff --quiet -I "CORE_VERSION = '" -I 'Generated from CiviCRM ' ; then

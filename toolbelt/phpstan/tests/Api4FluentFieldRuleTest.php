@@ -12,17 +12,8 @@ use PHPStan\Rules\Rule;
 use PHPStan\Testing\RuleTestCase;
 
 /**
- * The regression guard for the address-fields-on-Contact class of bug.
- *
- * `addSelect('street_address')` on a Contact is accepted by APIv4 and comes
- * back empty; only the catalog can say that the field lives on Address. The
- * negative half of the fixture is the more important one — the join form and
- * the option-value suffixes are how the correct code looks, and a rule that
- * flags those would be turned off fleet-wide within a day.
- *
- * The join half is the same bargain: the right-hand side of a KNOWN implicit
- * join is checkable, an explicit alias, a custom group and a multi-level path
- * are not, and the fixture pins both directions.
+ * Address fields selected on Contact are reported; the join form, option-value
+ * suffixes and unresolvable dotted paths are not.
  *
  * @extends RuleTestCase<Api4FluentFieldRule>
  */

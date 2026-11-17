@@ -1,22 +1,10 @@
 <?xml version="1.0"?>
 <!--
-  CiviKitchen's Psalm config — taint analysis ONLY.
+  Psalm config for cktaint, which runs taint analysis only. A project's own
+  psalm.xml or psalm.xml.dist replaces this file.
 
-  Psalm is not a second phpstan here. `cktaint` always runs it in taint mode,
-  which reports Tainted* issues and nothing else, so the
-  errorLevel below is set to the most permissive value (8) purely so that the
-  extension's undeclared CiviCRM surface (core classes, Smarty, hooks) cannot
-  turn into noise if someone runs psalm with this config by hand.
-
-  resolveFromConfigFile="false": this file lives in the image
-  (/opt/civikitchen/toolbelt/psalm), the code lives in the extension. With "false",
-  <projectFiles> resolves against the working directory — the extension root
-  cktaint runs in — instead of against the image directory, which would hold
-  no project code at all. The <stubs> entries below therefore have to be
-  absolute; they are the only paths here that belong to the image.
-
-  A project's own psalm.xml/.dist wins (cktaint skips this file entirely) —
-  same rule as mago.toml for cklint and rector.php for ckmodernize.
+  resolveFromConfigFile="false" resolves <projectFiles> against the extension
+  cktaint runs in, so the <stubs> paths into the image are absolute.
 -->
 <psalm
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -61,10 +49,8 @@
   </stubs>
 
   <issueHandlers>
-    <!-- BLOCKING: a true positive here is an outright vulnerability. These
-         are the classes that fail cktaint (Psalm exits non-zero on "error"),
-         and since the fleet-wide clean run the CI step is no longer
-         continue-on-error. docs/extension-standards.md, "Where this is going". -->
+    <!-- Blocking: these classes fail cktaint (Psalm exits non-zero on "error").
+         docs/extension-standards.md, "Taint analysis: `cktaint`". -->
     <TaintedSql errorLevel="error" />
     <TaintedShell errorLevel="error" />
     <TaintedInclude errorLevel="error" />
@@ -83,10 +69,8 @@
     <TaintedUserSecret errorLevel="info" />
     <TaintedCustom errorLevel="info" />
 
-    <!-- HTML/text taint is off, not advisory-off: CiviCRM output goes through
-         Smarty templates Psalm never sees, so what remains here is the escaping
-         Psalm cannot follow rather than the escaping nobody wrote. The
-         lint/phpstan layers own output escaping. -->
+    <!-- Off: CiviCRM output goes through Smarty templates Psalm never sees.
+         The lint and phpstan layers cover output escaping. -->
     <TaintedHtml errorLevel="suppress" />
     <TaintedTextWithQuotes errorLevel="suppress" />
 

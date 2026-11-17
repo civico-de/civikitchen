@@ -13,23 +13,9 @@ use PHPStan\Rules\Rule;
 use PHPStan\Rules\RuleErrorBuilder;
 
 /**
- * Schema changes inside a test that runs in a transaction.
- *
- * `Civi\Test\TransactionalInterface` wraps every test method in a transaction
- * and rolls it back afterwards. MySQL commits implicitly on any DDL, so a
- * custom field, a custom group, an extension install or a raw CREATE/ALTER
- * inside setUp() or a test method silently ends that transaction: the
- * rollback then has nothing to roll back, the rows stay, and the next test —
- * or the next run — fails somewhere else entirely. That is the worst kind of
- * flake, because the file that caused it is green.
- *
- * The fix is never a suppression, it is moving the schema work into
- * setUpHeadless() (which runs before the transaction opens) or dropping
- * TransactionalInterface for that class.
- *
- * The whole class is read at once because the schema work is usually one
- * `$this->ensureTestSchema()` away from setUp() — checking method bodies in
- * isolation would see the call and not the DDL.
+ * Schema changes inside a TransactionalInterface test: MySQL commits
+ * implicitly on DDL, so the rollback leaves rows behind. Fix: move it into
+ * setUpHeadless() or drop the interface. Own helpers are followed.
  *
  * @implements Rule<InClassNode>
  */
@@ -65,12 +51,8 @@ final class TransactionalTestDdlRule implements Rule
     }
 
     /**
-     * setUp(), tearDown() and the test methods, plus the own helpers they
-     * call through `$this->`, `self::` or `static::`.
-     *
-     * setUpHeadless() is deliberately not a root: it runs before the
-     * transaction opens, and is where this rule wants the schema work to end
-     * up.
+     * setUp(), tearDown() and the test methods, plus the own helpers they call;
+     * setUpHeadless() runs before the transaction opens and is not a root.
      *
      * @param  array<string, Node\Stmt\ClassMethod> $methods
      * @return list<Node\Stmt\ClassMethod>
@@ -237,8 +219,7 @@ final class TransactionalTestDdlRule implements Rule
             }
         }
 
-        // An extension manager is the only thing in a test whose install()
-        // means "run this extension's SQL"; the receiver has to say so.
+        // install() counts only on a receiver that names an extension manager.
         if (in_array($method, TransactionalDdl::EXTENSION_ACTIONS, true) && self::isExtensionManager($expr->var)) {
             return [self::error(
                 sprintf('extension %s() in a transactional test', $method),

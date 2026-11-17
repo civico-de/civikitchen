@@ -1,9 +1,6 @@
 # shellcheck shell=bash
-# Xdebug toggle — sourced from each image's entrypoint.
-# pcov is loaded but disabled; ckcoverage enables it. Xdebug is opt-in because it
-# slows down every request. Set XDEBUG_MODE to debug, develop, or any combo
-# from https://xdebug.org/docs/all_settings#mode to turn it on. Leave unset
-# (or set to "off") to skip.
+# Xdebug is on only with XDEBUG_MODE set (https://xdebug.org/docs/all_settings#mode);
+# it slows every request. pcov is loaded disabled; ckcoverage enables it.
 XDEBUG_INI="/usr/local/etc/php/conf.d/xdebug.ini"
 if [[ -n "${XDEBUG_MODE}" && "${XDEBUG_MODE}" != "off" ]]; then
     cat > "${XDEBUG_INI}" <<EOF

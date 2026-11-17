@@ -9,12 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * LICENSE.txt scaffolding leftovers: civix writes the key of whatever extension
- * the file was copied from, and a FIXME copyright holder. Both survive a
- * copy-paste bootstrap unnoticed, and then the licence file names someone else's
- * package.
- *
- * The extension key comes from the root element's `key` attribute via SimpleXML.
+ * LICENSE.txt scaffolding leftovers: a foreign extension key (compared with
+ * info.xml's `key` attribute) or a FIXME copyright holder.
  */
 final class LicenseSkeletonCheck implements Check
 {

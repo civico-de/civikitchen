@@ -43,8 +43,7 @@ final class RequiredExtensionsCheckTest extends CheckTestCase
     }
 
     /**
-     * A flat ang/*.aff.html glob missed the ang/afform/ layout most repos use,
-     * so a repo full of Afforms passed with no <ext> declared for them.
+     * The ang/afform/ layout most repos use, not just a flat ang/*.aff.html.
      */
     public function testFindsAfformsNestedBelowAng(): void
     {
@@ -145,9 +144,7 @@ PHP,
     }
 
     /**
-     * The regression this port exists for: an `<ext>[^<]+</ext>` regex could not
-     * see a declaration whose element carries an attribute, so a correctly
-     * declared dependency was reported as missing.
+     * An `<ext>` element carrying an attribute is still a declaration.
      */
     public function testAnExtElementWithAnAttributeIsStillADeclaration(): void
     {
@@ -170,8 +167,7 @@ PHP,
     }
 
     /**
-     * Substring matching (what bash did) would let a longer, unrelated key
-     * satisfy the requirement.
+     * A longer, unrelated key must not satisfy the requirement.
      */
     public function testALongerKeyDoesNotSatisfyTheRequirement(): void
     {

@@ -12,22 +12,9 @@ use CiviKitchen\Ckconform\Reporter;
 use CiviKitchen\Ckconform\Suppressions;
 
 /**
- * Enforces a repo-declared hook implementation style.
- *
- * Opt-in via `civikitchen.yaml`: `hook_style=listener` states that business hook
- * logic lives in scan classes (AutoSubscriber / HookInterface, registered by
- * the scan-classes mixin), and that the classic `<prefix>_civicrm_<suffix>()`
- * function form is reserved for the hooks that technically allow nothing else:
- * pre-boot hooks (dispatched before the container exists), the lifecycle hooks
- * (dispatched straight at the module, never through Symfony) and hooks whose
- * return value is the contract.
- *
- * Without the policy key the check is silent — which style a repo wants is the
- * repo's business, not this tool's. An unknown value fails loudly rather than
- * silently enforcing nothing.
- *
- * Warnings, not failures: a classic business hook still works; the style line
- * exists so new code lands in classes, not to break builds over old code.
+ * Under the opt-in policy `hook_style=listener`, warns on classic
+ * `<prefix>_civicrm_<suffix>()` functions outside the pre-boot, lifecycle and
+ * return-value hooks; scan classes need the scan-classes mixin.
  */
 final class HookStyleCheck implements Check
 {
@@ -43,8 +30,7 @@ final class HookStyleCheck implements Check
         'entityTypes',
         'container',
         // Lifecycle: dispatched straight at the extension via
-        // CRM_Extension_Manager_Module::callHook, never through Symfony — and
-        // at install time the extension's classes are not scanned yet anyway.
+        // CRM_Extension_Manager_Module::callHook, never through Symfony.
         'install',
         'postInstall',
         'uninstall',
@@ -105,9 +91,7 @@ final class HookStyleCheck implements Check
                     continue;
                 }
                 [, $prefix, $suffix] = $m;
-                // Foreign prefixes are HookDispatchNameCheck's finding, not a
-                // style question; the classic-only remainder is exactly what
-                // the style permits as functions.
+                // Foreign prefixes are HookDispatchNameCheck's finding.
                 if (!HookSurface::hasPrefix($prefix, $expected)
                     || in_array(strtolower($suffix), array_map('strtolower', self::CLASSIC_ONLY), true)
                     || $suppressions->suppressed($this->name(), $line)
@@ -122,9 +106,8 @@ final class HookStyleCheck implements Check
             }
         }
 
-        // A listener class without the scan-classes mixin registers nothing —
-        // the style's own failure mode. A warn, because a repo could still
-        // register the class by hand through hook_civicrm_container.
+        // A listener class without the scan-classes mixin registers nothing; warn,
+        // since hook_civicrm_container could still register it by hand.
         if ($listenerClasses && !$this->declaresScanClasses($context)) {
             $reporter->warn(
                 'listener classes exist (AutoSubscriber/HookInterface/AutoService) but info.xml declares no scan-classes mixin — nothing registers them'
@@ -133,9 +116,8 @@ final class HookStyleCheck implements Check
     }
 
     /**
-     * Whether the file references the scan-class bases, judged on real code
-     * tokens so comments and strings cannot trip it; bare, imported or
-     * fully qualified, in any case, as PHP resolves class names.
+     * Whether code tokens reference the scan-class bases, bare, imported or
+     * fully qualified, in any case.
      */
     private function usesListenerClasses(string $contents): bool
     {

@@ -1,32 +1,9 @@
 <?php
 
 /**
- * Transaction canary — a PHPUnit 9 listener that proves a transactional test
- * really was rolled back.
- *
- * The failure it exists for is silent by construction. A test that implements
- * Civi\Test\TransactionalInterface is wrapped in a transaction that
- * CiviTestListener rolls back afterwards, so fixtures never reach the next
- * test. But MySQL COMMITs implicitly on DDL — a CREATE TABLE, an ALTER, a
- * `civicrm_api3('CustomField', 'create')`, a schema rebuild in setUp() — and
- * from that statement on the "transaction" is gone. The rollback then rolls
- * back nothing, every later test inherits the leaked rows, and the suite stays
- * green until an unrelated test fails on a machine where the order differs.
- *
- * The check: inside the transaction, write a token row over the SITE
- * connection. After CiviTestListener has rolled back, look for that token over
- * a SECOND, independent connection. A row that is visible there was committed,
- * which can only have happened if the transaction was lost. One INSERT plus
- * one SELECT per transactional test; the second connection is opened once for
- * the whole process, never per test.
- *
- * The canary table is deliberately NOT named civicrm_*: Civi\Test's headless
- * schema rebuild drops core-prefixed tables, and a table that vanishes
- * mid-suite would read as a canary failure. If it is dropped anyway (a full
- * DROP DATABASE style reset), the INSERT is retried once after re-creating it.
- *
- * Wired in by `ckphpunit`, which injects this listener into a copy of the
- * repo's phpunit config — nothing in the extension repo references it.
+ * PHPUnit 9 listener, injected by `ckphpunit`: a token row written inside a
+ * transactional test must be invisible to a second connection afterwards.
+ * The canary table is not named civicrm_*, which the headless rebuild drops.
  */
 
 namespace Civi\CkTest;
@@ -53,10 +30,8 @@ final class TransactionCanaryListener implements TestListener {
   private ?string $token = NULL;
 
   /**
-   * Listener order matters and is set by ckphpunit: CiviTestListener opens the
-   * transaction in its startTest and rolls back in its endTest, and this
-   * listener is appended after it, so startTest here runs INSIDE the
-   * transaction and endTest here runs AFTER the rollback.
+   * Appended after CiviTestListener by ckphpunit, so startTest runs inside the
+   * transaction and endTest after the rollback.
    */
   public function startTest(Test $test): void {
     $this->token = NULL;
@@ -142,9 +117,7 @@ final class TransactionCanaryListener implements TestListener {
     if ($this->probe !== NULL) {
       return;
     }
-    // The site connection is the authority on which database the test run
-    // actually landed in (civicrm_test, if the bootstrap guard did its job);
-    // CIVICRM_DSN only supplies credentials and host.
+    // The site connection names the database; CIVICRM_DSN supplies credentials and host.
     $database = \CRM_Core_DAO::singleValueQuery('SELECT DATABASE()');
     $dsn = defined('CIVICRM_DSN') ? (string) CIVICRM_DSN : '';
     $parts = parse_url($dsn);
@@ -162,9 +135,8 @@ final class TransactionCanaryListener implements TestListener {
   }
 
   /**
-   * Reported as a test failure rather than thrown: startTest/endTest run
-   * outside the test's own try/catch, and an exception there aborts the whole
-   * run with no attribution to the offending test.
+   * Reported as a test failure, not thrown: an exception in startTest/endTest
+   * aborts the whole run unattributed.
    */
   private function fail(Test $test, string $message): void {
     $result = $test instanceof TestCase ? $test->getTestResultObject() : NULL;

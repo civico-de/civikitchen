@@ -11,25 +11,9 @@ use CiviKitchen\Ckconform\Scalar;
 use CiviKitchen\Ckconform\Suppressions;
 
 /**
- * A malformed `*.mgd.php` record does not fail at install time in a readable
- * way — it fails inside the managed-entity reconciliation that runs on every
- * enable, upgrade and `System.flush`. A record without `name`/`entity`, or a
- * v4 record missing `params.values`, makes
- * CRM_Core_ManagedEntities throw mid-reconcile, which aborts the whole
- * reconciliation — so unrelated managed records of unrelated extensions stop
- * being created too, and the upgrade screen shows a stack trace instead.
- *
- * The subtler failure class is `module` pointing at the wrong extension key:
- * the record is then owned by an extension that never ships it, so the very
- * next reconcile deletes it as orphaned. Config that "disappears after a
- * flush" is this. A missing `module` is fine — the mgd-php mixin fills it in.
- *
- * Two identical identities (module, name, entity) across files are equally
- * silent: the second record wins, the first never exists.
- *
- * Missing `cleanup` on an admin-editable entity is a warning, not a failure:
- * the default is `always`, so uninstalling the extension deletes the record
- * even if an admin has since rewritten it by hand.
+ * Malformed `*.mgd.php` records (missing name/entity or v4 `params.values`, a
+ * wrong `module`, duplicate identities) that abort or corrupt reconciliation;
+ * a missing `cleanup` on an admin-editable entity warns.
  */
 final class ManagedEntityMetadataCheck implements Check
 {
@@ -100,8 +84,7 @@ final class ManagedEntityMetadataCheck implements Check
                     } elseif ((int) $version === 4 && !is_array($params['values'])) {
                         $reporter->fail("$label: APIv4 params 'values' is not an array");
                     } elseif ((int) $version === 3 && !$this->fileSuppressed($context, $relative)) {
-                        // Records are evaluated via require, so there is no line
-                        // to anchor an inline ignore to — the escape is the
+                        // No line to anchor an inline ignore to; the escape is the
                         // file-wide `ckconform-ignore-file managed-entity-metadata`.
                         $reporter->warn("$label: managed record uses APIv3" . ($defaulted ? ' (no params.version, which mgd-php defaults to 3)' : '') . " — prefer version 4 with 'values' when the entity supports APIv4 save/update on the minimum supported core; otherwise document the compatibility exception");
                     }

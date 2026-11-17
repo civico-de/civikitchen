@@ -9,22 +9,16 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * node_modules, vendor and the phpunit result cache are machine-owned: every
- * run regenerates them, and every regeneration diverges from what the last
- * commit checked in. A committed copy is stale by construction.
- *
- * Checked as a tracked file of that exact name and as a tracked directory:
- * node_modules anywhere, vendor/ only beside the composer.json that installs it
- * (a `js/vendor/` of hand-picked bundles is source). Each hit names its path.
+ * Tracked machine-owned artifacts: node_modules anywhere, vendor/ beside the
+ * composer.json that installs it, the phpunit result cache, *.tsbuildinfo.
  */
 final class CommittedArtifactCheck implements Check
 {
     private const ARTIFACTS = ['.phpunit.result.cache', 'node_modules', 'vendor'];
 
     /**
-     * Suffix-matched artifacts, for caches named after the file they belong to.
-     * TypeScript writes <tsconfig-name>.tsbuildinfo, which is why one repo's
-     * '.tsbuildinfo' ignore pattern never matched and the cache ended up tracked.
+     * Suffix-matched artifacts, for caches named after their file
+     * (<tsconfig-name>.tsbuildinfo).
      */
     private const ARTIFACT_SUFFIXES = ['.tsbuildinfo'];
 
@@ -48,8 +42,7 @@ final class CommittedArtifactCheck implements Check
             }
         }
 
-        // CiviCRM extensions routinely SHIP vendor/ on purpose (they deploy
-        // without a composer install step). A repo declares that in its
+        // Extensions may ship vendor/ on purpose, declared in the
         // civikitchen.yaml policy: vendor=committed -- <reason>
         $vendorPolicy = $context->policyValue('vendor');
         $allowVendor = $vendorPolicy !== null && str_starts_with($vendorPolicy, 'committed');

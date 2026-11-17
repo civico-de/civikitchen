@@ -1,21 +1,9 @@
 <?php
 
 /**
- * ESCAPES — the two CRM_Utils_String helpers that really do sanitize, and one
- * that does not.
- *
- * munge() reduces the value to `[a-zA-Z0-9]` plus one replacement character
- * and truncates it, so nothing survives that any of these sinks parses:
- * quotes, semicolons, slashes, dots, CR/LF. Escaping it for sql/shell/file/
- * header/html at once is not generosity, it is what the regex does.
- *
- * purifyHTML() runs the value through the richtext filter (HTMLPurifier) —
- * an HTML escape only, and irrelevant while TaintedHtml is off, but stubbed
- * so it does not silently launder a value into an SQL sink.
- *
- * stripPathChars() is deliberately NOT an escape: it removes quotes and
- * shell metacharacters, but leaves `/`, `.` and `..` untouched, so a path
- * traversal walks straight through it. Left as a pass-through flow.
+ * ESCAPES: munge() (only `[a-zA-Z0-9]` survives, so every sink) and
+ * purifyHTML() (HTML only). stripPathChars() keeps `/` and `..`, so it stays
+ * a pass-through flow.
  *
  * Signatures verified against CiviCRM 6.18.0 (CRM/Utils/String.php).
  */

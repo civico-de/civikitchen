@@ -1,12 +1,7 @@
 import { test as setup, expect } from "@playwright/test";
 
-// Logs in once as the demo user and persists the session to .auth/admin.json.
-// Tests in the `chromium` project load this storage state automatically and
-// start out already authenticated.
-//
-// Credentials default to the standalone image's demo user (admin / admin).
-// Override via DEMO_USER / DEMO_PASS env vars if you changed
-// CIVIKITCHEN_DEMO_USER / CIVIKITCHEN_DEMO_PASS in docker-compose.yml.
+// Log in once and save the session to .auth/admin.json. DEMO_USER / DEMO_PASS
+// override the image's admin / admin.
 
 const authFile = ".auth/admin.json";
 const DEMO_USER = process.env.DEMO_USER ?? "admin";

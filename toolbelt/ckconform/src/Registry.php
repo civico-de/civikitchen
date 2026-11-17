@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace CiviKitchen\Ckconform;
 
 /**
- * The ordered list of checks.
- *
- * Order is not cosmetic: the golden output is compared line by line, so a
- * reordering reads as a regression. Entries whose class does not exist are skipped.
+ * The ordered list of checks; the golden output is compared line by line, so
+ * order matters. Entries whose class does not exist are skipped.
  */
 final class Registry
 {

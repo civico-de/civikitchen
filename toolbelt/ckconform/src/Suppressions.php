@@ -5,32 +5,14 @@ declare(strict_types=1);
 namespace CiviKitchen\Ckconform;
 
 /**
- * Inline suppressions, the eslint-style escape levels below the repo-wide
- * `civikitchen.yaml` policy (`ignore_checks=` there is the global one):
+ * Inline suppressions, parsed from real comment tokens:
  *
  *   // ckconform-ignore <check-name> -- <reason>        (this line + the next)
  *   // ckconform-ignore-file <check-name> -- <reason>   (the whole file)
  *
- * Several checks may be listed comma-separated. The reason is not optional —
- * an ignore without one is itself reported (SuppressionHygieneCheck), same
- * doctrine as `tests=optional -- <reason>` in the policy file.
- *
- * Parsed from real comment tokens, so the marker in a string literal or a
- * heredoc does not suppress anything.
- *
- * Instances also record which entries actually silenced something, so that
- * SuppressionHygieneCheck can report an ignore whose finding is gone — the
- * phpstan `reportUnmatchedIgnoredErrors` idea. That needs state shared across
- * checks: every check parses the files it cares about on its own, and only the
- * sum of all of them says whether an entry was ever needed. Instances are
- * therefore cached per contents hash, so the same file yields the same object
- * no matter which check asked for it, and `suppressed()` marks the matching
- * entry as consumed. Process-wide static state is defensible here and nowhere
- * else in this tool: ckconform is a one-shot CLI over one repo, the cache is
- * keyed by content rather than by path (identical files behave identically, so
- * sharing an entry between them cannot change a verdict), and `reset()` exists
- * for tests. Files without a marker are not cached — nothing to track, and a
- * large repo would otherwise retain an empty object per PHP file.
+ * Several checks may be listed comma-separated; the reason is mandatory.
+ * Instances are cached per contents hash so every check shares one record of
+ * which entries were consumed, the input to the unused-ignore report.
  */
 final class Suppressions
 {
@@ -53,8 +35,7 @@ final class Suppressions
 
     public static function of(string $contents): self
     {
-        // Cheap reject before the tokeniser: a file with no marker has no
-        // entries to share, so it needs neither parsing nor caching.
+        // A file with no marker needs neither parsing nor caching.
         if (!str_contains($contents, 'ckconform-ignore')) {
             return new self();
         }
@@ -104,14 +85,8 @@ final class Suppressions
     }
 
     /**
-     * Suppressions in JS/TS-style source files.
-     *
-     * PHP's tokenizer deliberately treats a TypeScript file as inline HTML, so
-     * `of()` cannot see its comments. Playwright configs need the same narrow,
-     * reason-required escape hatch as PHP without accepting a marker hidden in
-     * a string literal. Requiring a standalone // or one-line block comment is
-     * intentionally stricter than a JavaScript parser and covers the documented
-     * file-level form without inventing a second suppression language.
+     * Suppressions in JS/TS-style source files, which PHP's tokenizer reads as
+     * inline HTML. Only a standalone // or one-line block comment counts.
      */
     public static function ofLineComments(string $contents): self
     {
@@ -134,9 +109,7 @@ final class Suppressions
         return self::$cache[$key] = $self;
     }
 
-    /**
-     * Drop the shared instances. Tests only — a run is one process.
-     */
+    /** Drop the shared instances; tests only. */
     public static function reset(): void
     {
         self::$cache = [];
@@ -259,12 +232,8 @@ final class Suppressions
     }
 
     /**
-     * Does an ignore cover this check on this line? Answering also records the
-     * entry as consumed — that is the whole input to the unused-ignore report,
-     * and it has to happen where the match is known.
-     *
-     * Callers must therefore ask only where they are about to report: asking on
-     * a clean line consumes the ignore and hides the very report this feeds.
+     * Does an ignore cover this check on this line? Answering marks the entry
+     * consumed, so ask only where a finding is about to be reported.
      */
     public function suppressed(string $check, int $line): bool
     {
@@ -287,12 +256,8 @@ final class Suppressions
     }
 
     /**
-     * Listed check names that never silenced anything, one row per name: an
-     * entry naming two checks is two independent verdicts, and only the name
-     * that stayed idle is worth reporting.
-     *
-     * Only meaningful once every check has run, which is why the caller
-     * (SuppressionHygieneCheck) is last in the registry.
+     * Listed check names that never silenced anything, one row per name.
+     * Meaningful only once every check has run.
      *
      * @return list<array{line: int, name: string, file: bool}>
      */

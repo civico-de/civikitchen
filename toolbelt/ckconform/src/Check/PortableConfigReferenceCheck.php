@@ -9,28 +9,9 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * Shipped configuration that names a site-specific numeric ID works on exactly
- * one instance: the one it was exported from. `custom_42` is the column name of
- * a custom field whose ID differs on every other database, and
- * `custom_group_id: 7` points at whatever group happens to be seventh there.
- * The managed record installs without complaint and the SearchKit display or
- * Afform then queries a field that belongs to someone else, or to nothing —
- * an empty column, a "field not found" on save, or silently wrong data.
- * Portable forms use the `group_name.field_name` form, or an `:name` suffix.
- *
- * The second failure class is double-encoded payloads. `api_params` and friends
- * are stored as structured arrays; a PHP-serialized string (`a:3:{`) or a JSON
- * string that itself contains JSON was produced by exporting an already-encoded
- * column, and CiviCRM will hand that string to code expecting an array.
- *
- * mgd files are `return [...]` PHP with at most an ExtensionUtil dependency, so
- * they are evaluated with a stubbed ExtensionUtil; a file that throws anyway is
- * reported as a warning rather than silently skipped. Afform files are scanned
- * as text — the JSON half structurally, the HTML half by attribute pattern.
- *
- * Plain numbers are deliberately not flagged: `domain_id: 1`, weights and
- * `is_active: 1` are legitimate, so only the specific ID-bearing keys and the
- * `custom_\d+` shape are reported.
+ * Shipped mgd and Afform config naming site-specific IDs (`custom_42`, ID-bearing
+ * keys) or double-encoded payloads (serialized or nested JSON strings). mgd files
+ * are evaluated with a stubbed ExtensionUtil; one that throws is a warning.
  */
 final class PortableConfigReferenceCheck implements Check
 {

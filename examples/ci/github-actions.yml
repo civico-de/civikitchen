@@ -36,10 +36,8 @@ jobs:
       - name: Enable the extension
         run: docker compose -f docker-compose.ci.yml exec -T -u www-data app cv ext:enable myextension
 
-      # CIVICRM_UF=UnitTests runs against the isolated <db>_test scratch
-      # database the image configured at install — not the dev site. Prefers
-      # the extension's own vendor/bin/phpunit (from its lock file) over the
-      # image-global phpunit 9.
+      # CIVICRM_UF=UnitTests uses the isolated <db>_test database; the
+      # extension's own vendor/bin/phpunit wins over the image's phpunit 9.
       - name: Run headless phpunit
         run: |
           docker compose -f docker-compose.ci.yml exec -T -u www-data -e CIVICRM_UF=UnitTests app \
@@ -49,11 +47,8 @@ jobs:
         if: failure()
         run: docker compose -f docker-compose.ci.yml logs app
 
-  # Optional: also test against CMS flavors (Drupal 10/11, WordPress, Joomla).
-  # Uncomment this job and copy docker-compose.ci-cms.yml into your repo.
-  # Each flavor mounts the extension at its own CiviCRM extensionsDir
-  # (CK_EXT_BASE), and the dev images carry a HEALTHCHECK so --wait blocks
-  # until the first-boot civibuild reinstall is done.
+  # Optional: the CMS flavors. Uncomment this job and copy
+  # docker-compose.ci-cms.yml into your repo.
   #
   # phpunit-cms:
   #   runs-on: ubuntu-latest

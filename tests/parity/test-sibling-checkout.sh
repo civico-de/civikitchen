@@ -100,11 +100,7 @@ for entry in 'org/repo@' 'org/repo@-x' 'org/repo@a@b' 'org/repo@ref;id'; do
 done
 
 # --- owner/repo@ref against real git ---------------------------------------
-#
-# The stub above is enough for the script's bookkeeping; the pinned forms have
-# to prove the git commands themselves. This leg runs REAL git against a local
-# file:// repository through a shim that maps https://github.com/<owner>/<repo>
-# onto it — the only thing about github.com a local fixture cannot be.
+# A shim maps https://github.com/<owner>/<repo> onto a local file:// repository.
 remotes="$work/remotes"
 mkdir -p "$remotes/org" "$work/bin-real"
 cat > "$work/bin-real/git" <<SHIM

@@ -10,18 +10,8 @@ use CiviKitchen\Ckconform\PhpSource;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A CRM_ class whose file is not where PSR-0 says it is.
- *
- * CiviCRM autoloads CRM_Foo_Bar_Baz from CRM/Foo/Bar/Baz.php — underscores to
- * slashes, exact case. Put the class one letter off (CRM/Foo/Bar/baz.php, or
- * Forms/ where the class says Form_) and it still loads on a case-insensitive
- * macOS disk: the developer sees green, and the class is simply not found the
- * moment it is used on a Linux runner or a customer's server. The failure names
- * a missing class, not a misfiled file, so it reads as a different bug entirely.
- *
- * Checked against git, whose record of the path is case-exact however the local
- * filesystem folds it. The DAO files civix generates follow the same rule, so
- * they are not exempt — a drift there breaks just as hard.
+ * A CRM_ class (DAO files included) whose file is not where PSR-0 says it is,
+ * compared case-exactly through git: macOS resolves a case slip, Linux does not.
  */
 final class Psr0ClassPathCheck implements Check
 {

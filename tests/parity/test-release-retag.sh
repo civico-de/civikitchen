@@ -50,11 +50,8 @@ norm() {
 }
 same() { [ "$(norm < "${work}/calls")" = "$(norm <<<"$1")" ]; }
 
-# Release sources are digest-qualified. Buildx defaults to preferring an index
-# and may therefore wrap a manifest whose media type was not discovered,
-# changing the top-level digest despite identical image content.
-# The newest patch of the line on origin (by version, not by string:
-# 1.2.11 > 1.2.3) moves the major tags.
+# Sources are digest-qualified with --prefer-index=false, so the top-level digest
+# stays. The newest patch on origin (by version: 1.2.11 > 1.2.3) moves the major tags.
 attach v1.2.11 || { cat "${work}/out" >&2; fail "attach v1.2.11"; }
 expected="buildx imagetools create --prefer-index=false -t ${P}:standalone-v1.2.11 -t ${P}:standalone-v1 ${P}@sha256:aaa
 buildx imagetools create --prefer-index=false -t ${P}:v1.2.11 -t ${P}:v1 ${P}@sha256:aaa

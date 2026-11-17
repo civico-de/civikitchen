@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Pre-checkout working-directory suite: no workflow step runs in a workspace
-# subdirectory before the checkout — plus the fixture leg, because the check
-# is silent on success.
+# subdirectory before the checkout.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."

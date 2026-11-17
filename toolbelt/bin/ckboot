@@ -3,10 +3,8 @@
 # ckboot — provision the CiviCRM site inside THIS container, with the extension
 # in the current directory attached, and start Apache.
 #
-# For CI systems that run a job inside the image with the database as a service
-# (GitLab's docker executor) instead of starting the compose stack. The image
-# entrypoint does the work, exactly as on a compose boot; the extension is
-# attached through CIVIKITCHEN_EXTENSION_PATH because the job has no bind mount.
+# For CI jobs that run inside the image with the database as a service; the
+# extension is attached through CIVIKITCHEN_EXTENSION_PATH.
 #
 # Usage (from the extension root):  ext_dir=$(ckboot) && cd "$ext_dir"
 set -euo pipefail

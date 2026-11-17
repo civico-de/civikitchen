@@ -9,19 +9,9 @@ use PHPat\Test\Builder\Rule;
 use PHPat\Test\PHPat;
 
 /**
- * Fleet-wide phpat architecture rules, auto-registered from the image.
- *
- * Boundary rule: an extension may depend on CiviCRM core, on itself and on
- * every extension its info.xml declares in <requires><ext> (ExtensionBoundary).
- * Every other CRM_/Civi\ symbol is another extension's internals, and the
- * supported way across that line is APIv4.
- *
- * Legacy-UI rule: because phpat resolves the full ancestry, a class extending
- * an own intermediate base or a concrete core report is caught too.
- *
- * Both rules derive the extension from the working directory and stay inert
- * outside an extension root. Grandfathered code gets an ignoreErrors entry in
- * the repo's phpstan.neon.dist with a reason.
+ * phpat architecture rules: the extension boundary (core, itself and its
+ * <requires>; see ExtensionBoundary) and the legacy-UI rule. Both are inert
+ * outside an extension root.
  */
 final class ArchitectureTest
 {

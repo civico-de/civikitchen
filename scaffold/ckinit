@@ -5,9 +5,7 @@
 #
 #   ckinit [--force] <extension-dir>   ckinit --update <dir>   ckinit --check <dir>
 #
-# The git root above the target is mounted too: ckinit derives the repository
-# mount of the dev compose file from it. The checkout's YAML parser is
-# installed in the container on the first run. CKINIT_IMAGE overrides the image.
+# The git root above the target is mounted too. CKINIT_IMAGE overrides the image.
 set -euo pipefail
 
 die() { echo "ckinit: $*" >&2; exit 2; }

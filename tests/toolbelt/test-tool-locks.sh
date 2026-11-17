@@ -1,15 +1,6 @@
 #!/usr/bin/env bash
-# The image installs its dev tools from the committed root composer.json +
-# composer.lock. Two things have to hold, and neither is visible in a passing
-# build on a current image:
-#
-#   1. The lock matches its composer.json — an edited constraint that was never
-#      re-locked installs the OLD version, silently, until someone looks.
-#   2. The lock was resolved against the PHP floor the images support, not the
-#      maintainer's PHP. Resolved higher, a tree can pick a transitive that
-#      refuses to start on an 8.1/8.2 image: composer installs it, the tool
-#      then dies at startup. That is how `cktaint` was broken on PHP 8.2 —
-#      psalm's lock had sebastian/diff 7 (php >=8.3) in it.
+# The dev-tool lock matches its composer.json and was resolved against the
+# images' PHP floor, or a transitive can refuse to start on an older image.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

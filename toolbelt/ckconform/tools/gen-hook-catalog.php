@@ -8,24 +8,10 @@ declare(strict_types=1);
  * Usage:
  *   php tools/gen-hook-catalog.php <core-dir> [out-file]
  *
- * Reads core `CRM/Utils/Hook.php` by token scan, which also catches hooks core
- * assembles dynamically (post, pre, install), plus the literal hook_civicrm_*
- * dispatch sites in CRM/, Civi/, ext/ and api/: search_kit, oauth-client and
- * oembed dispatch theirs outside that class.
- *
- * Deprecation comes from two places, because core marks it inconsistently: the
- * `@deprecated` docblock tag, and a `deprecatedFunctionWarning()`/
- * `deprecatedWarning()` call in the method body — hook_civicrm_tokens carries no
- * tag at all and would otherwise be missed.
- *
- * What this tool deliberately does NOT derive, and why — both live as short,
- * hand-verified lists in HookDispatchNameCheck:
- *
- *  - REMOVED hooks. A removed hook leaves no trace in core, so the only signal
- *    is documentation prose, which condemns live hooks: post/install/enable
- *    (names built dynamically), alterExternUrl (dispatched from CRM/Utils/System.php).
- *  - Hooks deprecated only in the docs: two real ones against two pages that
- *    describe a deprecated *parameter* (links, merge) — not worth automating.
+ * Token-scans CRM/Utils/Hook.php plus the literal hook_civicrm_* dispatch sites
+ * in CRM/, Civi/, ext/ and api/. Deprecated means a `@deprecated` tag or a
+ * deprecation warning in the method body. Removed and docs-only deprecated
+ * hooks are hand-kept in HookDispatchNameCheck.
  */
 
 if ($argc < 2) {
@@ -141,8 +127,7 @@ foreach ($methods as $name => $info) {
     $note = deprecatedNote($info['doc']);
     $source = 'CRM/Utils/Hook.php:' . $info['line'];
 
-    // A hook can be deprecated without carrying the tag — core sometimes only
-    // logs a runtime warning from the method body.
+    // Some hooks only log a deprecation warning from the method body.
     if ($note === null && preg_match('/deprecated(?:Function)?Warning\s*\(/', $info['body'])) {
         $note = 'deprecated — core logs a deprecation warning when it fires';
     }

@@ -4,12 +4,8 @@
 declare(strict_types=1);
 
 /**
- * ckconform — repo-conformance check for CiviCRM extensions against the
- * civikitchen template. Complements cklint (style) and phpstan (types): this
- * checks the repo structure, the gaps every extension audit turned up.
- *
- * Run from the extension root. Beside the toolbelt's shared PHP library its only
- * dependency is the YAML parser of the scenario-schema package, which the image ships.
+ * ckconform: repository conformance of a CiviCRM extension against the
+ * civikitchen template. Run from the extension root.
  */
 
 use CiviKitchen\Ckconform\Autoloader;
@@ -55,26 +51,14 @@ if (!in_array($format, ['human', 'json', 'github', 'sarif'], true)) {
 }
 
 /**
- * Read-out modes for `civikitchen.yaml`, and the only way ck* shell tools get at
- * it — so that Policy stays the one parser of this format instead of the
- * seventh.
+ * Read-out modes, the only way ck* shell tools read `civikitchen.yaml`:
  *
  *   eval "$(ckconform --policy-env)"   # CK_POLICY_MIN_COVERAGE='70', …
  *   ckconform --policy <key>           # every value of one key, one per line
  *   ckconform --dist-paths             # `dir <name>` / `file <name>`, then `stage <path>`, one per line
  *
- * Both read the repo file over the CK_DEFAULT_CONFIG layer (Policy::effective).
- * --policy-env gives the scalar view with the ` -- <reason>` stripped, which is
- * what a shell caller comparing a number wants. --policy keeps the value
- * verbatim, for the repeatable keys and for the callers whose job is to check
- * that the reason is there (cklifecycle). --dist-paths is the same arrangement
- * one level up: DistPaths owns what a release archive leaves out and stages, ckrelease
- * reads it from here rather than keeping a second copy in bash.
- *
- * Before the info.xml gate and before a single check is constructed, on
- * purpose: this is a config read, its callers have already asserted they are at
- * the extension root, and a read-out that cost a full conformance run is a
- * read-out those callers would go back to writing in sed.
+ * --policy-env strips the ` -- <reason>`, --policy keeps values verbatim.
+ * They run before the info.xml gate and before any check is constructed.
  */
 $policyRaw = static function () use ($root): string {
     $base = $root === false ? '.' : $root;
@@ -116,8 +100,7 @@ switch ($argv[1] ?? '') {
         $distContext = new Context($root === false ? '.' : $root);
         $problems = DistPaths::problems($distContext);
         if ($problems !== []) {
-            // Exit rather than print a list the caller would build an archive
-            // from: an exclude that resolves nowhere excludes nothing.
+            // An exclude that resolves nowhere excludes nothing.
             foreach ($problems as $problem) {
                 fwrite(STDERR, "ckconform: {$problem}\n");
             }
@@ -160,9 +143,8 @@ try {
     exit(2);
 }
 
-// The repo-wide escape level: ignore_checks=<name>,<name> -- <reason> in
-// civikitchen.yaml policy.ignore_checks skips whole checks. The reason is not optional, and a name no
-// check carries is a dead ignore — both fail rather than silently narrowing.
+// policy.ignore_checks (`<name>,<name> -- <reason>`) skips whole checks; a
+// missing reason or an unknown name fails.
 $ignored = [];
 $ignoreRaw = $context->policyValue('ignore_checks');
 if ($ignoreRaw !== null) {
@@ -178,8 +160,6 @@ if ($ignoreRaw !== null) {
         }
     }
 }
-// Hand the skip list on: an inline ignore for a check that never ran is not an
-// unused ignore, and only this loop knows which checks were skipped.
 $context->skipChecks(array_values($ignored));
 
 foreach (Registry::all() as $check) {

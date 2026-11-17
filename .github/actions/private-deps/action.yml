@@ -6,10 +6,6 @@ description: >-
   that mounts and enables the siblings (output `sibling_override`); layer it
   with a second -f on `up`.
 
-# Every job that boots a stack needs the same steps, so they live here
-# rather than once per job. A reusable workflow reaches its own repository by
-# checking it out at `ref: ${{ job.workflow_sha }}` — `uses: ./…` alone
-# resolves against the CALLING repository.
 inputs:
   sibling_repo:
     description: Comma- or newline-separated extension repos (owner/repo).
@@ -62,20 +58,8 @@ outputs:
 runs:
   using: composite
   steps:
-    # App credentials stay on the runner. Nothing here is mounted, copied or
-    # passed into a container, and nothing echoes the token: the container
-    # gets the *result* (a vendor/ directory, a checked-out sibling), never
-    # the credential that produced it. A leaked build secret is otherwise the
-    # one mistake in this pipeline that outlives the job — and an
-    # installation token at least expires within the hour.
-    #
-    # One read token serves both the sibling checkout and composer: the app
-    # is installed on every private dependency repo, so there is no
-    # per-repo key to pick.
-    #
-    # Branching on the secret in bash, not in the step's `if:` — an absent app
-    # is a legitimate configuration: a repo can keep vendor/ out of git while
-    # every package it requires is public.
+    # App credentials stay on the runner: a container gets the result (vendor/,
+    # a sibling checkout), never the token. No app is valid: all packages public.
     - name: Decide whether a private-dependency token is needed
       id: need-token
       shell: bash
@@ -95,8 +79,7 @@ runs:
           echo "app=false" >> "$GITHUB_OUTPUT"
         fi
 
-    # `repositories:` scopes the token to composer_app_repositories, the
-    # caller-declared least-privilege set — never the app's full install.
+    # Scoped to composer_app_repositories, never the app's full install.
     - name: Mint a read token for private dependencies
       id: app
       if: ${{ steps.need-token.outputs.app == 'true' }}
@@ -106,26 +89,11 @@ runs:
         private-key: ${{ inputs.app_private_key }}
         owner: ${{ github.repository_owner }}
         repositories: ${{ inputs.composer_app_repositories }}
-        # The token only ever reads: a sibling checkout and composer's
-        # private packages over HTTPS. Nothing here writes with it.
         permission-contents: read
 
-    # Inside the workspace, like actions/checkout would — and the LEADING
-    # DOT of the directory is load-bearing, twice over:
-    #   * CiviCRM's extension scanner (CRM_Utils_File::findFiles, via
-    #     CRM_Extension_Container_Basic) skips any directory whose name
-    #     starts with a dot. Without that, a sibling would be discovered a
-    #     second time *through the extension's own mount* and the same key
-    #     would resolve to two paths.
-    #   * the ck* linters ignore `.civikitchen-siblings/` explicitly; a
-    #     whole-tree run would otherwise lint the sibling's code.
-    #
-    # `git clone` in a loop rather than actions/checkout: an action cannot
-    # run once per list entry, and keeping the action for the first repo
-    # while cloning the rest would be two implementations of one step.
-    #
-    # The token is used unconditionally: without an app it is the calling
-    # workflow's token, which is the right credential for a public sibling.
+    # The leading dot in `.civikitchen-siblings/` is load-bearing: CiviCRM's
+    # extension scanner skips dot directories (else a sibling resolves twice,
+    # via the extension's own mount), and the ck* linters ignore it.
     - name: Check out the sibling extensions
       id: siblings
       if: ${{ inputs.sibling_repo != '' }}
@@ -168,8 +136,7 @@ runs:
         CK_SIBLING_BUILD_DIRS: ${{ steps.sibling-builds.outputs.dirs }}
       run: ${{ github.action_path }}/build-siblings.sh build
 
-    # A sibling that loads its own vendor/ gets it built here, on the runner
-    # and with the same read token, before the read-only mount.
+    # Built on the runner, before the read-only mount.
     - name: Composer install in the siblings that ship runtime packages
       if: ${{ inputs.sibling_repo != '' }}
       shell: bash
@@ -183,9 +150,7 @@ runs:
         fi
         ${{ github.action_path }}/install-sibling-vendor.sh
 
-    # The organisation's default civikitchen.yaml, next to the sibling for the
-    # same two reasons (dot-prefixed: invisible to the extension scanner and
-    # to cklint). It reaches ckconform through the extension's own mount.
+    # Under the dot directory too; ckconform reads it through the extension's mount.
     - name: Check out the organisation policy defaults
       if: ${{ inputs.policy_defaults != '' }}
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -195,30 +160,9 @@ runs:
         token: ${{ steps.app.outputs.token || github.token }}
         path: .civikitchen-siblings/policy
 
-    # The CI compose file is template-managed (ckinit checks it), so the
-    # siblings cannot be written into it — the same bind the Playwright job is
-    # in, and the same way out: a compose override written here, in
-    # $RUNNER_TEMP, layered on top for `up` only.
-    #
-    # Two merge rules decide what this file has to contain:
-    #   * `volumes` is a LIST and merges by container path, so naming a new
-    #     target appends to the stack's mounts. The extension's own mount is
-    #     untouched.
-    #   * `environment` is a MAPPING and merges per key — the override's
-    #     value REPLACES the base file's for that key, it does not append to
-    #     it. So CIVIKITCHEN_ENABLE_EXTENSIONS has to be written out in full,
-    #     including the extension the template file already lists.
-    # The siblings come FIRST in that list, in input order: provision.sh
-    # enables the keys left to right, and the extension that declares the
-    # requirement should meet it already satisfied. A sibling required by
-    # another sibling therefore has to be listed before it.
-    #
-    # Absolute host paths, because compose resolves relative ones against the
-    # project directory — the directory of the FIRST -f file, i.e. .docker/,
-    # not the workspace this override was written from.
-    #
-    # Read-only: the stack's composer step skips these mounts, so a sibling's
-    # vendor/ is the one the step above built.
+    # `volumes` merges by container path (appends); `environment` merges per
+    # key (replaces), so the enable list is written in full, siblings first in
+    # input order. Absolute paths: compose resolves relative ones against .docker/.
     - name: Compose override — mount and enable the siblings
       id: override
       if: ${{ inputs.sibling_repo != '' }}
@@ -232,23 +176,18 @@ runs:
         keys=""
         set -f
         for dir in $CK_SIBLING_DIRS; do
-          # The checkout step named each directory after the extension key it
-          # read from that sibling's info.xml — the name CiviCRM registers the
-          # extension under and `cv ext:enable` expects.
+          # The checkout step names each directory after the sibling's key.
           sibling_key="${dir##*/}"
           mounts="$mounts      - $GITHUB_WORKSPACE/$dir:/var/www/html/ext/$sibling_key:ro"$'\n'
           keys="${keys:+$keys,}$sibling_key"
         done
         override="$RUNNER_TEMP/civikitchen-sibling-override.yml"
-        # Assembled line by line, not from one heredoc: the mount list has as
-        # many entries as the input had repos.
         {
           echo "services:"
           echo "  app:"
           echo "    volumes:"
           printf '%s' "$mounts"
-          # Without an ext_key the caller owns the enable list, and writing a
-          # partial one here would REPLACE theirs — environment merges per key.
+          # Without an ext_key the caller owns the enable list; a partial one would replace it.
           if [ -n "$CK_EXT_KEY" ]; then
             echo "    environment:"
             echo "      CIVIKITCHEN_ENABLE_EXTENSIONS: \"$keys,$CK_EXT_KEY\""
@@ -265,22 +204,11 @@ runs:
         CK_COMPOSER_TOKEN: ${{ steps.app.outputs.token || github.token }}
       run: |
         set -euo pipefail
-        # Composer's github-oauth config works for installation tokens too:
-        # it becomes the Authorization header for https://github.com/... VCS
-        # repositories and api.github.com dist downloads. Private packages
-        # therefore have to be declared by HTTPS URL, not git@github.com:.
-        # Written to the runner's global config, so a later `composer install`
-        # in the same job — a tree that moved between two commits — is
-        # authenticated without minting a second token.
+        # Global config, so later installs in this job are authenticated too.
+        # Private packages must be declared by HTTPS URL, not git@github.com:.
         if [ -n "${CK_COMPOSER_TOKEN:-}" ]; then
           composer config -g github-oauth.github.com "$CK_COMPOSER_TOKEN"
         fi
-        # No `composer update` and no --ignore-platform-reqs: the committed
-        # lock is installed as it stands. It runs on the RUNNER's PHP though,
-        # which is not the image's — a repo whose floor is above the runner's
-        # PHP should pin `config.platform.php` in composer.json to the
-        # version the extension actually runs on, which is the honest fix for
-        # resolving against one PHP and executing on another anyway.
-        # CI analyses repository tests as well as runtime code. Install the
-        # locked development tree here; release packaging remains --no-dev.
+        # The lock as it stands, dev tree included, on the runner's PHP: a repo
+        # whose floor is above it pins `config.platform.php`.
         composer install --no-interaction --no-progress

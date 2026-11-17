@@ -1,7 +1,5 @@
-# actionlint's context types don't yet know the job.workflow_* properties
-# GitHub shipped 2026-04 (rhysd/actionlint#707 unreleased). The reusable
-# workflows use job.workflow_sha to pin their checkout of this repo; drop these
-# ignores once an actionlint release accepts it.
+# actionlint does not know job.workflow_sha yet (rhysd/actionlint#707); drop
+# these ignores once a release accepts it.
 paths:
   .github/workflows/extension-docs.yml:
     ignore:

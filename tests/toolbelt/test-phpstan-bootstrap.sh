@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# The managed phpstanBootstrap.php autoloads the classes of core's own ext
-# packages and of every extension the repo's info.xml <requires> that exists
-# under CK_EXT_DIR, so Civi\Api4 façades of a core component and a class
-# extended from a required extension resolve without a repo-specific
-# bootstrap. Core is stubbed to the three files the bootstrap requires.
+# phpstanBootstrap.php autoloads core's ext packages and every info.xml <requires>
+# under CK_EXT_DIR. Core is stubbed to the three files the bootstrap requires.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

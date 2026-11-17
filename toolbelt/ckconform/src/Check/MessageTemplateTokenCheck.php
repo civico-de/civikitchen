@@ -9,25 +9,9 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * Own tokens in a message template with no provider, or in core's namespace.
- *
- * Two failure modes, both silent, both lived through in production:
- *
- * 1. A template uses `{myext.something}` and the extension registers no tokens
- *    at all. The token is not an error and not a warning — the mail simply goes
- *    out with the literal braces or with nothing, depending on the renderer.
- *
- * 2. Worse: an extension registers its own tokens *under* `contact.` (the
- *    namespace that looks natural for a per-recipient value). Core owns that
- *    namespace and overwrites every contact token it does not recognise with
- *    the EMPTY string, so the mail is silently blank in exactly that spot. The
- *    fix is an own namespace (`{myext.rufname}`), and there is no runtime signal
- *    that you need it.
- *
- * Deliberately conservative: a namespace other than the short name or a
- * `<shortname>_` prefix only warns, because a template may legitimately
- * reference a namespace a dependency provides. Filter syntax (`{contact.x|boolean}`) is
- * normal and never reported.
+ * Own tokens in a message template with no registered provider, or registered
+ * under core's `contact.` namespace, which core blanks. A foreign namespace
+ * only warns: a dependency may provide it.
  */
 final class MessageTemplateTokenCheck implements Check
 {
@@ -48,9 +32,7 @@ final class MessageTemplateTokenCheck implements Check
     ];
 
     /**
-     * Text that means "this repo registers tokens somewhere". Presence is
-     * enough — proving that a given token name comes out of a TokenProcessor
-     * subscriber would need to execute it.
+     * Text that means "this repo registers tokens somewhere"; presence is enough.
      *
      * @var list<string>
      */
@@ -150,10 +132,8 @@ final class MessageTemplateTokenCheck implements Check
     }
 
     /**
-     * `$tokens['contact']['myext_foo'] = …` — an own value smuggled into the
-     * namespace core clobbers. Only reported when the key carries the extension
-     * shortname, because deciding "is this a core contact field" from a static
-     * list would misfire on custom fields.
+     * `$tokens['contact']['myext_foo'] = …`, an own value in the namespace core
+     * clobbers. Only keys carrying the shortname count, sparing custom fields.
      *
      * @param list<string> $files
      * @param list<string> $shortnames
@@ -215,12 +195,8 @@ final class MessageTemplateTokenCheck implements Check
     }
 
     /**
-     * Files that carry mail copy: anything under a template-ish directory
-     * (msg_templates, msg*, templates, xml/templates), plus any *.mgd.php that
-     * actually ships a message body — which is how a modern extension bundles a
-     * MessageTemplate. Pragmatic on purpose: Smarty screen variables are
-     * `{$dollar}` and control tags carry whitespace, so neither reaches the
-     * token pattern.
+     * Files that carry mail copy: template-ish directories (msg_templates, msg*,
+     * templates, xml/templates) and any *.mgd.php that ships a message body.
      *
      * @param  list<string> $files
      * @return list<string>
@@ -259,10 +235,8 @@ final class MessageTemplateTokenCheck implements Check
     }
 
     /**
-     * Distinct namespaces of `{ns.token}` occurrences. Smarty control tags
-     * ({if …}, {foreach …}) never match, because the pattern demands
-     * exactly one dot-separated identifier pair and no whitespace; Angular's
-     * `{{row.name}}` is excluded by the lookbehind.
+     * Distinct namespaces of `{ns.token}` occurrences; Smarty tags and Angular's
+     * `{{row.name}}` do not match.
      *
      * @return list<string>
      */

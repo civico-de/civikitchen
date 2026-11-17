@@ -39,11 +39,9 @@ abstract class AbstractApiCallAssistRector extends AbstractRector {
   ) {}
 
   /**
-   * `\Civi\Api4\<Entity>::<action>($checkPermissions)`, or NULL when that
-   * static call would not run the same action: no class under exactly that
-   * name (dynamic entities such as Custom_* resolve through CustomValue), an
-   * action whose first parameter is not $checkPermissions, or a magic action
-   * given a non-literal flag (__callStatic honours only a literal FALSE).
+   * `\Civi\Api4\<Entity>::<action>($checkPermissions)`, or NULL when that would
+   * not run the same action (no such class, a first parameter other than
+   * $checkPermissions, or a magic action with a non-literal flag).
    */
   protected function api4ActionCall(string $entity, string $action, ?Expr $checkPermissions): ?StaticCall {
     $class = 'Civi\\Api4\\' . $entity;
@@ -67,10 +65,8 @@ abstract class AbstractApiCallAssistRector extends AbstractRector {
   }
 
   /**
-   * Entity, action and params array of a literal API call, or NULL to bail
-   * (wrong function, dynamic entity/action, non-literal params, arguments
-   * that do not map onto the signature). A missing params argument counts as
-   * an empty array, matching both API runtimes.
+   * Entity, action and params array of a literal API call, or NULL to bail. A
+   * missing params argument counts as an empty array, as in both API runtimes.
    *
    * @return array{String_, String_, Array_}|null
    */
@@ -96,15 +92,8 @@ abstract class AbstractApiCallAssistRector extends AbstractRector {
 
   /**
    * Classify a literal api3 get() params array into where rows and top-level
-   * clauses, or NULL to bail on anything outside the safe subset (non-string
-   * keys, `api.*` chaining, array filter values, options beyond limit/offset).
-   *
-   * `where` is a list of [field, value expr]; `top` is an ordered list of
-   * [clause, value expr] with clause one of select|checkPermissions|limit|
-   * offset, in source order so the array rule can reproduce it verbatim.
-   * `sequential` is handed over on its own, it only shapes the result;
-   * `version` is dropped, civicrm_api3() overwrites it anyway. `select` is
-   * always a list literal, the comma list api3 also accepts split up.
+   * clauses (in source order), or NULL outside the safe subset. `version` is
+   * dropped, and a comma-list `select` is split into a list literal.
    *
    * @return array{where: list<array{string, Expr}>, top: list<array{'select'|'limit'|'offset'|'checkPermissions', Expr}>, sequential: ?Expr}|null
    */

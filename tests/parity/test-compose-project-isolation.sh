@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Compose-project isolation suite: the real workflows must give every
-# stack-booting job its own compose project, and the checker must actually
-# catch one that does not (the fixture leg — the check is silent on success).
+# Compose-project isolation suite: every stack-booting job gets its own compose
+# project; the fixture leg proves the checker catches one that does not.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."

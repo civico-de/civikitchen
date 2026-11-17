@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Concurrency-group suite: every group in the shared extension CI workflow
-# names the caller workflow and the image, and the checker catches the ways
-# a group can miss them (the fixture legs — the check is silent on success).
+# Concurrency-group suite: every group in the shared extension CI names the
+# caller workflow and the image; the fixture legs prove the checker catches misses.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."

@@ -9,13 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * Without an explicit top-level `permissions:` block a workflow's job token
- * inherits the repository default, which is write-all on older repos and
- * orgs. A lint job does not need to be able to push.
- *
- * The block must start in column 0: a job-level `permissions:` (indented,
- * scoped to one job) narrows that job but says nothing about the others in
- * the same file, so it does not satisfy this check.
+ * A workflow without a top-level (column 0) `permissions:` block, whose token
+ * then inherits the repository default; job-level blocks do not count.
  */
 final class WorkflowPermissionsCheck implements Check
 {

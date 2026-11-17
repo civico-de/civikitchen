@@ -48,15 +48,9 @@ use PHPStan\Reflection\ParametersAcceptor;
 use Rector\NodeTypeResolver\Node\AttributeKey;
 
 /**
- * Shared scope analysis of the api3 get() rewriters. A literal call is
- * rewritten as a bare statement, or as `$v = civicrm_api3(...);` in a
- * function whose every other use of `$v` is a later read of `$v['values']`
- * or `$v['count']`. Those reads become `$v->getArrayCopy()` (`$v[$key]` for
- * one row) and `$v->countFetched()`, and the call selects `id` and keys the
- * rows by it unless `sequential` is 1, as api3 does. Any other use of the
- * result (returned, passed on, `['id']`, written, global scope) leaves the
- * call alone. The rows are api4's: its fields, types and default filters
- * (is_deleted, is_test, is_template) instead of api3's entity defaults.
+ * Shared scope analysis of the api3 get() rewriters: a bare statement, or
+ * `$v = civicrm_api3(...);` whose every other use is a later `$v['values']` or
+ * `$v['count']` read; any other use of `$v` leaves the call alone.
  */
 abstract class AbstractApi3GetAssistRector extends AbstractApiCallAssistRector {
 

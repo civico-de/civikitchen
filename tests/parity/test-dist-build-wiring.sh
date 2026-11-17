@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Dist-build-wiring suite: every job of the shared extension CI workflow that
-# runs the suite builds the policy.dist.build output first — plus the fixture
-# leg, because the check is silent on success.
+# Dist-build-wiring suite: every job of the shared extension CI that runs the
+# suite builds the policy.dist.build output first.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."

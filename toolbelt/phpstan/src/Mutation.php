@@ -7,13 +7,8 @@ namespace CiviKitchen\PHPStan;
 use PhpParser\Node;
 
 /**
- * Recognising a write in the AST.
- *
- * Used by the GET-route rule, which has to answer one question about a
- * handler: does anything down there change data? The answer must be certain
- * — a rule that guesses about writes gets baselined and stops being read —
- * so only the four unambiguous shapes count: an APIv4 write action, an
- * APIv3 write, a DAO/BAO write method, and literal INSERT/UPDATE/DELETE.
+ * Recognising a write in the AST: an APIv4 or APIv3 write, a DAO/BAO write
+ * method, or literal INSERT/UPDATE/DELETE.
  */
 final class Mutation
 {
@@ -114,9 +109,8 @@ final class Mutation
     }
 
     /**
-     * create/save/update/delete/replace, plus the custom actions built on
-     * them — `Widget::createDraft()` writes as surely as
-     * `create()` does.
+     * create/save/update/delete/replace, plus custom actions built on them
+     * (`Widget::createDraft()`).
      */
     public static function isApi4WriteAction(string $action): bool
     {

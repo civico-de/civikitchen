@@ -1,21 +1,8 @@
 #!/bin/bash
 #
-# cktaint — taint analysis for CiviCRM extensions: does request input reach a
-# query, a shell command, a file path, an include or a redirect without being
-# escaped on the way? Psalm is used ONLY as a taint engine here — never as a
-# second phpstan — and it runs against CiviKitchen's CiviCRM source/sink/escape
-# stubs, because Psalm cannot see CiviCRM core.
-#
-# The gate BLOCKS on the classes where a true positive is an outright
-# vulnerability (TaintedSql/Shell/Include/Unserialize/SSRF — errorLevel="error"
-# in the bundled config); the noisier classes are errorLevel="info": printed
-# via --show-info, never part of the exit code. A taint engine without the
-# whole framework modelled still produces false positives (a 'Positive'-typed
-# retrieve() is in fact safe) and false negatives (anything crossing a hook,
-# the API kernel or a Smarty template) — docs/extension-standards.md has the
-# reasoning and how to deal with a finding (--baseline / @psalm-suppress).
-#
-# A project's own psalm.xml/.dist wins — same rule as mago.toml for cklint.
+# cktaint — Psalm as a taint engine only, with CiviKitchen's CiviCRM
+# source/sink/escape stubs. errorLevel="error" classes fail the gate, "info"
+# ones are only printed. A project's own psalm.xml/.dist wins.
 #
 set -uo pipefail
 

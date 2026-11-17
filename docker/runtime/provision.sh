@@ -1,23 +1,9 @@
 #!/bin/bash
-# civikitchen shared provisioning library.
+# civikitchen first-boot provisioning shared by both entrypoints, sourced once
+# the CiviCRM site exists. CK_* defaults are the standalone layout.
 #
-# Sourced by both entrypoints AFTER their CiviCRM site exists (standalone:
-# `cv core:install`; buildkit: `civibuild create site`). It holds the
-# CMS-agnostic first-boot provisioning so the standalone and buildkit images
-# behave the same: dev settings, SMTP backend, an isolated test DB, no calls
-# to civicrm.org, core language files, registry + mounted extensions with
-# their <requires> (`ck internal provision-*`), named profiles
-# (CIVIKITCHEN_PROFILE), and /civikitchen-init.d hooks.
-#
-# Caller contract — define this BEFORE calling any ck_* function:
-#
-#   ck_as_web CMD...   Run CMD as the image's web user, against its CiviCRM
-#                      site. cv must auto-detect the site.
-#                        standalone: the command itself, runuser from root.
-#                        buildkit:   cd into the site docroot, su from root.
-#
-# The CK_* parameters below default to the standalone image's layout; the
-# buildkit entrypoint overrides them before sourcing.
+# The caller defines `ck_as_web CMD...` first: run CMD as the web user in a
+# directory where cv auto-detects the site.
 
 # Accept legacy CIVICRM_-spelled kitchen vars with a deprecation warning.
 _ck_legacy() {
@@ -40,28 +26,24 @@ _ck_legacy CIVIKITCHEN_ENABLE_EXTENSIONS CIVICRM_ENABLE_EXTENSIONS
 : "${CK_EXT_DIR:=/var/www/html/ext}"
 : "${CK_DATA_DIRS:=/var/www/html/private /var/www/html/public}"
 : "${CK_PROVISIONED_MARKER:=/var/www/html/private/.civikitchen-provisioned}"
-# init.d hooks seed the database, so their run is marked there: a recreated
-# container (private/ gone, database volume kept) must not run them twice.
+# init.d hooks seed the database, so their run is marked in it: a recreated
+# container with the old database volume must not run them twice.
 : "${CK_PROVISIONED_SETTING:=civikitchen_provisioned}"
-# Separate marker for the standalone post-install CONFIG bundle (ck_post_install_config:
-# dev settings / SMTP / test DB / auth / demo user). Kept distinct from
-# CK_PROVISIONED_MARKER so config and provisioning retry independently.
+# Marker of ck_post_install_config, apart from CK_PROVISIONED_MARKER so the two
+# retry independently.
 : "${CK_CONFIGURED_MARKER:=/var/www/html/private/.civikitchen-configured}"
 : "${CK_INIT_D:=/civikitchen-init.d}"
 # ~/.cv.json site key under which TEST_DB_DSN is stored. Standalone keys by its
 # bootstrap file; other CMSes key the site differently (resolved per image).
 : "${CK_TEST_DB_CV_KEY:=/var/www/html/civicrm.standalone.php}"
-# Boot stub patched by ck_wire_test_db_boot so CIVICRM_UF=UnitTests boots define
-# the test DSN before core's env-based DSN composition (see
-# patch-test-db-boot.php). Empty or missing file = skip (buildkit flavors
-# boot through their CMS, not a stub).
+# Boot stub ck_wire_test_db_boot patches (patch-test-db-boot.php); empty or
+# missing = skip, as buildkit flavors boot through their CMS.
 : "${CK_BOOT_STUB:=/var/www/html/civicrm.standalone.php}"
 # Standalone's settings file. Missing file = buildkit flavor, whose CMS owns it.
 : "${CK_SETTINGS_FILE:=/var/www/html/private/civicrm.settings.php}"
 # Where named profiles (docker/profiles/<name>/) ship inside the image.
 : "${CK_PROFILE_DIR:=/opt/civikitchen/docker/profiles}"
-# Optional civibuild-style settings.d dir (loaded into civicrm.settings.php).
-# Only the buildkit entrypoint sets this; see ck_smtp.
+# civibuild's settings.d dir; only the buildkit entrypoint sets it.
 : "${CK_SETTINGS_D:=}"
 # Mount table used to tell bind-mounted extensions from downloaded ones.
 : "${CK_MOUNTINFO:=/proc/self/mountinfo}"
@@ -79,12 +61,8 @@ ck_runtime_cli() {
     }
 }
 
-# Attach the scenario's flavor-neutral source mount to the extension directory
-# discovered/configured by the current image. This keeps generated scenarios
-# portable across Standalone, Drupal, WordPress and Joomla layouts without
-# teaching the generator each CMS's internal paths.
-# CIVIKITCHEN_EXTENSION_DIR names the link (default: the key); ckboot uses
-# info.xml's <file>, where the compose stacks mount the extension.
+# Link the scenario's flavor-neutral extension mount into this image's ext dir.
+# CIVIKITCHEN_EXTENSION_DIR names the link (default: the key).
 ck_attached_extension_link() {
     echo "${CK_EXT_DIR}/${CIVIKITCHEN_EXTENSION_DIR:-${CIVIKITCHEN_EXTENSION_KEY:-}}"
 }
@@ -126,7 +104,7 @@ ck_warn_removed_auto_composer() {
     fi
 }
 
-# Dev-mode defaults — there's no reason a dev image would want them off.
+# Dev-mode defaults.
 ck_dev_settings() {
     ck_as_web cv setting:set environment=Development >/dev/null
     ck_as_web cv setting:set debug_enabled=1 >/dev/null
@@ -134,35 +112,22 @@ ck_dev_settings() {
 }
 
 # Point Civi's mail backend at an SMTP host (e.g. the maildev sidecar).
-# Without this, Civi defaults to PHP mail() and outbound mail goes nowhere.
 ck_smtp() {
     [[ -n "${CIVIKITCHEN_SMTP_HOST}" ]] || return 0
     local smtp_port="${CIVIKITCHEN_SMTP_PORT:-1025}"
     echo "[civikitchen] Configuring mail backend → ${CIVIKITCHEN_SMTP_HOST}:${smtp_port}..."
     ck_as_web env SMTP_HOST="${CIVIKITCHEN_SMTP_HOST}" SMTP_PORT="${smtp_port}" \
         cv ev '\Civi::settings()->set("mailing_backend", ["outBound_option" => 0, "smtpServer" => getenv("SMTP_HOST"), "smtpPort" => (int) getenv("SMTP_PORT"), "smtpAuth" => 0, "smtpUsername" => "", "smtpPassword" => ""]);'
-    # buildkit only: its app/civicrm.settings.d/100-mail.php cannot see the
-    # DB-level setting above (it only checks the $civicrm_setting override)
-    # and so defines CIVICRM_MAIL_LOG=/dev/null — send() returns TRUE while
-    # every outbound mail silently vanishes. With an explicit SMTP host there
-    # is nothing left for that heuristic to decide: drop it.
-    # NOT `[[ ... ]] && rm`: as the function's last statement it returns 1
-    # when CK_SETTINGS_D is empty (standalone), and the entrypoints run set -e.
+    # buildkit's 100-mail.php ignores the DB setting above and sets
+    # CIVICRM_MAIL_LOG=/dev/null, which discards every mail. `if`, not `&&`:
+    # as the last statement a false test would fail the caller under set -e.
     if [[ -n "${CK_SETTINGS_D}" ]]; then
         rm -f "${CK_SETTINGS_D}/100-mail.php"
     fi
 }
 
-# Enable standaloneusers — the Standalone auth provider. It backs the
-# /civicrm/login route and supplies the \Civi\Api4\User entity. `cv core:install`
-# does NOT reliably install it across CiviCRM versions (it was absent on
-# standalone-6.12), which leaves the login route with no auth provider behind it.
-# Enable it explicitly so every Standalone boot has a working auth provider —
-# independent of CIVIKITCHEN_DEMO_USER, since a site without a demo user still
-# needs the provider. Idempotent: standaloneusers ships bundled with civicrm-core,
-# so this just enables the already-present extension. Standalone-only — buildkit
-# flavors authenticate through their CMS (Drupal/WordPress/Joomla) and must NOT
-# call this (their entrypoints don't).
+# Enable standaloneusers, the Standalone auth provider; `cv core:install` does
+# not install it on every version (absent on standalone-6.12). Standalone only.
 ck_standalone_auth() {
     echo "[civikitchen] Ensuring standaloneusers (Standalone auth provider) is enabled..."
     if ! ck_as_web cv ext:enable standaloneusers; then
@@ -171,17 +136,14 @@ ck_standalone_auth() {
     fi
 }
 
-# Demo login user. Opt-in via CIVIKITCHEN_DEMO_USER. Needs the standaloneusers
-# \Civi\Api4\User entity, which ck_standalone_auth enables (it runs first in the
-# standalone config bundle, ck_post_install_config). Standalone-only: buildkit flavors get their CMS login
-# from civibuild and must NOT call this (their entrypoints don't).
+# Opt-in demo login user (CIVIKITCHEN_DEMO_USER); needs ck_standalone_auth first.
+# Standalone only.
 ck_demo_user() {
     [[ -n "${CIVIKITCHEN_DEMO_USER}" ]] || return 0
     local demo_user="${CIVIKITCHEN_DEMO_USER}"
     local demo_pass="${CIVIKITCHEN_DEMO_PASS:-admin}"
     local demo_email="${CIVIKITCHEN_DEMO_EMAIL:-admin@example.org}"
     echo "[civikitchen] Creating demo user '${demo_user}'..."
-    # Pass env explicitly via `env` rather than relying on preserve-environment.
     ck_as_web env DEMO_USER="${demo_user}" DEMO_PASS="${demo_pass}" DEMO_EMAIL="${demo_email}" \
         cv scr /usr/local/share/civikitchen/demo-user.php
 }
@@ -197,10 +159,8 @@ ck_mysql_root() {
     return "${rc}"
 }
 
-# With binary logging on (mysql:8.0 default) a user without SUPER may not
-# create triggers or functions, and `cv core:install` creates both. Trusting
-# non-SUPER creators is a server setting, so it is set as root. Best effort:
-# MariaDB and binlog-less servers need nothing, and root may be unreachable.
+# With binary logging on (mysql:8.0 default) only SUPER may create the triggers
+# and functions `cv core:install` creates, unless this server setting is on.
 ck_trust_function_creators() {
     if ! echo "SET GLOBAL log_bin_trust_function_creators = 1;" | ck_mysql_root; then
         echo "[civikitchen] WARNING: could not set log_bin_trust_function_creators as database root; on a binlog-enabled server the install and the headless test DB need it (CIVICRM_DB_ROOT_PASSWORD)." >&2
@@ -213,8 +173,7 @@ ck_trust_function_creators() {
 # the scratch DB nor copy triggers and routines into it.
 ck_provision_test_db() {
     local test_db_name="$1" sql
-    # `_` is a GRANT wildcard even inside backticks — escape it so the grant
-    # covers <db>_test and nothing else.
+    # `_` is a GRANT wildcard even inside backticks.
     local grant_db="${test_db_name//_/\\_}"
     # Recreated, not reused: a seed over old \Civi\Test state (civitest_revs) skips the
     # schema rebuild, and core suites then run on the site's schema instead of core's.
@@ -232,13 +191,10 @@ ck_provision_test_db() {
         echo "[civikitchen] ERROR: could not create ${test_db_name} as database root. Headless tests need it; set CIVICRM_DB_ROOT_PASSWORD to the db service's root password, or CIVIKITCHEN_TEST_DB=0 to manage TEST_DB_DSN yourself." >&2
         return 1
     fi
-    # An EMPTY test DB is unusable: the headless harness boots CiviCRM against
-    # TEST_DB_DSN before \Civi\Test can (re)build any schema, and that boot dies
-    # on a schema-less database. civibuild does the same main→test copy.
+    # The headless harness boots against TEST_DB_DSN before \Civi\Test builds a
+    # schema, so an empty test DB is unusable.
     echo "[civikitchen] Seeding ${test_db_name} from ${CIVICRM_DB_NAME}..."
-    # pipefail in a subshell: without it a failing mysqldump feeds mysql empty
-    # input, the pipeline exits 0, and the marker gets written over a
-    # schema-less test DB.
+    # pipefail: a failing mysqldump must not pass as an empty, successful seed.
     local dump_err
     dump_err=$(mktemp)
     if ! (set -o pipefail; mysqldump -h "${CIVICRM_DB_HOST}" -P "${CIVICRM_DB_PORT}" -u root -p"${CIVICRM_DB_ROOT_PASSWORD:-root}" \
@@ -290,13 +246,8 @@ ck_wire_test_db_boot() {
     fi
     [[ "${CIVIKITCHEN_TEST_DB:-1}" == "1" ]] || return 0
     local test_db_dsn="mysql://${CIVICRM_DB_USER}:${CIVICRM_DB_PASSWORD}@${CIVICRM_DB_HOST}:${CIVICRM_DB_PORT}/${CIVICRM_DB_NAME}_test?new_link=true"
-    # cv merges ~/.cv.json into $GLOBALS['_CV'], keyed by the site bootstrap
-    # path; civicrm.settings.php reads _CV['TEST_DB_DSN'] under
-    # CIVICRM_UF=UnitTests. Write it for the web user, and for root when the
-    # container started as root. Don't clobber an existing ~/.cv.json (a project may have set its own).
-    # JSON-escape the DSN (the DB password may contain \ or ") and write both
-    # files from this shell — interpolating the payload into a `bash -c` string would
-    # let a password containing quotes execute as shell.
+    # civicrm.settings.php reads TEST_DB_DSN from ~/.cv.json under UnitTests.
+    # Written for the web user and root, never over an existing file.
     local site_json
     site_json="$(ck_json_member TEST_DB_DSN "${test_db_dsn}")"
     # Civi\Test\EndToEndInterface names an admin and a demo user; the one demo user, an admin, serves as both
@@ -345,10 +296,8 @@ ck_extra_extensions() {
     ck_provision extras "${CIVIKITCHEN_EXTRA_EXTENSIONS:-}"
 }
 
-# Directories bind-mounted directly into the ext dir, one per line — the
-# extensions a developer put there, as opposed to downloaded ones. Read from
-# the mount table (field 5 is the mount point), so nothing has to be declared;
-# the extension ck_attach_scenario_extension linked in counts as mounted too.
+# Directories bind-mounted directly into the ext dir, one per line, from the
+# mount table; the linked scenario extension counts as mounted too.
 ck_mounted_extension_dirs() {
     [[ -n "${CK_EXT_DIR}" ]] || return 0
     local mount_point
@@ -379,12 +328,8 @@ ck_enable_extensions() {
     ck_provision enable "${CIVIKITCHEN_ENABLE_EXTENSIONS:-}"
 }
 
-# Core language files. Opt-in via CIVIKITCHEN_LOCALES=de_DE[,fr_FR,...]: the
-# version-matching civicrm-<version>-l10n.tar.gz is downloaded once and only
-# the requested locales land in [civicrm.l10n], the directory core reads
-# translations from; an extension's own l10n/ catalogue translates without
-# them. CIVIKITCHEN_DEFAULT_LOCALE=<locale> additionally
-# sets lcMessages; it has to be one of the installed locales.
+# Core language files for CIVIKITCHEN_LOCALES=de_DE[,fr_FR,...] into
+# [civicrm.l10n]; CIVIKITCHEN_DEFAULT_LOCALE, one of them, sets lcMessages.
 ck_locales() {
     local out version l10n_dir
     local -a locales=()
@@ -467,9 +412,8 @@ ck_fetch_locales() {
     fi
     echo "[civikitchen] Installing core language files ${missing[*]} from ${archive} into ${l10n_dir}..."
     unpack="$(mktemp -d)"
-    # Saved before unpacking, so a stalled transfer (under 10 kB/s for 30 s)
-    # aborts and is retried whole. tar exits non-zero for a member that is not
-    # in the archive, so an unknown locale fails instead of leaving English behind.
+    # Saved before unpacking so a stalled transfer is retried whole; tar fails
+    # on a locale missing from the archive.
     if ! curl -fsSL --connect-timeout 20 --speed-limit 10240 --speed-time 30 \
             --retry 3 --retry-all-errors -o "${unpack}/l10n.tar.gz" "${archive}" \
         || ! tar -xzf "${unpack}/l10n.tar.gz" -C "${unpack}" "${missing[@]/#/${prefix}/}"; then
@@ -483,9 +427,8 @@ ck_fetch_locales() {
     chown -R "${CK_WEB_USER}:${CK_WEB_GROUP}" "${l10n_dir}"
 }
 
-# Resolve one profile name across explicit external roots plus the bundled root.
-# Ambiguity is an error rather than an implicit override: selecting `common`
-# must identify the same scenario on every host regardless of mount order.
+# Resolve one profile name across CIVIKITCHEN_PROFILE_PATH and the bundled
+# root; a name found twice is an error, not an override.
 ck_resolve_profile() {
     local name="$1" root candidate
     local -a roots=() matches=()
@@ -546,10 +489,8 @@ ck_profile_is_bundled() {
     [[ "${candidate}" == "${bundled}"/* ]]
 }
 
-# External profiles can carry a root/profile apply.sh and script PHP. Schema
-# validation proves their data shape; it is not a code sandbox. Requiring an
-# explicit trust decision prevents a read-only mount from being mistaken for a
-# data-only security boundary.
+# External profiles can carry apply.sh and PHP scripts, so they run only with
+# explicit trust; schema validation is no sandbox.
 ck_require_profile_trust() {
     local dir="$1"
     ck_profile_is_bundled "${dir}" && return 0
@@ -559,9 +500,8 @@ ck_require_profile_trust() {
     fi
 }
 
-# One instance has one global AuthX header policy. Missing policy is the AuthX
-# upstream-safe default (JWT + API key), never password. Multiple selected
-# profiles must agree before the first one mutates the site.
+# The one AuthX header policy the selected profiles agree on; empty means
+# AuthX's default (JWT + API key).
 ck_resolve_authx_policy() {
     local dir policy resolved=""
     for dir in "$@"; do
@@ -576,27 +516,17 @@ ck_resolve_authx_policy() {
     printf '%s' "${resolved}"
 }
 
-# Apply named profiles (extensions + config + seed + scripts + API users) at first boot.
-# Opt-in via CIVIKITCHEN_PROFILE=<name>[,<name>...] — a comma-separated list
-# is applied left to right, each profile after its `include`s; profiles ship in CK_PROFILE_DIR (see
-# docker/profiles/). Combining works because every layer converges instead of
-# colliding: apply.sh skips extensions the site already has, config converges,
-# seed records are created once per anchor, and configure-api-users.php upserts users/roles
-# (merging role permissions), so a name shared across profiles ends up with
-# the union. Needs network (git clones) and can take several minutes.
-# Runs inside ck_post_install_provision, so it is marker-gated: it applies
-# once, and a failure aborts the boot (no marker) and re-runs on next start.
-# Phase `deps` fetches and enables profile dependencies; `content` (config, seed,
-# scripts, API users) follows once the mounted extensions are enabled. A custom
-# apply.sh runs once, in the content phase.
+# Apply CIVIKITCHEN_PROFILE=<name>[,<name>...] left to right, each after its
+# includes; every layer converges, so profiles combine. Phase `deps` installs
+# dependencies, `content` the rest once mounted extensions are enabled; a
+# custom apply.sh runs only in the content phase.
 ck_apply_profile() {
     local phase="$1"
     [[ -n "${CIVIKITCHEN_PROFILE:-}" ]] || return 0
     local name dir root apply want_cms authx_policy merged
     local -a names resolved phase_arg
     IFS=',' read -ra names <<< "${CIVIKITCHEN_PROFILE}"
-    # Expand and validate the whole list before applying anything — a typo in
-    # the last name must not leave a half-provisioned site behind the failed boot.
+    # Validate the whole list before applying anything.
     CK_EXPANDED_PROFILES=()
     for name in "${names[@]}"; do
         name="${name// /}"
@@ -611,15 +541,12 @@ ck_apply_profile() {
     for dir in "${resolved[@]}"; do
         name="$(basename "${dir}")"
         root="$(dirname "${dir}")"
-        # An external root can share its own driver; otherwise use the bundled
-        # driver. A profile-local apply.sh is the narrowest override.
+        # Driver: the profile's apply.sh, else its root's, else the bundled one.
         apply="${CK_PROFILE_DIR}/apply.sh"
         phase_arg=("${phase}")
         [[ -f "${root}/apply.sh" ]] && apply="${root}/apply.sh"
         [[ -f "${dir}/apply.sh" ]] && apply="${dir}/apply.sh"
-        # CMS gate: profile.json declares the CMS family it needs (e.g.
-        # "drupal10"); match it as a prefix of the civibuild site type
-        # (drupal10-demo, ...).
+        # The CMS profile.json requires is a prefix of the site type (drupal10-demo).
         want_cms="$("$(ck_runtime_cli)" internal profile-cms "${dir}/profile.json" 2>/dev/null || true)"
         if [[ -n "${want_cms}" && "${CIVICRM_SITE_TYPE:-}" != "${want_cms}"* ]]; then
             echo "[civikitchen] ERROR: profile '${name}' requires a ${want_cms} site; this site is '${CIVICRM_SITE_TYPE:-unknown}'." >&2
@@ -630,14 +557,7 @@ ck_apply_profile() {
             phase_arg=()
         fi
         echo "[civikitchen] Applying profile '${name}', ${phase} (needs network; this can take several minutes)..."
-        # Pass CK_CREDENTIALS_FILE through explicitly (like ck_smtp/ck_demo_user
-        # above) so a profile's configure-api-users.php + scripts resolve it
-        # deterministically rather than relying on runuser's preserve-env. Empty
-        # when unset -> the script's `?:` falls back to $HOME/api-credentials.txt
-        # (no change for profiles that don't set it).
-        # CK_SEED_*: what a seed snapshot is keyed on and may restore over
-        # (docker/profiles/apply.sh, docs/seed-snapshots.md).
-        # CK_DEP_ARCHIVE_DIR and CK_SEED_EXTENSION_DIRS: the staged releases and the pins a dependency's <requires> take.
+        # CK_SEED_*: what a seed snapshot is keyed on (docs/seed-snapshots.md).
         ck_as_web env \
             CK_DEP_ARCHIVE_DIR="${CK_DEP_ARCHIVE_DIR:-}" \
             CK_CREDENTIALS_FILE="${CK_CREDENTIALS_FILE:-}" \
@@ -654,9 +574,8 @@ ck_apply_profile() {
             bash "${apply}" "${dir}" "${phase_arg[@]}"
     done
     [[ "${phase}" == content ]] || return 0
-    # Configure identities once from the complete selected set. This turns
-    # same-role declarations into an exact union and lets the CMS adapters
-    # remove stale CiviKitchen-owned permissions/users safely.
+    # API users once from the merged set, so a role shared across profiles gets
+    # the union of its permissions.
     merged="$(mktemp)"
     if ! "$(ck_runtime_cli)" internal profiles-merge "${merged}" "${authx_policy}" \
         "${resolved[@]/%//profile.json}"; then
@@ -701,12 +620,8 @@ ck_run_init_hooks() {
     done
 }
 
-# Heal root-owned files in the CiviCRM data dirs that root-run steps may have
-# left behind — the web workers can't write them otherwise. Cheap no-op when
-# ownership is already correct. -h: change symlinks, never their targets.
-# -xdev: an extension bind-mounted below a data dir (the buildkit flavors put
-# the CMS ext dir inside the site tree) belongs to the host user, and chowning
-# it to the web user locks that user — a CI runner — out of its own checkout.
+# Give root-owned files in the data dirs back to the web user. -xdev: an
+# extension bind-mounted below a data dir belongs to the host user.
 ck_heal_perms() {
     local dirs
     read -ra dirs <<<"${CK_DATA_DIRS}"
@@ -714,21 +629,8 @@ ck_heal_perms() {
         -exec chown -h "${CK_WEB_USER}:${CK_WEB_GROUP}" {} + 2>/dev/null || true
 }
 
-# Marker-gated STANDALONE post-install CONFIG bundle, run once: the steps that
-# must follow `cv core:install` — dev settings, SMTP backend, isolated test DB,
-# the Standalone auth provider, and an optional demo user. The marker is written
-# only on success, so a step that hard-fails (the standaloneusers enable or the
-# demo-user creation) exits the boot loudly AND re-runs the WHOLE — idempotent —
-# sequence on the next start, instead of being silently skipped because the
-# settings file already exists.
-#
-# ck_setup_test_db is ordered BEFORE the auth/demo-user steps deliberately: those
-# can hard-fail (return 1 under the entrypoint's set -e), and the test DB must be
-# created and seeded regardless, even if a demo-user step fails on every boot.
-#
-# Standalone-only — buildkit gets its demo user + isolated test DB from civibuild
-# and calls ck_smtp directly, so it must NOT call this bundle (its entrypoint
-# doesn't).
+# Standalone post-install config, once; the marker is written only on success.
+# The test DB comes before the auth steps, which can fail on every boot.
 ck_post_install_config() {
     if [[ -f "${CK_CONFIGURED_MARKER}" ]]; then
         echo "[civikitchen] Already configured (${CK_CONFIGURED_MARKER}) — first-boot config knobs (SMTP, test DB, demo user) are not re-applied; remove the marker to re-run."
@@ -763,12 +665,8 @@ ck_no_phone_home() {
     echo "[civikitchen] civicrm.org calls off (version_check job inactive, ext_repo_url=false)."
 }
 
-# Marker-gated post-install provisioning bundle: civicrm.org calls off, core
-# locales, profile, registry + mounted extensions, and init.d hooks, run once.
-# The marker is written only on success so a failed step re-runs on the next
-# start instead of being silently skipped. Profile dependencies come first, so the
-# mounted extension can rely on them; profile content follows the mounted
-# extension, so its seed and scripts can use it; init.d hooks run last.
+# Post-install provisioning, once; the marker is written only on success. Profile
+# dependencies precede the mounted extensions, profile content follows them.
 ck_post_install_provision() {
     if [[ -f "${CK_PROVISIONED_MARKER}" ]]; then
         echo "[civikitchen] Already provisioned (${CK_PROVISIONED_MARKER}) — CIVIKITCHEN_PROFILE / *_EXTENSIONS / init.d changes are not re-applied; remove the marker to re-run."

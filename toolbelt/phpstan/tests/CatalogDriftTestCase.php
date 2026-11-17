@@ -7,13 +7,8 @@ namespace CiviKitchen\PHPStan\Tests;
 use PHPUnit\Framework\TestCase;
 
 /**
- * The committed catalog must match what its generator produces.
- *
- * Without this gate a catalog silently rots: a core release that adds an
- * entity, hook or namespace makes the consuming rule reject code that is
- * fine, which is the one failure mode a checker like this must not have.
- * Skipped when no core checkout is around — CI provides one pinned to
- * CORE_VERSION.
+ * The committed catalog must match what its generator produces. Skipped when
+ * no core checkout is around; CI provides one pinned to CORE_VERSION.
  */
 abstract class CatalogDriftTestCase extends TestCase
 {

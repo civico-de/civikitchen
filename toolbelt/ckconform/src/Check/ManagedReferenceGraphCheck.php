@@ -9,26 +9,9 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * SearchKit and Afform configuration is glued together by NAMES, and nothing
- * validates the glue at install time. A SearchDisplay whose
- * `saved_search_id.name` names a SavedSearch that does not exist is created
- * without complaint — the implicit-join lookup just resolves to nothing — and
- * the failure only appears when a user opens the page: an empty display, or a
- * DB error on a NULL saved_search_id. Same for an Afform layout that embeds
- * `<crm-search-display search-name="..." display-name="...">`: a typo or a
- * search that was renamed in one file and not the other produces a form that
- * renders a blank hole.
- *
- * This is the classic aftermath of a rename: the SavedSearch got the new name,
- * the display and the .aff.html kept the old one. Both files still look
- * plausible on their own, so only a cross-file graph catches it.
- *
- * A dangling target whose name starts with this extension's own prefix must be
- * shipped here, so it is a failure. A foreign-looking name may legitimately
- * come from another extension, so it is only a warning — with the reminder that
- * info.xml's <requires> then has to cover that extension. While any managed
- * file could not be evaluated, the name set is incomplete and every dangling
- * target is a warning.
+ * SearchDisplays and Afform `<crm-search-display>` tags naming a SavedSearch or
+ * display nobody ships: an own-prefixed name fails, a foreign one warns, and all
+ * warn while any managed file could not be evaluated.
  */
 final class ManagedReferenceGraphCheck implements Check
 {
@@ -149,9 +132,8 @@ final class ManagedReferenceGraphCheck implements Check
     }
 
     /**
-     * Text-scan the layout for `<crm-search-display ...>` tags. A parser is not
-     * worth it: these layouts are Angular HTML fragments, not documents, and
-     * the two attributes are always literal strings.
+     * Text-scan the layout for `<crm-search-display ...>` tags; the attributes
+     * are always literal strings.
      *
      * @return list<array{search: string|null, display: string|null}>
      */

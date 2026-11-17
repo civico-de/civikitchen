@@ -11,15 +11,7 @@ use PHPStan\Rules\Deprecations\DeprecatedScopeResolver;
  * Treats code marked `@ck-legacy` as a deprecated scope, so calls it makes into
  * deprecated APIs are not reported.
  *
- * phpstan-deprecation-rules only exempts scopes that are themselves
- * `@deprecated`. That is wrong for a test of a deprecated API: the test is
- * living code, and marking it `@deprecated` would claim callers should stop
- * using the test. `@ck-legacy` states the real intent — this code exists to
- * exercise something deprecated — and it disappears together with the shim or
- * test it annotates.
- *
- * The marker counts on the surrounding class/trait or on the individual
- * method/function; the narrower placement is preferred.
+ * The marker counts on the class/trait or on the method/function.
  */
 final class CkLegacyScopeResolver implements DeprecatedScopeResolver
 {

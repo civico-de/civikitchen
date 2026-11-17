@@ -9,12 +9,8 @@ use PHPStan\Rules\Rule;
 use PHPStan\Testing\RuleTestCase;
 
 /**
- * Both spellings of a mandatory parameter, pinned against each other.
- *
- * `protected int $contactId;` with `@required` is reported — the kernel reads
- * the getter before it checks the requirement — while the untyped
- * `@var`+`@required` property next to it, which is core's own form, is not.
- * `?T` and `mixed` start uninitialized too; a constructor assignment does not.
+ * A typed `@required` parameter without a default is reported, core's untyped
+ * `@var`+`@required` form is not.
  *
  * @extends RuleTestCase<Api4ActionPropertyRule>
  */

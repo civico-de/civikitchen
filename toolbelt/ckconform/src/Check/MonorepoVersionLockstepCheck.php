@@ -9,14 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * Extensions of one repository whose versions have drifted apart.
- *
- * One `vX.Y.Z` tag releases every extension of the repository, which keeps the
- * tag namespace and every release rule as they are — but only while all of them
- * move together. A lagging info.xml gets tagged with a version it does not
- * carry, so `release-tags` and the Latest computation describe a release nobody
- * can install. The release date travels with the version for the same reason:
- * one tag, one date.
+ * Extensions of one repository whose info.xml versions or release dates differ:
+ * one `vX.Y.Z` tag releases them all.
  */
 final class MonorepoVersionLockstepCheck implements Check
 {

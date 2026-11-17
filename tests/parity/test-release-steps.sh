@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # The dist-job steps of extension-release.yml that decide what the smoke test
-# installs, run as written against fixture repositories: working_directory
-# normalization, the same-repository closure, the pins union and the staging.
+# installs, run as written against fixture repositories.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

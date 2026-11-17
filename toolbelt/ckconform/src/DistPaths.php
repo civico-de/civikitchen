@@ -5,23 +5,9 @@ declare(strict_types=1);
 namespace CiviKitchen\Ckconform;
 
 /**
- * What a release archive leaves out (the development layer), and the untracked
- * build output it stages on top of git (`policy.dist.build`).
- *
- * The one copy of that list. `ckrelease` builds and verifies the zip from it,
- * reading it through `ckconform --dist-paths` the way every ck* tool reads
- * `civikitchen.yaml` through this tool — same reason (one owner per format), and here
- * a drifting second copy reaches production sites as dev files inside an
- * installed extension.
- *
- * The list is central rather than per-repo `.gitattributes export-ignore`,
- * because `.gitattributes` is template-managed: editing it turns every
- * conforming repo's drift job red and puts the list in as many copies as there
- * are repos. A repo declares its deviation in `policy.dist` instead.
- *
- * Two names are deliberately absent. `vendor/`: a repo that commits it does so
- * because the site needs it at runtime. `dist/`: for a frontend-building
- * extension the committed build IS the shipped artifact.
+ * What a release archive leaves out and the untracked build output it stages
+ * (`policy.dist`); `ckrelease` reads it through `ckconform --dist-paths`.
+ * `vendor/` and `dist/` are absent on purpose: a committed one ships.
  */
 final class DistPaths
 {
@@ -41,9 +27,8 @@ final class DistPaths
     ];
 
     /**
-     * Directory-shaped entries. The build excludes them at the repo root, which
-     * is where the template puts them; `ckrelease verify` additionally rejects
-     * them as a path segment at any depth.
+     * Excluded at the repo root; `ckrelease verify` also rejects them as a path
+     * segment at any depth.
      *
      * @var list<string>
      */
@@ -90,10 +75,8 @@ final class DistPaths
     ];
 
     /**
-     * The central list adjusted by this repo's civikitchen.yaml policy.
-     * directory-shaped, everything else is a file name — which is the only
-     * thing the two lists differ in, since both become the same `git archive`
-     * pathspec.
+     * The central list adjusted by this repo's civikitchen.yaml policy; an entry
+     * ending in `/` is a directory, everything else a file name.
      *
      * @return array{dirs: list<string>, files: list<string>}
      */
@@ -124,9 +107,7 @@ final class DistPaths
     }
 
     /**
-     * Complaints about the declared values, for the caller that has to refuse
-     * to build rather than ship: a path leaving the repo excludes nothing here
-     * and something else wherever it does resolve.
+     * Complaints about the declared values; the caller refuses to build on any.
      *
      * @return list<string>
      */
@@ -180,12 +161,8 @@ final class DistPaths
     }
 
     /**
-     * Would this repo-relative path land in the archive? Root-anchored, like
-     * the build: a nested `sub/tests/` ships (and `verify` then rejects the
-     * archive, which is the finding that belongs to `verify`).
-     *
-     * File entries are prefix-matched too — a `dist_exclude=build` without a
-     * trailing slash still excludes the whole directory as a git pathspec.
+     * Would this repo-relative path land in the archive? Root-anchored like the
+     * build; file entries are prefix-matched too, as a git pathspec is.
      *
      * @param array{dirs: list<string>, files: list<string>} $excluded
      */

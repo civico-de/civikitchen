@@ -10,20 +10,8 @@ use CiviKitchen\Ckconform\Reporter;
 use CiviKitchen\Toolbelt\Repository\PhpFloor;
 
 /**
- * composer's PHP floor and info.xml's declared PHP support disagreeing.
- *
- * An extension states its PHP requirement in two places: composer.json's
- * require.php (the hard floor composer enforces at install) and info.xml's
- * <php_compatibility mode="list"> (the versions the extension claims to run on).
- * When they drift, one of them lies — composer >=8.1 against a list of 8.3/8.4
- * lets the extension install on an 8.1 site it never promised to support, and
- * the reverse refuses an install the list says is fine.
- *
- * Only the minimum is compared, and only when both are declared: a contradiction
- * between two stated bounds is provable, where inferring a bound from the source
- * would need real version analysis. The floors must match exactly — the lowest
- * PHP composer will install on is, by definition, the lowest the extension
- * supports.
+ * composer's require.php floor and info.xml's <php_compatibility> floor must
+ * match exactly when both are declared, and phpstan must analyse for that floor.
  */
 final class PhpVersionCoherenceCheck implements Check
 {
@@ -55,11 +43,8 @@ final class PhpVersionCoherenceCheck implements Check
     }
 
     /**
-     * The floor is a promise about where the code RUNS, and nothing checks it
-     * against the code itself: phpstan analyses with the interpreter it happens
-     * to run under — 8.3 in the image — so an 8.3-only feature in an extension
-     * that installs on 8.1 passes every gate and fatals on a customer site.
-     * `phpVersion` is what makes phpstan analyse for the floor instead.
+     * phpstan analyses with the interpreter it runs under (8.3 in the image)
+     * unless `phpVersion` sets the floor.
      */
     private function checkPhpstanFloor(Context $context, Reporter $reporter, string $floor): void
     {

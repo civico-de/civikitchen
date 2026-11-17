@@ -1,9 +1,7 @@
 <?php
-// Helpers for profile scripts whose data is stored as a snapshot (profile.json
-// "snapshot"): dates from CK_SEED_TODAY, a seeded RNG, period buckets that
-// survive the restore's date shift, and contributions through Order + Payment.
-// Include from scripts/<file>.php with: require_once __DIR__ . '/../../seed-lib.php';
-// An extension's own profile includes /opt/civikitchen/docker/profiles/seed-lib.php.
+// Helpers for snapshot profile scripts: CK_SEED_TODAY dates, a seeded RNG and
+// shift-proof period buckets. Include with require_once __DIR__ . '/../../seed-lib.php'
+// (an extension's profile: /opt/civikitchen/docker/profiles/seed-lib.php).
 
 require_once __DIR__ . '/lib.php';
 require_once __DIR__ . '/../../toolbelt/lib/php/src/Seed/Calendar.php';

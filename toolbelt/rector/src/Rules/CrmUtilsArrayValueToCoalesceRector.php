@@ -20,13 +20,9 @@ use Rector\PhpParser\Node\Value\ValueResolver;
 use Rector\Rector\AbstractRector;
 
 /**
- * Rewrite the deprecated CRM_Utils_Array::value('k', $arr) into
- * $arr['k'] ?? NULL. This is one of the footguns cklint already BANS —
- * ckmodernize fixes it.
- *
- * Only where both agree: value() returns a stored NULL where `??` falls back
- * to the default, so a non-NULL default bails, and so does a subject that may
- * be anything but an array, ArrayAccess or NULL (value() returns the default there).
+ * Rewrite CRM_Utils_Array::value('k', $arr) into $arr['k'] ?? NULL. Bails on a
+ * non-NULL default (value() returns a stored NULL) and on a subject that may be
+ * anything but an array, ArrayAccess or NULL.
  */
 final class CrmUtilsArrayValueToCoalesceRector extends AbstractRector {
 

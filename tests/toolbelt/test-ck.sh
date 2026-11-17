@@ -79,8 +79,7 @@ if "${root}/toolbelt/bin/ck" no-such-command >/dev/null 2>&1; then
 fi
 
 # The staged-release pin's line format is a contract: the extension
-# provisioner and extension-release.yml both split it on spaces. Its own
-# directory, so the policy above stays the one the conform run saw.
+# provisioner and extension-release.yml split it on spaces.
 pins=$(mktemp -d)
 trap 'rm -rf "$work" "$pins"' EXIT
 digest=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

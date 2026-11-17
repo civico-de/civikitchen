@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # ckup writes free host ports into .docker/.env once (existing values are
 # kept), installs vendor/ as the calling user, then runs docker compose up -d.
-# Fake docker records the calls; the
-# port probe is replaced by a list of "taken" ports.
+# Fake docker records the calls; the port probe reads a list of "taken" ports.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

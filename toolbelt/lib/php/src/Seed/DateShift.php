@@ -7,13 +7,9 @@ namespace CiviKitchen\Toolbelt\Seed;
 use RuntimeException;
 
 /**
- * Move every DATE, DATETIME and TIMESTAMP value of the dumped civicrm_* tables
- * forward by N days, keeping the time of day. Columns come from
- * information_schema, so custom value tables are included.
- *
- * Core's triggers stamp civicrm_contact.modified_date and rebuild
- * civicrm_relationship_cache on UPDATE, so the shift refuses a schema with
- * triggers: restore a dump made with --skip-triggers, shift, then rebuild them.
+ * Move every DATE, DATETIME and TIMESTAMP value of the dumped civicrm_* tables,
+ * custom value tables included, forward by N days. Refuses a schema with
+ * triggers, which fire on UPDATE: restore with --skip-triggers, shift, rebuild.
  */
 final class DateShift
 {

@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # ckeslint's APIv4 contract rule, policy.javascript.type_check and --core mode,
 # through the real command and the pinned oxlint toolchain. Each fixture marks its expected findings inline
-# (`// expect: <text>`); the reported lines must equal the marked ones, so a
-# healthy call that is flagged fails as loudly as a typo that is missed.
+# (`// expect: <text>`); the reported lines must equal the marked ones.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

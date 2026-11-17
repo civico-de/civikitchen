@@ -11,9 +11,8 @@ make_extension() {
   printf '%s\n' '<extension key="org.acme.example_ext" type="module"><file>example_ext</file><license>AGPL-3.0</license></extension>' > "$target/info.xml"
 }
 
-# POSIX sed has no portable in-place flag: GNU and BSD sed interpret `-i`
-# differently. Rewrite through a sibling temporary file and copy back so the
-# original file mode remains intact for ckinit's mode-drift assertions.
+# sed -i differs between GNU and BSD; rewrite via a temp file and copy back
+# to keep the file mode for the mode-drift assertions.
 rewrite_with_sed() {
   local expression="$1"
   local file="$2"

@@ -1,23 +1,9 @@
 #!/bin/bash
 #
-# ckmodernize — one-command modernization for a CiviCRM extension, via the
-# civikitchen-bundled tools. The extension carries NOTHING: civikitchen
-# provides everything, so you can modernize/upgrade any extension *through* the
-# image. It orchestrates two layers, each with the right tool:
-#
-#   1. STRUCTURE — civix (the official scaffolding migrator):
-#        civix upgrade          old hook boilerplate -> mixins, info.xml format,
-#                               regenerated glue (version-incremental)
-#        civix convert-entity   legacy XML entity declarations -> entityType.php
-#   2. CODE — rector: off-the-shelf PHP-version + quality sets PLUS CiviKitchen's
-#        CiviCRM footgun rules (the deprecations cklint flags).
-#
-# api3 -> apiv4 is NOT rewritten by default (APIv4 is a deliberate breaking
-# change) — the opt-in --api / --api=array flags migrate a safe subset;
-# everything else cklint flags for a human.
-#
-# Pairs with cklint:   cklint flags  ->  ckmodernize fixes what's mechanical.
-# A project's own rector.php wins for the code step when present.
+# ckmodernize — modernize a CiviCRM extension with the bundled tools:
+#   1. structure: civix upgrade, civix convert-entity
+#   2. code: rector's PHP-version and quality sets plus CiviKitchen's rules
+# api3 -> APIv4 only with --api / --api=array. A repo's own rector.php wins.
 #
 set -uo pipefail
 
@@ -78,8 +64,7 @@ done
 while [ "$#" -gt 0 ]; do paths+=("$1"); shift; done
 
 # -------------------------------------------------------------------------
-# 1. Structure — civix (writes; civix has no dry-run, so we only run it on --fix
-#    and otherwise just announce the plan).
+# 1. Structure — civix has no dry-run, so it runs only on --fix.
 if [ "${do_civix}" -eq 1 ] && [ -f info.xml ] \
     && "$ck_root/bin/ck" internal xml-has-child info.xml civix; then
   if [ "${fix}" -eq 1 ]; then

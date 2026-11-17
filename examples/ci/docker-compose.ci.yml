@@ -1,11 +1,5 @@
-# Minimal CI stack for testing a CiviCRM extension against civikitchen.
-#
-# Copy this file into your extension repo (root), together with the
-# workflow from github-actions.yml. Replace `myextension` with your extension
-# key — the same name you use in the workflow.
-#
-# No ports beyond the app, no phpMyAdmin/Maildev, no persistent volume: this
-# stack is meant to be booted, tested against, and thrown away.
+# Minimal throwaway CI stack: copy it to your extension repo's root with
+# github-actions.yml and replace `myextension` with your extension key.
 services:
   app:
     # Pin a minor for reproducible CI (e.g. :standalone-6.15) or track the

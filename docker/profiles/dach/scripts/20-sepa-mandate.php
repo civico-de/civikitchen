@@ -1,13 +1,7 @@
 <?php
-// Seed CiviSEPA: a creditor for the Verein and recurring direct-debit (RCUR)
-// mandates for the members created by the membership profile — Vollmitglieder pay
-// 120 EUR annually, Fördermitglieder 5 EUR monthly. Uses the CiviSEPA API3
-// actions (the extension has no API4); IBANs are the well-known German test
-// IBANs (valid checksums, no real accounts).
-// Idempotent: gets or creates the creditor; writes the mandates in one
-// transaction and skips them when any exist.
-// cv scr runs without a logged-in user, so every API call disables permission
-// checks explicitly.
+// A CiviSEPA creditor and RCUR mandates for the membership profile's members,
+// through API3 (CiviSEPA has no API4) with German test IBANs. Skips existing
+// mandates; permission checks are off, as cv scr has no logged-in user.
 
 require_once __DIR__ . '/../../lib.php';
 

@@ -3,13 +3,8 @@
 declare(strict_types = 1);
 
 /**
- * The bundled ckdeps config decides which "unknown" classes are core's rather
- * than the extension's. That decision is one regex, and a typo in it either
- * drowns a repo in false findings or silently stops reporting a real one.
- *
- * The analyser itself is installed into the image, not into this repo, so the
- * config is included against stubs and the captured pattern is asserted
- * directly.
+ * The ckdeps config's regex for which "unknown" classes are core's. The analyser
+ * lives in the image, so the config runs against stubs and the pattern is asserted.
  */
 
 namespace ShipMonk\ComposerDependencyAnalyser\Config;
@@ -87,8 +82,7 @@ $expected = [
   'Symfony\Component\Config\FileLocator' => 1,
   'Symfony\Contracts\EventDispatcher\Event' => 1,
   // Libraries core hands to an extension as a parent class, return value or
-  // hook argument: CRM_Core_Form extends HTML_QuickForm_Page, createMailer()
-  // returns a Mail, hook_civicrm_emailProcessor passes an ezcMail.
+  // hook argument.
   'HTML_QuickForm_select' => 1,
   'HTML_Common' => 1,
   'PEAR' => 1,

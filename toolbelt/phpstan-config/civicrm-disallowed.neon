@@ -1,10 +1,5 @@
-# CiviCRM call sites that have modern, mandatory replacements, as
-# spaze/phpstan-disallowed-calls config rather than a sniff: phpstan resolves
-# types, so a ban also holds through a variable (`$class::value()`) and an alias.
-# The list itself is civicrm-disallowed.php, which the mago extension reads too.
-#
-# Shipped at /opt/civikitchen/toolbelt/phpstan-config/civicrm-disallowed.neon;
-# a project opts in with one `includes:` line (the template's phpstan.neon.dist
-# has it).
+# CiviCRM calls with mandatory modern replacements, as spaze/phpstan-disallowed-calls
+# config; the list is civicrm-disallowed.php, which the mago extension reads too.
+# A project opts in with one `includes:` line.
 includes:
 	- civicrm-disallowed.php

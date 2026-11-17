@@ -1,55 +1,38 @@
 #!/usr/bin/env bash
 # Clone every entry of CK_SIBLING_REPO into .civikitchen-siblings/<extension
 # key> and write the directory list to $GITHUB_OUTPUT as `paths=`.
-#
-# An entry is `owner/repo` (default branch) or `owner/repo@ref`, where ref is
-# a tag, a branch or a full 40-hex commit.
-#
-# The directory is named after the extension KEY, not the repo: that is the
-# name CiviCRM registers the extension under, the name `cv ext:enable`
-# expects, and the path phpstan's ArchitectureTest probes
-# (<ext>/.civikitchen-siblings/<key>). The key is only known once the clone's
-# info.xml can be read, so the clone lands in a staging directory named after
-# owner AND repo — two siblings may share a basename — and is moved afterwards.
-#
-# Lives next to action.yml rather than in .github/scripts/: the reusable
-# workflows check this repository out with `sparse-checkout: .github/actions`.
+# An entry is `owner/repo` or `owner/repo@ref` (tag, branch or 40-hex commit).
+# Named by key, which CiviCRM and phpstan's ArchitectureTest expect; cloned to
+# an owner-repo staging dir first, since the key is read from the clone.
 set -euo pipefail
 
-# No globbing anywhere below: an entry is a clone target and a path, never a
-# pattern, and an unquoted expansion is what splits the list.
+# Entries are split by unquoted expansion and must never glob.
 set -f
 
-# A sibling is mounted for its code: files it keeps in Git LFS stay pointers,
-# as with actions/checkout's default lfs: false.
+# LFS files stay pointers, as with actions/checkout's default.
 export GIT_LFS_SKIP_SMUDGE=1
 
 # The toolbelt is checked out beside .github/actions, as build-siblings.sh needs it too.
 ck="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/toolbelt/bin/ck"
 
-# Every path below is workspace-relative, and the calling job may run its own
-# steps from somewhere else entirely.
+# Every path below is workspace-relative.
 cd "${GITHUB_WORKSPACE:-.}"
 
 root=.civikitchen-siblings
 
-# The calling workflow checks its own helpers out under the same parent. A
-# sibling claiming one of those names would have the workflow delete it.
+# The calling workflow's own checkouts under the same parent.
 reserved="ci policy"
 
-# Every entry has to be owner/repo, optionally @ref — it becomes a clone
-# target and a path. Validated here as well as in the calling job: this is the
-# only place that turns the value into a command. A ref may not start with a
-# dash: git would read it as an option.
+# Validated here, where the value becomes a command. A ref may not start with
+# a dash: git would read it as an option.
 entry_re='^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*(@[A-Za-z0-9][A-Za-z0-9._/-]*)?$'
 for entry in ${CK_SIBLING_REPO//,/ }; do
   [[ "$entry" =~ $entry_re ]] \
     || { echo "invalid sibling_repo entry (expected owner/repo or owner/repo@ref): $entry" >&2; exit 1; }
 done
 
-# `git -c` keeps the credential in this process: unlike a token in the clone
-# URL it never reaches the sibling's .git/config. Never echoed either — base64
-# defeats the runner's secret masking.
+# `git -c` keeps the token out of .git/config. Never echo it: base64 defeats
+# the runner's secret masking.
 header="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$CK_SIBLING_TOKEN" | base64 | tr -d '\n')"
 
 mkdir -p "$root"
@@ -67,8 +50,7 @@ for entry in ${CK_SIBLING_REPO//,/ }; do
     git -c "http.https://github.com/.extraheader=$header" \
       clone --quiet --depth 1 "$url" "$staging"
   elif [[ "$ref" =~ ^[0-9a-fA-F]{40}$ ]]; then
-    # A commit is not a ref the remote advertises, so it cannot be cloned by
-    # name: fetch it into an empty repository and check out what came back.
+    # A commit cannot be cloned by name: fetch it into an empty repository.
     git -c init.defaultBranch=main init --quiet "$staging"
     git -C "$staging" remote add origin "$url"
     if ! git -C "$staging" -c "http.https://github.com/.extraheader=$header" \
@@ -87,8 +69,6 @@ for entry in ${CK_SIBLING_REPO//,/ }; do
     echo "sibling_repo: no info.xml in $repo — that repo is not a CiviCRM extension" >&2
     exit 1
   fi
-  # Parsed as XML, not with a tag-shaped regex: an attribute order or a root
-  # element split over two lines is legal and would silently yield an empty key.
   key=$(php "$ck" internal xml-field "$info" key)
   if ! [[ "$key" =~ ^[A-Za-z][A-Za-z0-9._-]*$ ]]; then
     echo "sibling_repo: could not read a usable extension key from $repo's info.xml (got: '$key')" >&2

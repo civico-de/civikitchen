@@ -3,9 +3,8 @@
 declare(strict_types=1);
 
 /**
- * Every job of a GitLab pipeline has to carry `rules`, its own or through
- * `extends`: GitLab leaves a job without them out of merge request pipelines,
- * and the merge request then shows a green status for the jobs that did run.
+ * Every GitLab job carries `rules`, its own or via `extends`; GitLab leaves a
+ * job without them out of merge request pipelines.
  *
  * Usage: php gitlab-mr-jobs.php <pipeline.yml> [<pipeline.yml> ...]
  */

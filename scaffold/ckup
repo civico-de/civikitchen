@@ -1,18 +1,8 @@
 #!/bin/bash
 #
-# ckup — start an extension's dev stack on host ports that are free.
-#
-# The template compose reads its host ports from .docker/.env
-# (CK_HTTP_PORT, CK_MAILDEV_PORT, CK_SMTP_PORT, CK_PMA_PORT) and derives
-# CIVIKITCHEN_SITE_URL from the HTTP one. This writes a missing variable with
-# the first free port at or above its default, keeps what is already there
-# (a stack keeps its ports across restarts), then runs `docker compose up -d`
-# with any further arguments passed through. Before that it installs vendor/
-# in every mounted extension that ships a composer.json without one.
-#
-# The stack runs the image CI runs: :standalone-<minor> of policy.civicrm in
-# civikitchen.yaml, unless CIVIKITCHEN_IMAGE is set in the environment or
-# .docker/.env; with neither, the compose file's default.
+# ckup — start an extension's dev stack: write missing CK_*_PORT values to
+# .docker/.env with the first free port, install vendor/, then `compose up -d`.
+# The image is CI's :standalone-<minor> unless CIVIKITCHEN_IMAGE is set.
 #
 # Usage, from anywhere inside the extension repo:  ckup [compose up args]
 set -euo pipefail

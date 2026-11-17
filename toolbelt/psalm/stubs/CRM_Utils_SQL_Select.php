@@ -1,16 +1,8 @@
 <?php
 
 /**
- * Taint SINKS: the SQL fragments of CRM_Utils_SQL_Select.
- *
- * The builder is the modern way to assemble a query, but every one of these
- * methods takes a raw SQL expression — `where('contact_id = ' . $id)` is an
- * injection the DAO stubs never see, because the string reaches
- * CRM_Core_DAO only via ->execute() much later.
- *
- * $exprs is the sink; $args is NOT — that is the interpolation array
- * (`where('id = #1', [1 => $id])`), the safe path, exactly like the $params
- * of CRM_Core_DAO::executeQuery. param() is the same story.
+ * Taint SINKS: the raw SQL expressions ($exprs) of CRM_Utils_SQL_Select; $args,
+ * the interpolation array, is the safe path.
  *
  * Signatures verified against CiviCRM 6.18.0 (CRM/Utils/SQL/Select.php).
  */

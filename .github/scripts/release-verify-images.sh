@@ -1,17 +1,9 @@
 #!/usr/bin/env bash
-# Resolve the digest behind every published flavor tag of GHCR package $PKG
-# (owner $OWNER) into digests.txt and verify each belongs to release
-# $TAG/$RELEASE_SHA: its build commit's docker/ + toolbelt/ trees must match
-# the release's, and an already-published patch tag must not move to another
-# digest. standalone and standalone-demo are mandatory; a CMS flavor that is
-# missing or drifted is a warning and stays out of digests.txt until a re-run
-# catches it up. A flavor this release already tagged is left as is.
-# A build commit that cannot be told counts as drift. $ALLOW_DRIFT=1 downgrades
-# drift to a warning and attaches. Needs $GH_TOKEN.
+# Write the digest behind each flavor tag of $PKG to digests.txt if its build
+# commit's image trees match $RELEASE_SHA. standalone(-demo) are mandatory;
+# other flavors warn. $ALLOW_DRIFT=1 attaches anyway. Needs $GH_TOKEN.
 set -euo pipefail
 
-# --paginate concatenates one JSON array per page; --jq '.[]' streams the
-# elements so `jq -s` can make them one array again.
 gh api "/orgs/${OWNER}/packages/container/${PKG}/versions?per_page=100" \
     --paginate --jq '.[]' | jq -s '.' > versions.json
 
@@ -28,11 +20,8 @@ candidate_of() {
     | map(select(test("-[0-9a-f]{40}$"))) | .[0] // ""' versions.json
 }
 
-# What decides whether a built image belongs to this release: the trees the
-# Dockerfiles copy from. docker/ (image definitions, entrypoints, provisioning,
-# demo profiles), toolbelt/ (the ck* tools and analysers) and packages/ (the
-# profile and scenario schemas). 2>/dev/null: an older build commit missing a
-# path yields an empty result, which compares unequal — the right verdict.
+# The trees the Dockerfiles copy from. A path missing in an older commit
+# yields an empty hash, which compares unequal.
 image_tree_of() { # $1 = commit-ish
   printf '%s %s %s' \
     "$(git rev-parse "$1:docker" 2>/dev/null)" \
@@ -44,9 +33,7 @@ drift=()
 fatal=()
 : > digests.txt
 
-# Every published flavor. standalone leads because the unprefixed :v1 /
-# :v1.2.3 tags alias it — it is the image the extension template's compose
-# stacks run.
+# standalone leads: the unprefixed :v1 / :v1.2.3 tags alias it.
 for flavor in standalone drupal10 drupal11 wordpress joomla backdrop \
               standalone-demo drupal10-demo drupal11-demo \
               wordpress-demo joomla-demo backdrop-demo; do
@@ -61,8 +48,7 @@ for flavor in standalone drupal10 drupal11 wordpress joomla backdrop \
   for t in "${release_tags[@]}"; do
     released+=("$(digest_of "${t}")")
   done
-  # A re-run after a rebuild finds the moving tag on a newer digest. A tag
-  # this release already set stays where it is.
+  # A tag this release already set stays, even if the moving tag has moved on.
   if [ -n "${released[0]}" ] && [ "$(printf '%s\n' "${released[@]}" | sort -u)" = "${released[0]}" ]; then
     echo "::notice::release tag :${flavor}-${TAG} is already released on ${released[0]}, left as is"
     continue
@@ -78,9 +64,7 @@ for flavor in standalone drupal10 drupal11 wordpress joomla backdrop \
     continue
   fi
 
-  # Provenance: which commit was this digest built from, and do its docker/ +
-  # toolbelt/ + packages/ trees match the release? An unknown answer counts as
-  # a mismatch.
+  # Provenance: an unknown build commit counts as a mismatch.
   candidate=$(candidate_of "${flavor}")
   build_sha="${candidate##*-}"
   problem=''
@@ -102,8 +86,7 @@ for flavor in standalone drupal10 drupal11 wordpress joomla backdrop \
     fi
   fi
 
-  # Released patch tags are immutable: a half-tagged flavor (one of its
-  # release tags on another digest) must not be moved to complete it.
+  # Released patch tags are immutable, even to complete a half-tagged flavor.
   for i in "${!release_tags[@]}"; do
     if [ -n "${released[i]}" ] && [ "${released[i]}" != "${digest}" ]; then
       fatal+=(":${release_tags[i]} is already published on another digest — cut a new patch version")

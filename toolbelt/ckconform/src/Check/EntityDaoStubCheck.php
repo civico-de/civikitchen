@@ -10,22 +10,8 @@ use CiviKitchen\Ckconform\ExtensionUtilStub;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * `schema/*.entityType.php` names a DAO class that something has to ship.
- *
- * The schema file is declarative and looks complete on its own, but the class
- * it names under `class` is generated separately — `civix generate:entity`
- * writes the schema AND the `CRM/<Ns>/DAO/<Entity>.php` stub. Hand-write or
- * copy a schema file and the stub is simply absent, with nothing in the repo
- * pointing at the gap: PHPStan does not resolve a class named in a string,
- * the tests pass, and CI is green.
- *
- * It fails at install time instead, as `Class "CRM_Acme_DAO_Thing" not found`
- * thrown out of AbstractEntity while the extension is being enabled — after
- * the earlier entities' tables were already created, so the retry then hits
- * "DB Error: already exists" and the install needs a manual teardown.
- *
- * A stale `$_tableName` is the quieter half: the class resolves, so the enable
- * succeeds, and every query for that entity silently addresses another table.
+ * A `schema/*.entityType.php` whose `class` DAO stub is not shipped (the install
+ * fails halfway), or whose stub's `$_tableName` addresses another table.
  */
 final class EntityDaoStubCheck implements Check
 {

@@ -10,13 +10,7 @@ use CiviKitchen\Ckconform\Reporter;
 
 /**
  * Every tracked package.json must carry the npm licence the repo policy names
- * (`npm_license=` in `civikitchen.yaml`). npm publishes what the manifest says, not
- * what info.xml says, so a proprietary extension with a default `"ISC"` in a
- * nested build manifest is one `npm publish` away from being open source.
- *
- * Tracked rather than on-disk: an untracked manifest cannot be published by
- * anyone else. node_modules and `vendored_paths` are excluded: third-party
- * manifests keep their upstream licence.
+ * (`npm_license=` in `civikitchen.yaml`); node_modules and `vendored_paths` are excluded.
  */
 final class NpmLicenseCheck implements Check
 {
@@ -71,10 +65,7 @@ final class NpmLicenseCheck implements Check
         if (is_string($license)) {
             return $license;
         }
-        // npm allows the SPDX disjunctive form too. Allowed, but still checked:
-        // the expected licence has to be one of the members, or the whole list
-        // is reported. See LicenseCoherenceCheck for why an unchecked array
-        // would be a hole straight through the policy.
+        // An SPDX disjunctive list passes only when the expected licence is a member.
         if (is_array($license)) {
             $entries = array_values(array_filter(
                 array_map(static fn ($entry): string => is_string($entry) ? $entry : '', $license),

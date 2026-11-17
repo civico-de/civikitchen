@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
-# Resolve the CiviCRM version every image bakes: current upstream stable plus
-# the supported extra standalone minors, each resolved to its newest patch
-# release. Emits stable/minor/standalone_versions outputs. The extras come
-# from CK_STANDALONE_EXTRA_MINORS in toolbelt/versions.env; a non-empty
-# $EXTRA_MINORS (the workflow_dispatch input) replaces the list for one run.
-# The phpstan catalog's minor is added either way.
+# Resolve upstream stable plus the extra standalone minors (versions.env, or
+# $EXTRA_MINORS for one run, plus the phpstan catalog's) to exact releases.
+# Emits stable/minor/standalone_versions.
 set -euo pipefail
 
 if [ -z "${EXTRA_MINORS:-}" ]; then
@@ -27,11 +24,7 @@ if ! [[ "${STABLE}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 1
 fi
 MINOR=${STABLE%.*}
-# EXACT versions, because each one names a release tarball — the standalone
-# image installs CiviCRM itself since it stopped building FROM civicrm/civicrm
-# (whose Docker Hub tags lagged the release). Requested extra minors flow
-# through the whole standalone chain (build → merge → smoke → e2e → promote)
-# via this one array, resolved to their newest patch release here.
+# Exact versions: each one names the release tarball the standalone image installs.
 VERSIONS_ARR=("${STABLE}")
 IFS=',' read -ra EXTRAS <<< "${EXTRA_MINORS:-}"
 for v in "${EXTRAS[@]}"; do
@@ -52,8 +45,7 @@ for v in "${EXTRAS[@]}"; do
   fi
   VERSIONS_ARR+=("${exact}")
 done
-# The tarball is the build input; a version without one should fail HERE with
-# a message, not twelve minutes later on a Dockerfile curl.
+# Fail here on a missing tarball, not later in the Dockerfile.
 for v in "${VERSIONS_ARR[@]}"; do
   curl -fsIL --retry 2 -o /dev/null \
       "https://download.civicrm.org/civicrm-${v}-standalone.tar.gz" \

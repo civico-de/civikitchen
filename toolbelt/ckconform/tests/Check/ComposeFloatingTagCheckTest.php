@@ -8,9 +8,8 @@ use CiviKitchen\Ckconform\Check\ComposeFloatingTagCheck;
 use CiviKitchen\Ckconform\Tests\CheckTestCase;
 
 /**
- * The regression: on 2026-07-06 maildev/maildev:latest became 3.0.0-rc.1, whose
- * healthcheck queries a route its own app answers with 404. Six stacks stopped
- * coming up, with no diff in any repo to point at.
+ * On 2026-07-06 maildev/maildev:latest became 3.0.0-rc.1, whose healthcheck
+ * queries a route its own app answers with 404.
  */
 final class ComposeFloatingTagCheckTest extends CheckTestCase
 {

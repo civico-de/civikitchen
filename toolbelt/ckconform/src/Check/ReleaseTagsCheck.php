@@ -10,26 +10,9 @@ use CiviKitchen\Ckconform\Policy;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A release is two halves: the commit that bumps info.xml `<version>`, then
- * the `v<version>` tag (docs/extension-releases.md). This rule is about the
- * versions the repo has already moved PAST — every one of them was announced
- * as a release and only the tag makes it installable, so a number that came
- * and went untagged is a release that exists nowhere but in the history.
- *
- * The current version is deliberately not judged: between the bump commit and
- * the tag it is legitimately untagged, and release-tag-coherence owns that
- * window.
- *
- * An entry of `policy.untagged_versions` that the history does not need is
- * reported as stale, in three shapes: the version carries a tag after all, the
- * version is the one info.xml carries right now, or info.xml never carried it.
- *
- * The opt-out is `policy.release: none` with its reason — a repo that cuts no
- * releases has no tags to miss. For a single number the repo passed through and
- * will never publish — a bump that was re-scoped or taken back — the narrow
- * escape is `policy.untagged_versions`, one entry per version with its reason.
- * Tagging such a version after the fact is not the fix: the tag push runs the
- * release workflow and publishes the code of that moment.
+ * A version info.xml carried before the current one that has no `v<version>`
+ * tag, and stale `policy.untagged_versions` entries. Opt-out: `policy.release:
+ * none`; a version never to be published goes into `untagged_versions` with a reason.
  */
 final class ReleaseTagsCheck implements Check
 {

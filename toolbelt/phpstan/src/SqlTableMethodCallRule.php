@@ -9,12 +9,8 @@ use PHPStan\Analyser\Scope;
 use PHPStan\Rules\Rule;
 
 /**
- * Table names in `$dao->query()` and in the CRM_Utils_SQL_Select builder.
- *
- * The builder is matched by method name, not by receiver type: the fluent
- * chain often starts from a helper whose return type is not annotated. That
- * is safe because SqlSchema only ever speaks about `civicrm_`-prefixed
- * names it can prove wrong — `$collection->join('items')` says nothing.
+ * Table names in `$dao->query()` and in the CRM_Utils_SQL_Select builder,
+ * matched by method name since SqlSchema judges only `civicrm_` names.
  *
  * @implements Rule<Node\Expr\MethodCall>
  */

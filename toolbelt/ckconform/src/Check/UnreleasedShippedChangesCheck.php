@@ -10,19 +10,8 @@ use CiviKitchen\Ckconform\DistPaths;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * Shipped code that sits behind the newest tag reaches no site: every install
- * gets the tag, so a fix committed after it exists only for whoever reads the
- * branch.
- *
- * Two things keep it from being noise. Only changes that land in the release
- * archive count — the development layer (tests/, .github/, docs) never reaches
- * an install, and what does is DistPaths', not this check's, definition. And
- * unreleased work is the normal state of a repo, so the finding is about age:
- * it fires once the oldest such commit has been waiting longer than
- * `max_unreleased_days`.
- *
- * A warning: when to cut a release is a judgement about the change, and a
- * failing build cannot make it.
+ * Shipped changes (DistPaths) behind the newest tag whose oldest commit has
+ * waited longer than `max_unreleased_days`; a warning.
  */
 final class UnreleasedShippedChangesCheck implements Check
 {

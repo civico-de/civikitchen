@@ -4,15 +4,11 @@ declare(strict_types=1);
 
 /**
  * No moving tag may point at an unscanned digest. Every promote job
- *  - runs only on success: no always(), cancelled() or failure() in its `if`;
- *  - needs, directly, a scan-images.yml call that scans exactly the merged
- *    candidates of its own chain: a merge-manifest.yml call in its transitive
- *    needs (reached without passing through a scan) with the same `tags`,
- *    `prefix` and `package`;
- *  - promotes `fromJSON(needs.<scan>.outputs.digests)[matrix.<key>]`, the
- *    digests that scan passed, where matrix.<key> iterates those same tags;
- *  - never names this run's candidate tag (github.sha), which another run on
- *    the same commit can overwrite after the scan.
+ *  - runs only on success (no always(), cancelled() or failure() in its `if`);
+ *  - directly needs a scan-images.yml call with the same `tags`, `prefix` and
+ *    `package` as the merge-manifest.yml call of its chain;
+ *  - promotes `fromJSON(needs.<scan>.outputs.digests)[matrix.<key>]` over those tags;
+ *  - never names the candidate tag (github.sha), which another run can overwrite.
  *
  * Usage: php promote-scanned.php <workflow.yml> [<workflow.yml> ...]
  */
@@ -38,9 +34,7 @@ function ck_calls(array $job, string $workflow): bool
 
 /**
  * One spelling per tag list: a YAML list or JSON literal becomes its JSON, an
- * expression its context path without the fromJSON/toJSON wrappers, so
- * `toJSON(fromJSON(inputs.variants).*.name)` and `fromJSON(inputs.variants).*.name`
- * agree.
+ * expression its context path without the fromJSON/toJSON wrappers.
  */
 function ck_tag_list(mixed $value): string
 {

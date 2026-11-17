@@ -10,29 +10,9 @@ use CiviKitchen\Ckconform\ExtensionUtilStub;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * An Afform layout binds fields to an entity alias declared by `<af-entity>`.
- * A fieldset bound to an alias that was never declared — a rename that missed
- * one half, a block copied out of another form — does not error at install:
- * Afform renders the form, the fields have nothing to write to, and the submit
- * saves nothing. The user sees a form that "works" and loses their input.
- *
- * A duplicated alias is the same class of silent damage from the other side:
- * the second declaration wins, so half the form writes to an entity nobody
- * expects.
- *
- * The metadata half is the `.aff.json` next to the layout. Without it, Afform
- * falls back to whatever the database happens to hold (or to defaults) — that
- * is a forgotten file far more often than an intent. And a form with no
- * `permission` key inherits a default rather than a decision, which is how a
- * staff-only form ends up reachable.
- *
- * Field *names* are deliberately not validated: that needs the live schema, and
- * a static guess would either miss custom fields or cry wolf on them. Only the
- * structural contract inside the file is checked — plus an `af-field` sitting
- * outside every fieldset, which has no entity to bind to at all (blocks and
- * search forms excepted: the embedding form supplies their fieldset). An extra
- * field carries no `name` and an input type in its `defn`, and binds to the
- * form itself; a compatibility floor below the core that supports it is a warn.
+ * Afform structure defects: a fieldset bound to an undeclared or duplicated
+ * `<af-entity>` alias, an `af-field` outside every fieldset, a missing `.aff.json`
+ * or `permission`, and extra fields below the core floor that supports them.
  */
 final class AfformContractCheck implements Check
 {
@@ -110,9 +90,8 @@ final class AfformContractCheck implements Check
 
             $aliases = $this->declaredAliases($html, $relative, $reporter);
 
-            // Blocks and search forms often declare no entity at all; their
-            // fieldsets are bound by the including form. Only enforce the
-            // binding contract once this file declares entities itself.
+            // Blocks and search forms are bound by the including form; enforce
+            // bindings only once this file declares entities itself.
             $enforceBindings = $aliases !== []
                 || ($type !== null && !in_array($type, self::ENTITYLESS_TYPES, true));
 
@@ -176,10 +155,8 @@ final class AfformContractCheck implements Check
     }
 
     /**
-     * An af-field that no af-fieldset element encloses. Approximated by
-     * position: a field before the first fieldset opening tag, or after the
-     * point where fieldset nesting has closed again, has no entity to bind to.
-     * An extra field binds to the form, so it may stand anywhere.
+     * An af-field before the first fieldset or after nesting closes again, by
+     * position; an extra field binds to the form and may stand anywhere.
      */
     private function checkStrayFields(string $html, string $relative, Reporter $reporter): void
     {
@@ -203,9 +180,8 @@ final class AfformContractCheck implements Check
     }
 
     /**
-     * Older cores have no extra fields: they look the field up by its empty
-     * name and break, inside a fieldset as well as outside one. 6.15 throws on
-     * an input type outside EARLY_EXTRA_INPUT_TYPES.
+     * Older cores break on extra fields, inside a fieldset or not; 6.15 throws
+     * on an input type outside EARLY_EXTRA_INPUT_TYPES.
      */
     private function checkExtraFields(string $html, string $relative, string $floor, Reporter $reporter): void
     {
@@ -270,9 +246,8 @@ final class AfformContractCheck implements Check
     }
 
     /**
-     * Byte ranges covered by an element carrying af-fieldset, by walking tags
-     * and tracking depth. Self-closing and void forms are ignored, since an
-     * empty fieldset cannot contain a field anyway.
+     * Byte ranges covered by an element carrying af-fieldset, by tag depth;
+     * self-closing and void forms are ignored.
      *
      * @return list<array{0: int, 1: int}>
      */

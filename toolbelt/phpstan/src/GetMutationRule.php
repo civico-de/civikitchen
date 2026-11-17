@@ -18,26 +18,9 @@ use PHPStan\Rules\Rule;
 use PHPStan\Rules\RuleErrorBuilder;
 
 /**
- * A route reachable by GET must not change data.
- *
- * "GET is safe" is not a style preference: browsers, prefetchers, link
- * scanners and corporate proxies fetch URLs on their own, a logged-in user
- * only has to look at a page for an `<img src="…/civicrm/x/delete?id=5">`
- * to fire, and every back button re-runs the write. A handler that creates
- * or deletes on GET is therefore a CSRF hole and a data-integrity problem
- * at the same time.
- *
- * Two kinds of handler are checked: the static methods a repo's xml/Menu
- * declares as page_callback (read from the generated route catalog, see
- * RouteCatalog) and the run() of a CRM_Core_Page subclass. Writes are
- * followed two hops through the class's own methods, because the endpoint
- * itself is usually three lines that delegate.
- *
- * Silent when the handler checks the request method — `$request->getMethod()
- * !== 'POST'` with a 405 answer is the whole point, and a handler that only
- * writes on POST is fine. The other legitimate case, a GET that writes on
- * purpose (a redirect flow with its own CSRF mitigation), is a narrow
- * ignore of `ck.route.mutationOnGet` carrying the reason.
+ * A route reachable by GET must not change data. Checks xml/Menu page_callback
+ * methods (see RouteCatalog) and CRM_Core_Page::run(), following own-method
+ * calls two hops; silent when the handler checks the request method.
  *
  * @implements Rule<InClassNode>
  */
@@ -108,8 +91,7 @@ final class GetMutationRule implements Rule
     }
 
     /**
-     * The methods of this class a browser enters through, lowercase name =>
-     * route path.
+     * The methods a browser enters through, lowercase name => route path.
      *
      * @param  array<string, Node\Stmt\ClassMethod> $methods
      * @return array<string, string>
@@ -135,9 +117,8 @@ final class GetMutationRule implements Rule
     }
 
     /**
-     * Methods of the traits a class uses, lowercase name => [method, file].
-     *
-     * Reflection has no method bodies, so each trait's file is parsed.
+     * Methods of the traits a class uses, lowercase name => [method, file],
+     * parsed from each trait's file.
      *
      * @return array<string, array{Node\Stmt\ClassMethod, string}>
      */
@@ -179,11 +160,6 @@ final class GetMutationRule implements Rule
     /**
      * The handler plus the class's own methods it calls, MAX_HOPS deep.
      *
-     * An endpoint is typically a few lines of HTTP handling around a helper
-     * that does the work, so a rule that only reads the handler body sees
-     * nothing at all. Two hops is where it stops: further down the call
-     * graph a write is no longer obviously this route's doing.
-     *
      * @param  array<string, Node\Stmt\ClassMethod> $methods
      * @return list<Node\Stmt\ClassMethod>
      */
@@ -208,12 +184,6 @@ final class GetMutationRule implements Rule
         return array_values($seen);
     }
 
-    /**
-     * Calls to this class's own methods: `$this->x()`, `self::x()`,
-     * `static::x()`.
-     *
-     * @return list<string>
-     */
     /**
      * The method's nodes matching $filter, minus those of a class declared in it:
      * its methods run only when called, an anonymous class's constructor runs
@@ -253,6 +223,11 @@ final class GetMutationRule implements Rule
         return $visitor->found;
     }
 
+    /**
+     * Calls to this class's own methods: `$this->x()`, `self::x()`, `static::x()`.
+     *
+     * @return list<string>
+     */
     private static function localCalls(Node\Stmt\ClassMethod $method): array
     {
         $names = [];
@@ -279,13 +254,8 @@ final class GetMutationRule implements Rule
     }
 
     /**
-     * Does anything on this path look at the request method?
-     *
-     * The PSR-7 `$request->getMethod()`, the raw `$_SERVER['REQUEST_METHOD']`,
-     * or core's `CRM_Core_Page_AJAX::validateAjaxRequestMethod()`, which
-     * demands an XMLHttpRequest header no link or prefetch can send. The comparison value is not inspected:
-     * a handler that reads the method at all is deciding on it, and second-
-     * guessing which verb it allows would only produce noise.
+     * Does anything on this path read the request method (PSR-7 getMethod(),
+     * `$_SERVER['REQUEST_METHOD']`, validateAjaxRequestMethod())? The value is not inspected.
      *
      * @param list<Node\Stmt\ClassMethod> $methods
      */

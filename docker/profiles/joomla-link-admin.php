@@ -1,14 +1,6 @@
 <?php
-// Link the Joomla CMS admin user to a CiviCRM contact (run via cv scr).
-//
-// civibuild's joomla-demo install is deliberately incomplete — its install.sh
-// ends with a commented-out "#fixme joomla extension:install" and the note
-// "everything below here is generally untested". One thing the proper install
-// would do (and Drupal/WordPress/Standalone do at install time) is link the CMS
-// admin to a CiviCRM contact. Without that UFMatch, `cv --user=admin` fails with
-// "Cannot login. Failed to determine contact ID", which blocks running the
-// profile scripts as admin. Create the link the same way CiviCRM itself does, via
-// CRM_Core_BAO_UFMatch::synchronizeUFMatch (idempotent). Joomla only.
+// Link the Joomla admin to a contact, which civibuild's install skips: without
+// it `cv --user=admin` fails with "Failed to determine contact ID".
 if (CIVICRM_UF !== 'Joomla') {
   return;
 }

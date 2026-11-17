@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# Install the workflow contract's Trivy into $RUNNER_TEMP, verified against the
-# release's own checksums. Both Linux runner architectures supported by the
-# reusable workflows are pinned; anything else fails instead of scanning with
-# an unverified or wrong binary.
+# Install the pinned Trivy into $RUNNER_TEMP, verified against the release's
+# checksums. Only the two pinned Linux architectures are accepted.
 set -euo pipefail
 
 readonly version=0.72.0

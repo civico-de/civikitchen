@@ -1,15 +1,8 @@
 <?php
 
 /**
- * Taint SINKS: the query entry points, plus the one real SQL escaper.
- *
- * Only the $query parameter is a sink. The $params array is NOT: that is the
- * safe path (composeQuery type-validates and escapes every placeholder), and
- * tainting it would flag exactly the code we want people to write.
- *
- * escapeString() is a genuine escape, but for SQL only — `psalm-taint-escape`
- * is per taint type, so a value laundered through it still counts as tainted
- * for shell/html/file sinks. That is intended.
+ * Taint SINKS: the query entry points ($query only; $params is the safe path),
+ * plus escapeString(), an escape for SQL only.
  *
  * Signatures verified against CiviCRM 6.18.0 (CRM/Core/DAO.php).
  */
@@ -48,9 +41,7 @@ class CRM_Core_DAO {
   public static function &singleValueQuery($query, $params = [], $abort = TRUE, $i18nRewrite = TRUE) {}
 
   /**
-   * composeQuery does not execute anything, but it is where an unparameterized
-   * string is assembled — flagging it here catches the injection at the line
-   * that builds it, one step before the DAO that runs it.
+   * Executes nothing, but flags the injection at the line that assembles it.
    *
    * @psalm-taint-sink sql $query
    */

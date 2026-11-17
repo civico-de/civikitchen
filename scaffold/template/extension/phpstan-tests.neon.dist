@@ -1,38 +1,19 @@
-# Static analysis of the test suite — part of the standard CI contract.
-#
-# The main phpstan.neon.dist analyses production code only. This second pass
-# keeps test helpers and assertions at the same level instead of allowing a
-# weakly typed test layer to hide defects in otherwise strict production code.
-#
-# Do not add a baseline. Existing findings are work to fix, not a reason to
-# remove this configuration or make the gate optional.
-#
-# What it buys beyond level 10 on test code: the test-only rules in
-# civikitchen/phpstan-ck-legacy only ever see a file that is analysed, and
-# ck.test.customFieldInTransaction / ck.test.extensionInTransaction /
-# ck.test.ddlInTransaction are inert everywhere until then — DDL inside a
-# TransactionalInterface test is the flake whose own file stays green.
+# Second phpstan pass over the test suite, at the same level and without a
+# baseline; the ck.test.* rules see only analysed files.
 includes:
 	- phpstan.neon.dist
 
 parameters:
-	# Level 10 here too. Test code that cannot carry the same level is test
-	# code that may not catch the bug it was written for.
 	level: 10
-	# `!` overrides the included list instead of appending to it — this is a
-	# second pass over the tests, not a re-run of the production analysis.
+	# `!` overrides the included list instead of appending to it.
 	paths!:
 		- tests/phpunit
-	# phpstan.neon.dist leaves tests/ out of the analysis; this pass puts it
-	# back. Its other exclusions only concern files outside tests/.
+	# Puts tests/ back, which phpstan.neon.dist excludes.
 	excludePaths:
 		analyse!: []
-	# The second pass replaces production `paths`; scan the extension's classes
-	# so APIv4 façades loaded by CiviCRM's runtime classloader remain known while
-	# only tests themselves are analysed for findings.
+	# Scan the extension's classes, so runtime-loaded APIv4 façades stay known.
 	scanDirectories:
 		- .
-	# PHPUnit's own classes come from core's dev dependencies. A packaged
-	# install may not have them; point phpstan at wherever they are, e.g.:
+	# PHPUnit comes from core's dev dependencies; a packaged install may need:
 	#	scanDirectories:
 	#		- /var/www/html/core/vendor/phpunit/phpunit/src

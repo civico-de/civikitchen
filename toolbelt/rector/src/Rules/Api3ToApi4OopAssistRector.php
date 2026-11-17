@@ -14,18 +14,11 @@ use PhpParser\Node\Scalar\Int_;
 use PhpParser\Node\Scalar\String_;
 
 /**
- * Like Api3ToApi4AssistRector, but emits the idiomatic OOP builder form:
+ * Like Api3ToApi4AssistRector, but emits the OOP builder:
  *
  *   civicrm_api3('Contact', 'get', ['first_name' => 'Bob', 'return' => ['id']])
  *   -> \Civi\Api4\Contact::get(FALSE)->addWhere('first_name', '=', 'Bob')
  *        ->addSelect('id')->setLimit(25)->execute()
- *
- * Same safe subset + guardrails (checkPermissions becomes the get() argument,
- * defaulting to FALSE to preserve api3 behavior; limit defaults to 25). Same
- * bail-outs (non-get, operators, chaining, options beyond limit/offset,
- * non-literal params). A result read only as `$r['values']`/`$r['count']`
- * gets `->indexBy('id')` unless `sequential` is 1; its rows follow api4's
- * fields and default filters. Preview only.
  */
 final class Api3ToApi4OopAssistRector extends AbstractApi3GetAssistRector {
 

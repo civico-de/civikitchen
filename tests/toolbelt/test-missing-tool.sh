@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# A login shell resets PATH (/etc/profile drops what the image prepends), and
-# proc_open then fails with a raw PHP warning about posix_spawn that reads like a
-# memory or seccomp problem. The tools must name the missing program instead.
+# With PATH reset by a login shell, the tools name the missing program instead
+# of proc_open's raw posix_spawn warning.
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 work=$(mktemp -d)

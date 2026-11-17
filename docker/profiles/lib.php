@@ -1,9 +1,7 @@
 <?php
-// Shared helpers for profile scripts (listed in profile.json "scripts", run via
-// `cv scr` with a booted CiviCRM). Include from scripts/<file>.php with:
+// Create-only helpers for profile scripts (ck_seed_search_page converges by
+// name); each script keeps its own guard. Include from scripts/<file>.php with:
 //   require_once __DIR__ . '/../../lib.php';
-// Helpers are create-only, except ck_seed_search_page, which converges by name;
-// idempotency guards stay in each script, keyed on data only that script creates.
 
 use Civi\Api4\Address;
 use Civi\Api4\Afform;
@@ -120,10 +118,9 @@ function ck_seed_atomically(callable $seed): void {
 }
 
 /**
- * A SavedSearch "$name" with a table display and an Afform page at $route
- * showing it, matched by name so a re-run converges. The Afform lives in a
- * file, so a snapshot profile lists the calling script in after_restore too.
- * $columns maps select keys to column labels.
+ * A SavedSearch "$name" with a table display and an Afform page at $route,
+ * matched by name. The Afform is a file, so snapshot profiles list the caller
+ * in after_restore. $columns maps select keys to column labels.
  */
 function ck_seed_search_page(string $name, string $title, string $entity, array $apiParams, array $columns, string $route): void {
   $search = SavedSearch::save(FALSE)

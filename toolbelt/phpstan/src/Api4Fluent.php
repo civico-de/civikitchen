@@ -17,11 +17,8 @@ use PHPStan\Analyser\Scope;
 use PHPStan\Type\ObjectType;
 
 /**
- * Reading the entity out of a fluent APIv4 chain.
- *
- * `\Civi\Api4\Contact::get()->addWhere(...)->execute()` parses as nested
- * method calls whose innermost node is the static call. The return type does
- * not name the entity: core returns the generic DAOGetAction for most of them.
+ * Reading the entity out of a fluent APIv4 chain's innermost static call; the
+ * return type (mostly DAOGetAction) does not name it.
  */
 final class Api4Fluent
 {
@@ -58,11 +55,8 @@ final class Api4Fluent
     /**
      * The APIv4 builders a function body holds, each with every link that configures it.
      *
-     * A builder is a chain rooted in `\Civi\Api4\X::action()`, or a variable
-     * assigned exactly once from one. Core applies the clauses at execute(),
-     * so an alias selected after an orderBy still binds, and every link of the
-     * builder is read. A variable that leaves the body (an argument, a return,
-     * a closure) may gain links elsewhere; `escapes` says so.
+     * A builder is a chain rooted in `\Civi\Api4\X::action()` or a variable
+     * assigned once from one; `escapes` marks one that leaves the body.
      *
      * @param  array<Node>  $body
      * @param  list<string> $boundOutside variables the body did not assign: parameters, closure uses
@@ -140,11 +134,8 @@ final class Api4Fluent
     }
 
     /**
-     * Aliases the builder's select defines: `SUM(line_total) AS total`.
-     *
-     * An alias is a legal name in orderBy and groupBy but exists in no catalog.
-     * Null when a select argument is not fully known (spread, merged or
-     * computed lists), so any alias may exist.
+     * Aliases the builder's select defines (`SUM(line_total) AS total`); null
+     * when a select argument is not fully known.
      *
      * @param  list<MethodCall> $links
      * @return ?list<string>

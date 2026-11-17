@@ -1,13 +1,8 @@
-# The ck* tools source toolbelt/lib/ckcommon.sh beside their own real path, in
-# a checkout and in the image alike. Following it is what keeps shellcheck able
-# to see ck_die, ck_git and the ck_re_* patterns as assigned — without these two
-# it reports every use as SC2154 "referenced but not assigned".
+# Follow toolbelt/lib/ckcommon.sh, which the ck* tools source, so its
+# variables do not read as SC2154 "referenced but not assigned".
 external-sources=true
 source-path=SCRIPTDIR
 
-# SC1091: the entrypoints and provisioning scripts source container-absolute
-#         paths (/usr/local/share/civikitchen/*.sh) that don't exist at lint
-#         time. ckcommon.sh is NOT one of those — it is followed, see above.
-# SC2016: embedded PHP (cv ev/scr) and sed programs intentionally use single
-#         quotes — the $vars belong to PHP/sed, not the shell.
+# SC1091: container-absolute sourced paths do not exist at lint time.
+# SC2016: single-quoted $vars in embedded PHP and sed programs are theirs.
 disable=SC1091,SC2016

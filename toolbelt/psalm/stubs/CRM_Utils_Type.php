@@ -1,21 +1,9 @@
 <?php
 
 /**
- * ESCAPE — and one deliberate non-escape.
- *
- * escape() is CiviCRM's real sanitizer: the scalar types come back cast
- * (int/float/validated date), and 'String'/'Memo'/'Text' come back through
- * CRM_Core_DAO::escapeString(). SQL-safe, so `psalm-taint-escape` sql.
- *
- * validate() is NOT an escape and is stubbed here to say so: for
- * 'String'/'Text'/'Memo'/'Link' it returns $data completely unchanged
- * (CRM/Utils/Type.php, verified in 6.18.0). Left unstubbed it would still
- * launder taint — a stub without a body returns something Psalm considers
- * clean — so it carries an explicit `psalm-flow` instead and stays a
- * pass-through in the graph.
- *
- * Both keep the flow so that a value escaped for SQL is still tainted for
- * shell/html/file sinks.
+ * escape() is an SQL escape. validate() is not: it returns 'String'/'Text'/
+ * 'Memo'/'Link' data unchanged, so it carries an explicit flow. Both keep the
+ * flow for the other sinks.
  *
  * Signatures verified against CiviCRM 6.18.0 (CRM/Utils/Type.php).
  */

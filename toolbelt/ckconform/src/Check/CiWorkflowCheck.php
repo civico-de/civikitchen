@@ -9,8 +9,7 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * No CI means every conformance rule that only fires "on push" runs on a
- * laptop at best, which is to say: sometimes.
+ * A repository without CI.
  */
 final class CiWorkflowCheck implements Check
 {
@@ -27,9 +26,8 @@ final class CiWorkflowCheck implements Check
             return;
         }
 
-        // Reported here and nowhere else: one defect, one finding. Every
-        // workflow-reading check judges the caller job that names this
-        // extension's directory, and with no such job they would all be silent.
+        // Reported here only: every workflow-reading check is silent when no
+        // caller job names this extension's directory.
         $scopeFailure = $context->workflowScopeFailure();
         if ($scopeFailure !== null) {
             $reporter->fail($scopeFailure);

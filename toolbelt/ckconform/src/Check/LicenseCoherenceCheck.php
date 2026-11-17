@@ -9,17 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * Licence coherence between info.xml and composer.json. The two drift apart
- * silently, and a repo can end up publishing itself under terms its LICENSE file
- * never granted.
- *
- * WHICH licence is organisation policy, so the expected value is read from the
- * optional `civikitchen.yaml` (`license=`). Without one the declarations only have to
- * agree with each other.
- *
- * Both values are read with real parsers — SimpleXML and json_decode — so a
- * `<license>` split over two lines or a "license" string elsewhere in
- * composer.json cannot mislead the comparison.
+ * Licence coherence between info.xml and composer.json, and with the optional
+ * `license=` policy; both files are read with real parsers.
  */
 final class LicenseCoherenceCheck implements Check
 {
@@ -60,12 +51,9 @@ final class LicenseCoherenceCheck implements Check
     }
 
     /**
-     * Composer allows `"license": ["MIT", "GPL-2.0"]` or `"(MIT or GPL-2.0)"` for disjunctive licensing, and
-     * that form is permitted here — but permitted is not the same as unchecked:
-     * an unchecked array would be the way to bypass every licence rule.
+     * Composer licences; a disjunctive list (`["MIT", "GPL-2.0"]`, `(MIT or GPL-2.0)`)
+     * satisfies the policy when the expected licence is one of its members.
      *
-     * So a disjunctive list satisfies the policy when the expected licence is
-     * one of its members, and is reported in full when it is not.
      *
      * @return list<string>
      */

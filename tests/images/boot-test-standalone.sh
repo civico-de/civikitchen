@@ -1,49 +1,21 @@
 #!/bin/bash
-# Boot test for the standalone dev image: the real first-boot path against an
-# an external MySQL-compatible database, with the provisioning knobs a
-# developer stack relies on.
-# It asserts what the fast (fake-cv) suites under tests/toolbelt cannot:
-#   * an extension bind-mounted into the ext dir is enabled without being
-#     named in CIVIKITCHEN_ENABLE_EXTENSIONS, its <requires> in place;
-#   * CIVIKITCHEN_LOCALES installs the core catalogue and gettext really
-#     initialises — ts() renders German, which is the whole point of the knob;
-#   * CIVIKITCHEN_DEFAULT_LOCALE installs the site in that language, so the
-#     seed data labels are German while their machine names stay English;
-#   * an external profile is schema-validated and applied, with generated API
-#     credentials written mode 0600 and never disclosed in default logs;
-#   * a profile's config and seed are written before its scripts run, and a
-#     second apply changes nothing;
-#   * the admin status check makes no calls to civicrm.org (version_check job
-#     inactive, ext_repo_url false);
-#   * word replacements reach ts(), which the standalone boot order breaks
-#     without the core patch.
-#   * cklifecycle's settings-metadata check names every malformed
-#     pseudoconstant and passes valid ones, on a site that loads options;
-#   * cklifecycle accepts managed records core keeps by cleanup policy;
-#   * cksmarty compiles managed MessageTemplate bodies and SearchDisplay
-#     rewrites that mix tokens with Smarty, and still fails a broken one;
-#   * the phpstan field check accepts every live get and create field on the
-#     catalog's minor release.
-#   * execute() and civicrm_api4() without an index return array rows, the
-#     type ckanalyze gives them; getInfo() and addJoin() match their patches.
-# The db service gets a plain MYSQL_USER and no grant script: the app user
-# holds rights on its own database only, exactly as a hand-written stack.
+# Boot test for the standalone dev image: the real first boot against an
+# external database, with the provisioning knobs a developer stack uses. The
+# app user holds rights on its own database only (plain MYSQL_USER).
 #
 # Usage:
 #   bash tests/images/boot-test-standalone.sh <image>
 #   CK_PROVISION_OVERRIDE=docker/runtime/provision.sh bash tests/images/boot-test-standalone.sh ghcr.io/civico-de/civikitchen:standalone
 #   CK_DATABASE_IMAGE=mysql:8.0 bash tests/images/boot-test-standalone.sh ghcr.io/civico-de/civikitchen:standalone
-# CK_PROVISION_OVERRIDE mounts a checkout's provision.sh over the image's, with this checkout's PHP
-# library and profile driver it calls — for running the test against a published image before it is rebuilt.
+# CK_PROVISION_OVERRIDE mounts this checkout's provision.sh, PHP library and
+# profile driver over a published image's.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
 IMAGE="${1:?usage: boot-test-standalone.sh <image>}"
 DATABASE_IMAGE="${CK_DATABASE_IMAGE:-mariadb:11.4}"
 SRC="$(cd "$(dirname "$0")/../.." && pwd)"
-# The fixture is staged, not mounted from the checkout: the headless suite
-# needs the TEMPLATE bootstrap next to it, and nothing may be written into
-# tests/images/fixtures.
+# Staged copy: the headless suite needs the template bootstrap beside it.
 # Inside the checkout, never $TMPDIR: on macOS the Docker VM sees only $HOME.
 FIXTURE="${SRC}/.cache/boot-fixture-$$"
 mkdir -p "${FIXTURE}"
@@ -116,9 +88,8 @@ check "site serves HTTP 200 (got ${code})" "[ '${code}' = '200' ]"
 db_version=$(docker exec "${DB}" sh -c 'mariadb -uroot -proot -Nse "SELECT CONCAT(@@version, \" \", @@version_comment)" 2>/dev/null || mysql -uroot -proot -Nse "SELECT CONCAT(@@version, \" \", @@version_comment)"' 2>/dev/null || true)
 check "database responds (${db_version:-unknown})" "[ -n '${db_version}' ]"
 
-# 1b) The phpstan field check accepts every live get and create field: a
-# rejected one is a false unknownField report. The label carries the script's
-# verdict, so a row on another release shows "skipped", not a silent pass.
+# 1b) The phpstan field check accepts every live get and create field; the
+# label carries the script's verdict (e.g. "skipped" on another release).
 docker cp "${SRC}/toolbelt/phpstan/tools/live-api4-drift.php" "${APP}:/tmp/" >/dev/null
 docker cp "${SRC}/toolbelt/phpstan/src" "${APP}:/tmp/ck-phpstan-src" >/dev/null
 drift_rc=0
@@ -157,9 +128,7 @@ check "ts(\"Contacts\") renders German (got '${word}')" "[ '${word}' = 'Kontakte
 donation=$(cv api4 FinancialType.get +w name=Donation +s label --out=json-strict | tr -d '[:space:]' || true)
 check "financial type Donation is labelled Spende (got ${donation:-absent})" "echo '${donation}' | grep -q '\"label\":\"Spende\"'"
 
-# 5) The compatibility leg includes the scratch DB contract, not only install.
-# A green site with an empty civicrm_test DB would still wipe developer data on
-# the first headless suite, so boot CiviCRM through UnitTests and read from it.
+# 5) Booted as UnitTests, CiviCRM uses civicrm_test, never the main database.
 test_db=$(docker exec -e CIVICRM_UF=UnitTests -u www-data "${APP}" \
     cv ev 'CRM_Core_DAO::executeQuery("CREATE TABLE IF NOT EXISTS ck_test_db_canary (id INT PRIMARY KEY)"); echo CRM_Core_DAO::singleValueQuery("SELECT DATABASE()");' \
     2>/dev/null | tr -d '[:space:]"' || true)
@@ -230,9 +199,8 @@ check "word replacement applies on an en_US site (got '${replaced}')" "[ '${repl
 check "core patch log lists the patch" \
     "docker exec '${APP}' grep -Eq '^(applied|contained) i18n-boot-replacements.patch$' /usr/local/share/civikitchen/core-patches.log"
 
-# 10) cklifecycle's settings-metadata check and managed cleanup policies. Copied
-# in, not bind-mounted, so the malformed fixture is not enabled while the steps
-# above run.
+# 10) cklifecycle's settings-metadata check and managed cleanup policies; copied
+# in late so the malformed fixture is not enabled during the steps above.
 docker exec "${APP}" bash -c 'cp -R /civikitchen-lifecycle-fixtures/. /var/www/html/ext/ && chown -R www-data: /var/www/html/ext/cksettings* /var/www/html/ext/ckmanagedkept /var/www/html/ext/ckmsgtpl*'
 cv ext:enable cksettingsgood cksettingsbad ckmanagedkept ckmsgtplgood ckmsgtplbad cksearchgood cksearchbad cksearchpunct >/dev/null || true
 lifecycle() { docker exec -u www-data -w "/var/www/html/ext/$1" "${APP}" cklifecycle > "${FIXTURE}/lifecycle-$1.log" 2>&1; }
@@ -264,9 +232,8 @@ if [ "$(cv ev 'echo (int) method_exists("Civi\\Token\\TokenCompatSubscriber", "r
 fi
 [ "${fail}" = 0 ] || tail -20 "${FIXTURE}"/smarty-*.log
 
-# 12) A profile set with neither API users nor an AuthX policy, like the empty
-# dev profile, leaves the site's AuthX header policy as it is. Same calls as
-# provision.sh: resolve the policy, merge the set, configure from the merge.
+# 12) A profile set with neither API users nor an AuthX policy leaves the
+# AuthX header policy alone; same calls as provision.sh.
 authx_get='echo json_encode(Civi::settings()->get("authx_header_cred"));'
 authx_before=$(cv ev "${authx_get}" || true)
 docker exec -u www-data "${APP}" sh -c '

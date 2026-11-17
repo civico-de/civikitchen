@@ -9,14 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A headless suite rebuilds the database it is pointed at, so a bootstrap
- * without the TEST_DB_DSN guard can wipe the developer's own CiviCRM while the
- * test run reports green.
- *
- * Only Civi\Test rebuilds anything, so a pure unit suite (plain TestCase, no
- * CiviCRM boot) has nothing to guard and demanding the guard there would be
- * noise. The markers are searched across the whole tests/ tree, not just
- * bootstrap.php, because the interfaces are implemented in the test cases.
+ * A Civi\Test headless suite whose tests/ tree has no TEST_DB_DSN guard, which
+ * can wipe the developer's own CiviCRM; pure unit suites are exempt.
  */
 final class TestBootstrapGuardCheck implements Check
 {
@@ -74,14 +68,8 @@ final class TestBootstrapGuardCheck implements Check
     }
 
     /**
-     * Whether the bootstrap actually executes the guard, rather than describing
-     * it in a comment or merely naming the constant.
-     *
-     * Comments are stripped first (an explanatory comment naming TEST_DB_DSN is
-     * not a guard), and a bare read (`getenv('TEST_DB_DSN')`) is not one either:
-     * the code must both name TEST_DB_DSN and reach a terminating statement
-     * (throw / exit / die). The read is left loose on purpose: pulling the value
-     * out of a decoded ~/.cv.json is a valid guard too.
+     * Whether code (comments stripped) names TEST_DB_DSN and reaches a throw,
+     * exit or die; a bare getenv() read is no guard.
      */
     private function guardsInCode(string $source): bool
     {

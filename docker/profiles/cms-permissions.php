@@ -62,10 +62,8 @@ function ck_joomla_db(): \Joomla\Database\DatabaseInterface {
 }
 
 /**
- * CRM_Core_Permission_Joomla checks permissions via $user->authorise(perm,
- * 'com_civicrm'), which needs a com_civicrm ACL asset. civibuild never
- * registers the component, so create the asset the way Joomla's installer
- * would. Idempotent.
+ * The com_civicrm ACL asset $user->authorise() needs, created the way Joomla's
+ * installer would, since civibuild never registers the component. Idempotent.
  */
 function ck_joomla_civicrm_asset(): void {
   $asset = new \Joomla\CMS\Table\Asset(ck_joomla_db());

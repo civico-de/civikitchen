@@ -10,14 +10,9 @@ use CiviKitchen\Ckconform\Reporter;
 use PhpToken;
 
 /**
- * A `setUpHeadless()` that builds a `CiviEnvBuilder` but never calls `->apply()`.
- *
- * `Civi\Test\CiviTestListener` discards `setUpHeadless()`'s return value, so an
- * unapplied builder installs nothing. In a single-extension repo provisioning has
- * already enabled the extension, and the suite stays green while the headless
- * setup never ran. Every chain in the method that starts at `ck_headless(` or
- * `\Civi\Test::headless(` (also through a `use` import) must call `->apply(`,
- * or be assigned to a variable whose later chain in the method does.
+ * A `setUpHeadless()` chain from `ck_headless(` or `\Civi\Test::headless(` that
+ * never calls `->apply()`, directly or via a variable: CiviTestListener discards
+ * the return value, so the builder installs nothing.
  */
 final class HeadlessBuilderAppliedCheck implements Check
 {

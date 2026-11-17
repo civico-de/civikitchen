@@ -1,17 +1,11 @@
 #!/usr/bin/env bash
-# Publish a release to a second git repository whose tags an extension
-# directory reads: the source branch as it is at the release, and the release
-# archive's contents as one commit on top of it, tagged with the bare version.
-# That tag carries what the archive carries (vendor/, build output), so an
-# archive of it installs.
+# Push the source branch and the archive's contents as one commit on top,
+# tagged with the bare version, to the mirror repository $CK_MIRROR_URL.
 #
 #   release-mirror.sh <archive.zip> <version> <branch>
 #
-# Run in a full clone of the source repository with the released commit
-# checked out. CK_MIRROR_URL names the repository; CK_MIRROR_TOKEN (a token
-# that may write to it) and CK_SOURCE_TOKEN (one that may read the source's
-# LFS objects) are handed to git by a credential helper, never placed in a URL,
-# a config value or an argument.
+# Runs in a full clone at the released commit. CK_MIRROR_TOKEN (write) and
+# CK_SOURCE_TOKEN (source LFS read) reach git only via a credential helper.
 set -euo pipefail
 
 zip="${1:?usage: release-mirror.sh <archive.zip> <version> <branch>}"
@@ -28,8 +22,7 @@ if [ "$(git rev-parse --is-shallow-repository)" != false ]; then
   exit 1
 fi
 
-# A credential helper per host answers git and git-lfs alike; it reads the
-# token from the environment, so no config value or argument carries it.
+# One credential helper per host, for git and git-lfs; it reads the token from the env.
 config=()
 credentials() { # <url> <user> <name of the variable holding the token>
   local host
@@ -76,9 +69,8 @@ if [ "${#tops[@]}" -ne 1 ] || [ ! -f "${tops[0]}/info.xml" ]; then
   exit 1
 fi
 
-# Built without a checkout: the archive's files become the tree, as they are.
-# The author and dates are the released commit's, so a re-run builds the same
-# commit and pushes nothing new.
+# The archive's files become the tree as they are; author and dates are the
+# released commit's, so a re-run builds the same commit.
 tree="$(
   export GIT_DIR GIT_WORK_TREE="${tops[0]}" GIT_INDEX_FILE="$work/index"
   GIT_DIR="$(git rev-parse --absolute-git-dir)"

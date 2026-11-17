@@ -10,31 +10,9 @@ use CiviKitchen\Ckconform\PhpSource;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A shipped `l10n/` whose compiled catalogs do not match its sources.
- *
- * Gettext is a two-file arrangement and only one of the two is ever read: at
- * runtime CiviCRM loads the binary `.mo`, never the `.po` a translator edits.
- * So the whole class of "translated, but not really" bugs is invisible — the
- * .po is full, the UI is English, and nothing anywhere says why:
- *
- * 1. A `.po` with no `.mo` beside it. Every string in it is inert.
- * 2. A `.mo` that predates the `.po`. The strings added since the last
- *    `msgfmt` run are the ones nobody sees, which is to say the newest ones.
- *
- * Freshness is decided by CONTENT, not by timestamps: git does not preserve
- * mtimes, so a fresh clone — every CI run, every deploy — gives every file the
- * same checkout time, and an mtime comparison would be a coin flip that usually
- * reads clean. Each translated msgid of the .po is instead looked up in the .mo.
- *
- * Third, at warn level: string literals handed to `E::ts()` or `{ts}` that
- * appear in no catalog at all. Those are strings added after the last
- * extraction run — translatable in principle, untranslatable in practice. A
- * `ts()` whose first argument is not a literal is warned about for the same
- * reason: no extractor can see it, so it never reaches a .po either.
- *
- * Shipping translations is optional and an extension without `l10n/` is none of
- * this rule's business — it stays completely silent. Shipping *broken*
- * translations is the bug.
+ * A shipped `l10n/` whose `.mo` is missing or lacks translated msgids of its
+ * `.po` (compared by content: git keeps no mtimes). Warns on `ts()` strings in
+ * no catalog and on non-literal `ts()` arguments. Silent without `l10n/`.
  */
 final class TranslationCatalogCheck implements Check
 {
@@ -68,10 +46,8 @@ final class TranslationCatalogCheck implements Check
                 // no target language and nothing to compile.
                 continue;
             }
-            // CRM_Core_I18n builds the lookup path as
-            // l10n/<locale>/LC_MESSAGES/<domain>.mo — a catalog anywhere else
-            // under l10n/ compiles fine and is never loaded, the same silent
-            // inertness as a missing .mo.
+            // CRM_Core_I18n loads only l10n/<locale>/LC_MESSAGES/<domain>.mo;
+            // a catalog anywhere else is never read.
             if (preg_match('#^l10n/[^/]+/LC_MESSAGES/[^/]+\.po$#', $catalog) !== 1) {
                 $reporter->fail(
                     "$catalog: not under l10n/<locale>/LC_MESSAGES/ — CiviCRM builds the runtime "
@@ -231,9 +207,7 @@ final class TranslationCatalogCheck implements Check
                 : $this->unescape($body);
         }
 
-        // A .mgd.php can carry Smarty message-template bodies as PHP string
-        // literals — their {ts} blocks are user-facing source strings like any
-        // template's.
+        // A .mgd.php can carry Smarty message-template bodies with {ts} blocks.
         if (str_ends_with($file, '.mgd.php')) {
             $literals = array_merge($literals, $this->smartyStrings($source));
         }
@@ -265,14 +239,8 @@ final class TranslationCatalogCheck implements Check
     }
 
     /**
-     * msgid => "has a non-empty translation".
-     *
-     * A fuzzy entry counts as present but untranslated: msgfmt leaves it out of
-     * the .mo by design, so demanding it there would report every half-reviewed
-     * translation as a stale catalog — while its msgid is very much in the
-     * catalog and must not be reported as unextracted. Obsolete entries (`#~`)
-     * are a graveyard msgfmt ignores entirely, and count as neither. The header
-     * entry (empty msgid) is metadata, not a string.
+     * msgid => "has a non-empty translation". Fuzzy entries count as present but
+     * untranslated (msgfmt omits them); obsolete `#~` entries and the header do not count.
      *
      * @return array<string, bool>
      */
@@ -345,12 +313,7 @@ final class TranslationCatalogCheck implements Check
 
     /**
      * The untranslated strings a compiled catalog knows about, or null if the
-     * file is not a gettext catalog.
-     *
-     * The format is four little- or big-endian longs of header, then two tables
-     * of (length, offset) pairs — readable with unpack() and no dependency, and
-     * the alternative (shelling out to msgunfmt) is a tool that is not installed
-     * in half the places this runs.
+     * file is not a gettext catalog. Parsed with unpack(): msgunfmt is often absent.
      *
      * @return list<string>|null
      */
@@ -378,9 +341,7 @@ final class TranslationCatalogCheck implements Check
         }
         $count = $header[1];
         $table = $header[2];
-        // A truncated catalog must be rejected before it is indexed, not while:
-        // unpack() on a short read raises a warning, and a warning from a check
-        // is a stack trace where a diagnosis belongs.
+        // Reject a truncated catalog before indexing: unpack() on a short read warns.
         if ($count < 0 || strlen($binary) < $table + $count * 8) {
             return null;
         }
@@ -418,9 +379,7 @@ final class TranslationCatalogCheck implements Check
     }
 
     /**
-     * A few of the offending strings, shortened. Cut on a character boundary,
-     * not a byte one: translatable copy is exactly the kind of string that ends
-     * in a multibyte character, and half of one renders as a replacement glyph.
+     * A few of the offending strings, shortened on a character boundary.
      *
      * @param list<string> $strings
      */

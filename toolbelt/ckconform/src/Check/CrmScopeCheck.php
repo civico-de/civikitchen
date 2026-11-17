@@ -11,36 +11,9 @@ use CiviKitchen\Ckconform\Reporter;
 use CiviKitchen\Ckconform\SmartySource;
 
 /**
- * `{ts}` in an extension template that no `{crmScope extensionKey='…'}` covers.
- *
- * The Smarty twin of bare `ts()` in PHP, with the identical silent failure: a
- * `{ts}` block resolves in CIVICRM CORE's translation domain unless a
- * `{crmScope}` names the extension, so the extension's own .po files are never
- * consulted. Nothing errors, nothing warns, no log line appears — the string
- * just renders in English forever, on an install whose l10n/ is complete and
- * whose translators did their job. The mago rule civikitchen/use-extension-ts
- * closes the PHP half of this hole; the templates had no equivalent.
- *
- * The same applies to the message-template bodies an extension ships inside a
- * `.mgd.php`: they are Smarty too, and a `{ts}` in a mail body is scoped by the
- * same wrapper or by nothing at all.
- *
- * Judged per file. `{crmScope}` is a runtime stack, so a partial rendered by
- * `{include}` from inside a wrapper does inherit the domain — but a partial that
- * relies on that breaks the moment it is included from anywhere else, and
- * wrapping it in its own `{crmScope}` costs nothing and is never wrong. Files
- * are therefore required to stand on their own.
- *
- * A wrapper whose extensionKey is a Smarty variable is accepted: what it
- * resolves to is not statically knowable, and refusing to guess beats guessing
- * wrong. A wrapper that names a *different* extension's key, on the other hand,
- * is exactly the mistake this rule exists for.
- *
- * A `{ts domain="<key>"}` needs no wrapper at all: core's smarty_block_ts
- * fills the domain from {crmScope}'s extensionKey only when the tag carries
- * none of its own, so an explicit domain attribute is equivalent — and it WINS
- * over any enclosing {crmScope}, which also means a foreign domain attribute
- * is a finding even inside a correct wrapper.
+ * `{ts}` in an extension template or `.mgd.php` body that no
+ * `{crmScope extensionKey='…'}` or `domain` attribute ties to this extension,
+ * judged per file; a foreign key fails, a Smarty-variable key is accepted.
  */
 final class CrmScopeCheck implements Check
 {
@@ -79,8 +52,8 @@ final class CrmScopeCheck implements Check
     }
 
     /**
-     * Templates the extension owns, plus the `.mgd.php` files that may carry a
-     * message-template body. Tests and vendored code are not shipped UI.
+     * Templates the extension owns, plus `.mgd.php` files that may carry a
+     * message-template body.
      *
      * @return list<string>
      */
@@ -95,8 +68,7 @@ final class CrmScopeCheck implements Check
     }
 
     /**
-     * Uncovered `{ts}` blocks, grouped by reason so a template with twenty
-     * strings and one missing wrapper produces one line, not twenty.
+     * Uncovered `{ts}` blocks grouped by reason, one line per reason.
      *
      * @return array<string, list<int>> reason => 1-based line numbers
      */
@@ -139,9 +111,7 @@ final class CrmScopeCheck implements Check
             }
 
             if (($event['hasDomain'] ?? false) === true) {
-                // An explicit domain attribute wins over any {crmScope}
-                // (smarty_block_ts only fills an ABSENT domain from the
-                // wrapper), so it is judged on its own, wrapper or not.
+                // An explicit domain attribute wins over any {crmScope}.
                 if ($event['dynamic'] || $event['key'] === $key) {
                     continue;
                 }
@@ -197,9 +167,7 @@ final class CrmScopeCheck implements Check
      */
     private function attributeValue(string $attributes, string $name): array
     {
-        // Inside a .mgd.php the tag lives in a PHP string literal, so its
-        // quotes arrive escaped: extensionKey=\'greeter\'. PHP unescapes them
-        // long before Smarty ever sees the tag.
+        // Inside a .mgd.php the quotes arrive escaped: extensionKey=\'greeter\'.
         $attributes = str_replace(['\\\'', '\\"'], ["'", '"'], $attributes);
 
         if (preg_match('/\b' . preg_quote($name, '/') . '\s*=\s*(?:\'([^\']*)\'|"([^"]*)"|(\S+))/i', $attributes, $match) !== 1) {

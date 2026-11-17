@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# CIVIKITCHEN_LOCALES fetches the version-matching core l10n tarball (the daily
-# catalogue for an alpha or beta core) and unpacks only the requested locales
-# into [civicrm.l10n]; the default locale has to be one of them. Fake curl
-# serves archives built here; fake cv answers the version and path queries and
-# records the rest.
+# CIVIKITCHEN_LOCALES unpacks only the requested locales of the version-matching
+# l10n tarball (daily for alpha/beta); the default must be one. curl and cv are faked.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

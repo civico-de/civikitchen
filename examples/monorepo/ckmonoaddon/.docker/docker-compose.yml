@@ -9,37 +9,27 @@
 #        maildev :${CK_MAILDEV_PORT:-1080} · phpMyAdmin :${CK_PMA_PORT:-8081}
 #        (opt-in: COMPOSE_PROFILES=pma in .docker/.env, or --profile pma)
 #
-# Host ports come from .docker/.env (gitignored; ckup writes it) so several
-# stacks can run side by side; the defaults apply when it is absent.
+# Host ports come from .docker/.env (gitignored; ckup writes it).
+# Re-provision from scratch: docker compose down -v && up -d
 #
-# Re-provision from scratch (re-seeds the profile, re-runs init.d hooks): docker compose down -v && up -d
-#
-# Every gate the shared CI runs in the container, with a summary table:
+# Every gate the shared CI runs, in the container:
 #   /path/to/civikitchen/scaffold/ckx ck ci
-# ckx execs into app as www-data in the extension directory. In a repository of
-# several extensions the repository root is mounted at /civikitchen-repo, and
-# ckx points the git-reading gates there (CK_TOOL_PATH).
 
-# Explicit project name — unnamed .docker/ stacks all become one project
-# called "docker" and share volumes across checkouts.
+# Unnamed .docker/ stacks would all become one project "docker".
 name: ckmonoaddon
 
 services:
   app:
     image: ${CIVIKITCHEN_IMAGE:-ghcr.io/civico-de/civikitchen:v1}
-    # :v1 is the released contract image, matching the @v1 CI pin. Override
-    # CIVIKITCHEN_IMAGE to pin a specific CiviCRM minor (e.g.
-    # ghcr.io/civico-de/civikitchen:standalone-6.15) for this extension. Always
-    # pull so a stale local layer doesn't mask entrypoint fixes.
+    # :v1 matches the @v1 CI pin; CIVIKITCHEN_IMAGE can pin a CiviCRM minor
+    # (ghcr.io/civico-de/civikitchen:standalone-6.15).
     pull_policy: always
     depends_on:
       db:
         condition: service_healthy
     ports:
       - "${CK_HTTP_PORT:-8080}:80"
-    # The DB connection (host db, database/user/password civicrm) is the
-    # image's default and matches the db service below; only what differs
-    # from the defaults in docs/configuration.md needs a line here.
+    # The DB connection is the image default, matching the db service below.
     environment:
       CIVICRM_AUTO_INSTALL: "1"
       # Must match the host:port opened in the browser (asset URLs).
@@ -54,8 +44,7 @@ services:
       CIVIKITCHEN_SMTP_PORT: "1025"
     volumes:
       # Every extension mounted under ext/ is enabled on first boot, with its
-      # info.xml <requires> resolved. Mount siblings the same way; use
-      # CIVIKITCHEN_ENABLE_EXTENSIONS only to order them or add non-mounts.
+      # <requires> resolved. Mount siblings the same way.
       - ..:/var/www/html/ext/ckmonoaddon
       # The repository root: .git for cklint, ckfmt and ckconform.
       - ../../../..:/civikitchen-repo
@@ -63,8 +52,7 @@ services:
       - ./profiles:/civikitchen-profiles:ro
       # Hooks for the stack's environment, run after the profile. See init.d/README.md.
       - ./init.d:/civikitchen-init.d:ro
-      # Seed snapshots of a profile with a `snapshot` block (civikitchen's
-      # docs/seed-snapshots.md); kept across `down -v`, so a re-provision restores.
+      # Seed snapshots (docs/seed-snapshots.md), kept across `down -v`.
       - ./snapshots:/var/lib/civikitchen/snapshots
 
   db:
@@ -103,16 +91,14 @@ services:
     environment:
       PMA_HOST: db
 
-  # Headless Chrome for browser tests (Civi\Test\MinkBase), opt-in:
-  #   docker compose --profile browser up -d
-  # It shares the app's network, so it opens the site URL as your browser does
-  # and MinkBase reaches it at its default localhost:9222.
+  # Headless Chrome for Civi\Test\MinkBase, opt-in (--profile browser), in the
+  # app's network so MinkBase reaches it at localhost:9222.
   browser:
     profiles: [browser]
     image: chromedp/headless-shell:152.0.7939.3
     network_mode: service:app
-    # Docker's default 64 MB /dev/shm makes Chrome drop script loads on
-    # asset-heavy pages (net::ERR_INSUFFICIENT_RESOURCES); the image README advises 2G.
+    # With the default 64 MB /dev/shm Chrome drops script loads
+    # (net::ERR_INSUFFICIENT_RESOURCES).
     shm_size: 2gb
 
 volumes:

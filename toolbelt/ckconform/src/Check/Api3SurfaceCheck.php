@@ -11,19 +11,8 @@ use CiviKitchen\Ckconform\Reporter;
 use CiviKitchen\Ckconform\Suppressions;
 
 /**
- * An extension shipping its own APIv3 surface.
- *
- * APIv3 still runs in core — this is a policy signal, not a breakage: new
- * public extension APIs should be APIv4 entities/actions. Judged on the actual
- * export symbols (`civicrm_api3_<entity>_<action>()` definitions), not on the
- * `api/v3/` directory: that directory legitimately holds `*.mgd.php` (even
- * core's mgd-php@2 example does) and other near-misses.
- *
- * The common reason for one is a scheduled job: CRM_Core_BAO_Job::parseParameters()
- * forces version 3 for key=value parameters but passes JSON parameters through, so
- * a job with `'parameters' => '{"version":4}'` reaches an APIv4 action directly.
- *
- * WARN per function; the escape for a documented external compatibility
+ * An extension defining `civicrm_api3_<entity>_<action>()` functions; new APIs
+ * should be APIv4. WARN per function; the escape for a documented external compatibility
  * contract is an inline `ckconform-ignore api3-surface -- <reason>` (or the
  * file/repo levels).
  */

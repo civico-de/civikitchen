@@ -38,8 +38,7 @@ final class LicensingUrlCheckTest extends CheckTestCase
 
     /**
      * `*agpl*` has to be decided before `*gpl*`: an AGPL url contains "gpl", so
-     * a repo declaring plain GPL while linking the AGPL text would otherwise
-     * look coherent.
+     * plain GPL linking the AGPL text would otherwise look coherent.
      */
     public function testAnAgplUrlIsNotAcceptedForAPlainGplDeclaration(): void
     {

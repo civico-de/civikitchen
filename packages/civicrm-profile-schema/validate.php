@@ -145,9 +145,7 @@ final class CkProfileSchemaValidator {
   /** @param list<mixed> $choices */
   private function matchesEnum(mixed $value, array $choices): bool {
     foreach ($choices as $choice) {
-      // JSON Schema numbers compare by mathematical value. JSON 1 and 1.0
-      // are therefore equal even though PHP's strict comparison distinguishes
-      // the decoder's int and float representations.
+      // JSON Schema compares numbers by value: 1 equals 1.0, unlike PHP's ===.
       if ((is_int($value) || is_float($value)) && (is_int($choice) || is_float($choice))) {
         if ($value == $choice) return TRUE;
       }

@@ -8,21 +8,9 @@ declare(strict_types=1);
  * Usage:
  *   php tools/gen-api4-catalog.php <core-dir> [out-file]
  *
- * Reads the SOURCE tree only — no booted CiviCRM, no database. Everything
- * comes out of the tokenizer, so the catalog can be built in CI from a
- * tarball and pinned to a release.
- *
- * Entities are the top-level classes in Civi/Api4/ of core and of every
- * core-shipped extension. Actions are the static factory methods on the
- * entity and its base classes (DAOEntity, BasicEntity, AbstractEntity)
- * plus every class under Civi/Api4/Action/<Entity>/, which AbstractEntity
- * exposes through __callStatic. Fields come from schema/*.entityType.php.
- *
- * What is NOT knowable statically, and is therefore marked incomplete:
- * custom fields, ECK types, multi-record custom groups, SearchKit's SK_*
- * entities and everything a spec provider adds behind a runtime condition.
- * Entities without an entityType definition get fields_complete = false and
- * the rule then checks their actions but never their field names.
+ * Tokenizes the source tree only, no booted CiviCRM. Entities are the classes
+ * in Civi/Api4/, actions their static factories plus Action/<Entity>/ classes,
+ * fields come from schema/*.entityType.php; entities without one are incomplete.
  */
 
 require_once __DIR__ . '/catalog-common.php';
@@ -40,43 +28,26 @@ if (!is_file($coreDir . '/Civi.php') || !is_dir($coreDir . '/Civi/Api4')) {
 }
 
 /**
- * Static methods that exist on entity classes but are not API actions.
- *
- * The general test is the action-factory shape (`new SomethingAction(...,
- * __FUNCTION__)`); these are the reflection helpers that share the static
- * modifier without returning an action.
+ * Static methods on entity classes that are not API actions.
  */
 const NOT_ACTIONS = ['getEntityName', 'getEntityTitle', 'getInfo', 'getDaoName', 'permissions'];
 
 /**
- * Entity name prefixes whose entities only exist once a site is configured.
- *
- * `Custom_Foo` follows a multi-record custom group, `Eck_Foo` an entity
- * construction kit type, `SK_Foo` a SearchKit search. No source tree can
- * enumerate them, so the rule treats the prefix as "assume it exists".
+ * Entity name prefixes whose entities only exist once a site is configured;
+ * the rule assumes they exist.
  */
 const DYNAMIC_PREFIXES = ['Custom_', 'Eck_', 'SK_', 'Import_'];
 
 /**
- * Field-name prefixes core computes from site configuration.
- *
- * SearchKit exposes every saved search segment on the queried entity as
- * `segment_<name>`, where <name> is whatever the site called it. The names
- * are unknowable, the prefix is not.
+ * Field-name prefixes core computes from site configuration (SearchKit's
+ * `segment_<name>`).
  */
 const DYNAMIC_FIELD_PREFIXES = ['segment_'];
 
 /**
- * Providers that compute field names, and why that is safe.
- *
- * ContactSpecProvider is covered by DYNAMIC_SPEC_FIELDS below.
- * SearchSegmentExtraFieldProvider is covered by DYNAMIC_FIELD_PREFIXES.
- * PriceFieldSpecProvider builds `<price_set>.<field>`, which the rule skips
- * for containing a dot.
- * FullTextSearchFilterSpecProvider names a filter field after each full-text
- * index; core's defaults are read by ftsDefaultIndexFields(), indices a site
- * or extension adds through `civi.schema.fts_indices` are unknowable.
- * Anything not on this list gets a warning.
+ * Providers that compute field names, each covered elsewhere: Contact by
+ * DYNAMIC_SPEC_FIELDS, SearchSegment by DYNAMIC_FIELD_PREFIXES, PriceField by
+ * the dot rule, FullTextSearch by ftsDefaultIndexFields(). Others get a warning.
  */
 const REVIEWED_COMPUTED_PROVIDERS = [
     'ContactSpecProvider',
@@ -86,16 +57,8 @@ const REVIEWED_COMPUTED_PROVIDERS = [
 ];
 
 /**
- * Spec-provider fields whose names core computes instead of writing them.
- *
- * ContactSpecProvider builds these as `strtolower($entity) . '_' . $type`
- * over two nested literal arrays, mirroring the joins
- * ContactSchemaMapSubscriber adds — no tokenizer reads a name out of that.
- * The alternatives were both worse: flagging them is a false positive on
- * real code, and dropping Contact's field list to incomplete would retire
- * the check on the entity extensions touch most. Eight names, listed once,
- * next to the reason. The generator reports any other provider that builds
- * names this way, so a future release cannot add one unnoticed.
+ * Spec-provider fields whose names core computes: ContactSpecProvider builds
+ * `strtolower($entity) . '_' . $type` over two nested literal arrays.
  */
 const DYNAMIC_SPEC_FIELDS = [
     'Contact' => [
@@ -107,15 +70,8 @@ const DYNAMIC_SPEC_FIELDS = [
 ];
 
 /**
- * Joins no entityType file declares, because a subscriber adds them.
- *
- * ContactSchemaMapSubscriber builds `{email,address,phone,im}_{primary,
- * billing}` on civicrm_contact in a nested loop — the same eight names
- * DYNAMIC_SPEC_FIELDS already lists as fields, here with their target so the
- * right-hand side of `address_primary.street_address` becomes checkable. Any
- * other subscriber to `api.schema_map.build` would have to be added here;
- * core 6.17.2 has this one, the alias-less MessageTemplate master link, and
- * the custom-group joins, which are site data.
+ * Joins ContactSchemaMapSubscriber adds on `api.schema_map.build`; another
+ * subscriber to that event would have to be added here.
  */
 const IMPLICIT_JOINS = [
     'Contact' => [
@@ -186,13 +142,8 @@ function classDeclaration(string $source): ?array
 }
 
 /**
- * Traits a class pulls in, by short name.
- *
- * Actions do not only come down the extends chain: SavedSearch, Navigation,
- * OptionValue and some twenty others get export() and revert() from
- * Generic\Traits\ManagedEntity. Trait uses sit inside the class body, which
- * is what separates them from the import statements at the top of the file
- * and from a closure's `use (...)`.
+ * Traits a class pulls in, by short name: a `use` inside the class body, not
+ * an import or a closure's `use (...)`. Traits carry actions too.
  *
  * @return list<string>
  */
@@ -233,10 +184,8 @@ function traitNames(string $source): array
 }
 
 /**
- * Public static methods of a class, as name => body source.
- *
- * Abstract methods (no body) map to an empty string — AbstractEntity
- * declares getFields that way and it is still an action.
+ * Public static methods of a class, as name => body source; abstract ones
+ * (AbstractEntity::getFields) map to ''.
  */
 function staticMethods(string $source, bool $staticOnly = true): array
 {
@@ -304,16 +253,9 @@ function isActionFactory(string $name, string $body): bool
 }
 
 /**
- * Field names and implicit-join targets of an entityType definition.
- *
- * Parsed rather than executed — the closures call ts() and reach into
- * CRM_Core_DAO, which needs a booted core. Depth-1 keys of the getFields
- * array literal are the field names; nested arrays (usage lists,
- * pseudoconstants) sit deeper and are skipped by the bracket count, except
- * a depth-2 `entity_reference`, whose target entity SchemaMapBuilder::
- * addJoins() turns into a joinable named after the field — what makes
- * `contact_id.display_name` a legal select. The reference `key` is
- * irrelevant here, only the name and its target entity.
+ * Field names and implicit-join targets of an entityType definition, parsed:
+ * depth-1 keys of getFields are fields, a depth-2 `entity_reference` makes the
+ * field a join to its target entity (SchemaMapBuilder::addJoins).
  *
  * @return array{list<string>, array<string, string>} [fields, join name => target]
  */
@@ -487,21 +429,8 @@ foreach ($roots as $root) {
 }
 
 // ---------------------------------------------------------------------------
-// Extra fields contributed by spec providers.
-//
-// Spec providers add fields at runtime that no schema file mentions —
-// Contact's `groups` and `age_years`, Activity's `source_contact_id`. Only
-// the literal `new FieldSpec('x', ...)` names are collectable.
-//
-// Attribution is deliberately cautious in both directions. A provider that
-// names its entity — in applies(), or as the second FieldSpec argument, or,
-// without an applies(), through its own class name — contributes to that
-// entity. applies() calls the generator can read (isContact, isType, an
-// option group's seeded values) name entities too. A provider whose applies()
-// decides otherwise names no entity a source tree can pin down, so its fields
-// go to every entity. An
-// extra field name can only silence an error, never invent one; guessing the
-// entity wrong in the other direction would invent one.
+// Extra fields from spec providers: literal `new FieldSpec('x', ...)` names,
+// attributed to the entity the provider names, else to every entity.
 // ---------------------------------------------------------------------------
 
 /**
@@ -646,10 +575,8 @@ foreach ($roots as $root) {
         }
 
         $targets = [];
-        // The entity the provider declares it applies to, and the one an
-        // explicit `new FieldSpec('x', 'Foo')` names. Every other entity
-        // literal in the file is a reference (a foreign key, a join) and
-        // attributing the field to it would blur the catalog.
+        // Only applies() and `new FieldSpec('x', 'Foo')` name the target; other
+        // entity literals in the file are references.
         preg_match_all('/\'([A-Z][A-Za-z0-9_]*)\'/', $methods['applies'] ?? '', $applies);
         preg_match_all('/new\s+FieldSpec\s*\(\s*\'[^\']+\'\s*,\s*\'([A-Z][A-Za-z0-9_]*)\'/', $source, $explicit);
         foreach (array_merge($applies[1], $explicit[1]) as $literal) {
@@ -657,10 +584,7 @@ foreach ($roots as $root) {
                 $targets[$literal] = true;
             }
         }
-        // `CoreUtil::isContact($entity)` is core's own name for "Contact or
-        // one of its pseudo-entities" — a decidable answer written as a call.
-        // Individual, Household and Organization pick the fields up through
-        // the ancestry.
+        // isContact() covers Contact; its subtypes inherit through the ancestry.
         if (str_contains($methods['applies'] ?? '', 'isContact(')) {
             $targets['Contact'] = true;
         }
@@ -675,9 +599,7 @@ foreach ($roots as $root) {
         foreach ($groups[1] as $group) {
             $targets += array_fill_keys(array_filter(optionGroupNames($group, $roots), static fn (string $n): bool => isset($entityNames[$n])), true);
         }
-        // The class name is only evidence where there is no applies() — one
-        // that consults the database has an answer this generator may not
-        // read, and the name of the file must not pretend otherwise.
+        // The class name is evidence only where there is no applies().
         $undecidableApplies = isset($methods['applies']) && $targets === [];
         if (!isset($methods['applies'])) {
             $className = basename($entry->getFilename(), '.php');
@@ -718,8 +640,7 @@ function inheritedActions(string $class, array $classes, array $magicActions, ar
         $classes[$class]['actions'],
         $magicActions[$class] ?? [],
     );
-    // Traits first: a trait can itself use traits, and the recursion through
-    // $seen keeps that from looping.
+    // A trait can use traits; $seen keeps the recursion from looping.
     foreach ($classes[$class]['uses'] as $trait) {
         $actions = array_merge($actions, inheritedActions($trait, $classes, $magicActions, $seen));
     }
@@ -762,11 +683,8 @@ function inheritedFieldSource(string $class, array $classes, array $entityTypeFi
 }
 
 /**
- * Entity names along the ancestry, nearest first.
- *
- * Individual is a Contact with a filter: it inherits Contact's schema fields
- * through the class chain, and it has to inherit Contact's spec fields
- * (groups, age_years, next_birthday) the same way.
+ * Entity names along the ancestry, nearest first, so Individual inherits
+ * Contact's spec fields.
  *
  * @return list<string>
  */
@@ -813,9 +731,8 @@ foreach ($classes as $class => $info) {
     }
     ksort($joins);
 
-    // Only a table-backed entity has a field list a schema file can settle.
-    // Setting has a civicrm_setting table but its API fields are the setting
-    // names, so the DAOEntity ancestry — not the table — is the test.
+    // Complete only for DAOEntity descendants: Setting has a table but its
+    // API fields are the setting names.
     $catalog[$entity] = [
         'actions' => $actions,
         'fields' => $fields,
@@ -824,8 +741,7 @@ foreach ($classes as $class => $info) {
     ];
 }
 
-// A join whose target is not an entity in this catalog cannot be validated
-// against anything, so it is dropped rather than recorded as unresolvable.
+// A join whose target is not in this catalog cannot be validated; drop it.
 $knownEntities = array_fill_keys(array_keys($catalog), true);
 foreach ($catalog as $entity => $info) {
     $catalog[$entity]['joins'] = array_filter(
@@ -1050,10 +966,8 @@ fwrite(STDOUT, sprintf(
     $version,
 ));
 
-// Providers that compute field names are the blind spot behind
-// DYNAMIC_SPEC_FIELDS. Any entity affected by one but not listed there can
-// produce false positives, so it gets said out loud rather than discovered
-// by a developer whose correct code was rejected.
+// An unreviewed provider that computes field names on a complete entity
+// would cause false positives.
 foreach ($computedFieldProviders as $entity => $providers) {
     $unreviewed = array_diff(array_unique($providers), REVIEWED_COMPUTED_PROVIDERS);
     if ($unreviewed === [] || $entity === '*' || ($catalog[$entity]['complete'] ?? false) === false) {

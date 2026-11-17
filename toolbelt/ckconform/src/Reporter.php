@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace CiviKitchen\Ckconform;
 
 /**
- * Collects results and renders them byte for byte in the golden-output format
- * the consuming repos' captured output is compared against.
+ * Collects results and renders them byte for byte in the golden-output format.
  */
 final class Reporter
 {

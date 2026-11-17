@@ -11,14 +11,8 @@ use PHPStan\Rules\Rule;
 use PHPStan\Rules\RuleErrorBuilder;
 
 /**
- * Field names passed to the fluent APIv4 builder.
- *
- * The rule reads one function body at a time, because a builder's clauses
- * may be spread over a chain and over statements on a variable, and an
- * alias may be selected after the orderBy that uses it. Only builders rooted
- * in a `\Civi\Api4\X::action()` are considered — an addWhere() on anything
- * else is somebody else's builder. Field names are read with the scope at
- * the function's entry: literals and constants, not local variables.
+ * Field names passed to a fluent APIv4 builder rooted in `\Civi\Api4\X::action()`,
+ * read per function body; only literals and constants count as names.
  *
  * @implements Rule<Node\FunctionLike>
  */

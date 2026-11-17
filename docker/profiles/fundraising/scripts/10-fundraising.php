@@ -1,8 +1,6 @@
 <?php
-// Seed the fundraising world: the NGO itself, two campaigns, donors giving
-// this and last calendar year, pledges with installment schedules, and
-// recurring donors. Runs via `cv scr` with CiviCRM booted. Idempotent: skips
-// entirely when the NGO org already exists.
+// Seed an NGO, two campaigns, donors, pledges and recurring donors; skipped
+// when the NGO org exists.
 
 require_once __DIR__ . '/../../seed-lib.php';
 

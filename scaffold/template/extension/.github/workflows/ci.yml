@@ -1,22 +1,6 @@
-# Thin caller: the actual pipeline lives in civikitchen's reusable
-# extension-ci.yml (compose stack → cklint + ckconform → phpunit under
-# ckcoverage → phpstan → template-drift check), so it is defined once instead
-# of drifting between copy-pasted workflows. civikitchen is public — no
-# cross-repo token needed.
-#
-# Repo-specific needs (a different compose file, a different image, skipping
-# the drift check) go through the workflow's inputs (`with:`), not a fork of
-# its steps.
-#
-# The @v1 pin is the versioned contract: workflow, template, ck* tools and
-# images are released together, so this ref and the image tag in
-# .docker/docker-compose.ci.yml move as one. Fixes arrive without a PR here;
-# a change this repo has to react to ships as a minor marked Breaking in the
-# changelog. See civikitchen's docs/releases.md.
-#
-# Everything up to the END marker is template-managed; what this repo needs
-# beyond it — `with:` inputs for the call, further jobs — goes below the
-# marker and survives `ckinit --update`.
+# Thin caller of civikitchen's reusable extension-ci.yml at the @v1 contract
+# (docs/releases.md). Up to the END marker template-managed; `with:` inputs
+# and further jobs go below it.
 # BEGIN CIVIKITCHEN MANAGED caller
 name: CI
 

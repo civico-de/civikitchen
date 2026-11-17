@@ -7,10 +7,8 @@ namespace CiviKitchen\Ckconform\Tests;
 use CiviKitchen\Toolbelt\Filesystem\Directory;
 
 /**
- * A throwaway fake CiviCRM core on disk for checks that read core's Civi/Api4
- * tree. The using test writes its own entity files under makeCore()'s
- * Civi/Api4; creation and removal live here, so the removal only ever reaches
- * the directory this trait itself created.
+ * A throwaway fake CiviCRM core with an empty Civi/Api4 tree; removal only
+ * reaches the directory this trait created.
  */
 trait FakeCoreTrait
 {

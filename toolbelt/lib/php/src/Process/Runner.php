@@ -7,10 +7,8 @@ namespace CiviKitchen\Toolbelt\Process;
 class Runner
 {
     /**
-     * The message for a program that cannot be spawned, or null when it can.
-     * Checked before proc_open, whose own failure is a raw PHP warning that
-     * reads like a memory or seccomp problem; a login shell resetting PATH is
-     * the usual cause. No fallback path: a guessed tool is worse than an error.
+     * The message for a program that cannot be spawned, or null; proc_open's own
+     * failure reads like a memory or seccomp problem.
      *
      * @param non-empty-list<string> $command
      */

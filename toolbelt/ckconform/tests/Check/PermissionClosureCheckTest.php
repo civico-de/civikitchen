@@ -270,8 +270,7 @@ final class PermissionClosureCheckTest extends CheckTestCase
     }
 
     /**
-     * The failure that started this check: a typo turns the guard into an
-     * always-no and nothing at runtime says so.
+     * A typo turns the guard into an always-no that nothing at runtime reports.
      */
     public function testFailsForATypoOfAnOwnPermissionInMenuXml(): void
     {
@@ -359,9 +358,8 @@ final class PermissionClosureCheckTest extends CheckTestCase
     }
 
     /**
-     * Unrelated strings elsewhere in a file that happens to hold the hook must
-     * not enter the definition set — an over-wide set turns warnings into false
-     * FAILs.
+     * Unrelated strings in a file holding the hook must not enter the definition
+     * set; an over-wide set turns warnings into false FAILs.
      */
     public function testOnlyTheHookBodyContributesDefinitions(): void
     {

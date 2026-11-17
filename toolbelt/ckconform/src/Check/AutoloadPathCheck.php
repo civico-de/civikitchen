@@ -9,20 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A composer autoload path that points at nothing — or at the wrong case.
- *
- * PSR-4/PSR-0 base directories and classmap/files entries are paths relative to
- * composer.json. Get one wrong and the classes under it never autoload: a fatal
- * the first time one is used. The nastier variant is case: `Civi/acme/` where
- * the directory is `Civi/Acme/` resolves on a case-insensitive macOS disk and
- * fails on a Linux runner, so the build is green on the laptop and red in CI for
- * a reason that looks nothing like a path typo.
- *
- * The check reads git, not the disk, precisely so case is exact: git records
- * `Civi/Acme/` however the local filesystem folds it, and a mapping to
- * `Civi/acme/` then matches no tracked file. A base directory "exists" when
- * the repo tracks a file under it; "." and "" (the PSR-0 CRM_ root) are trivially
- * present and skipped.
+ * A composer autoload path that matches no tracked file, compared case-exactly
+ * through git (macOS resolves `Civi/acme/` for `Civi/Acme/`, Linux does not).
  */
 final class AutoloadPathCheck implements Check
 {
@@ -92,9 +80,8 @@ final class AutoloadPathCheck implements Check
                 }
             }
         }
-        // classmap entries may be files or directories; a directory ends in '/'
-        // or has no extension. Only treat the obvious directory ones here; the
-        // rest go through filePaths().
+        // A classmap entry is a directory when it ends in '/' or has no extension;
+        // the rest go through filePaths().
         foreach ($this->stringList($block['classmap'] ?? null) as $path) {
             if ($this->isDirectoryPath($path)) {
                 $paths[] = $this->normalise($path);
@@ -159,9 +146,8 @@ final class AutoloadPathCheck implements Check
     }
 
     /**
-     * Strip leading './' segments only. A character-set ltrim('./') would eat
-     * into the filename ('./.civix.php' -> 'civix.php') and silently re-root
-     * an escaping '../x' — which must stay as-is so it matches nothing.
+     * Strip leading './' segments only; ltrim('./') would eat './.civix.php' and
+     * re-root an escaping '../x', which must match nothing.
      */
     private function stripDotSlash(string $path): string
     {

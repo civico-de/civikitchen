@@ -4,9 +4,7 @@
 # phpMyAdmin: http://localhost:8081  (opt-in: --profile pma)
 # Maildev:    http://localhost:1080
 
-# Distinct compose project name (rather than the CWD-derived default, e.g.
-# 'standalone') so parallel civikitchen examples don't collide on container
-# names / networks.
+# Own project name, so parallel examples do not collide on names and networks.
 name: civikitchen-backdrop
 
 services:
@@ -22,15 +20,12 @@ services:
       CIVICRM_DB_HOST: db
       CIVICRM_DB_ROOT_PASSWORD: root
       CIVIKITCHEN_SITE_URL: "http://localhost:8080"
-      # Buildkit CMS tags share the same Dockerfile — only the default
-      # civibuild site type differs. Setting it explicitly here makes the
-      # example self-documenting.
+      # The tag's default civibuild site type, set explicitly for the reader.
       CIVICRM_SITE_TYPE: backdrop-demo
       # Enable extensions you bind-mount below (comma-separated keys):
       # CIVIKITCHEN_ENABLE_EXTENSIONS: myextension
-    # Mount your extension under development. NOTE: on the buildkit CMS
-    # flavors the extension dir is the CMS extensionsDir, NOT
-    # /var/www/html/ext (that path is standalone-only). For this image:
+    # Mount your extension into the CMS extensionsDir (/var/www/html/ext is
+    # standalone-only):
     # volumes:
     #   - ../path/to/myextension:/home/buildkit/buildkit/build/site/web/files/civicrm/ext/myextension
 

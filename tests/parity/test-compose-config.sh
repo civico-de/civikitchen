@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Every shipped compose file must pass `docker compose config`, and every build
-# section must name a context and Dockerfile that exist: a dangling key or a
-# moved tree fails the consumer at `up`, not here. Needs the docker CLI only.
+# Every shipped compose file passes `docker compose config` and names an existing
+# build context and Dockerfile. Needs the docker CLI only.
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$root"

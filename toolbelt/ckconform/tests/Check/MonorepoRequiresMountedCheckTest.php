@@ -190,9 +190,8 @@ final class MonorepoRequiresMountedCheckTest extends CheckTestCase
     }
 
     /**
-     * The neighbour's key and its `<file>` differ, as a dotted key always does:
-     * `de.civico.ckmonobase` ships as `ckmonobase`, but a dependency is looked
-     * up under its key.
+     * A dotted key differs from its `<file>` (`de.civico.ckmonobase` ships as
+     * `ckmonobase`); a dependency is looked up under its key.
      */
     private function dotted(string $volume): Context
     {

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# The private-deps sibling build: a sibling whose committed composer.lock
-# carries runtime packages gets `composer install --no-dev` before it is
-# mounted; one without stays untouched. `composer` is stubbed.
+# A sibling whose composer.lock carries runtime packages gets `composer install
+# --no-dev` before the mount; one without stays untouched. `composer` is stubbed.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

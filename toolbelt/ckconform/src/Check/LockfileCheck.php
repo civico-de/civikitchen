@@ -10,17 +10,9 @@ use CiviKitchen\Ckconform\Policy;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A tracked manifest without a tracked lockfile means nobody can reproduce a
- * build — least of all the CI run that shipped the bundle.
- *
- * Three sub-rules, all git-only:
- *  - every tracked package.json that declares dependencies needs a tracked
- *    lockfile next to it, unless it is a workspace member, whose lockfile is the
- *    workspace root's (npm/yarn `workspaces`, pnpm-workspace.yaml);
- *  - a composer.json that declares real dependencies (platform packages such
- *    as php and ext-* are none) needs a tracked composer.lock;
- *  - where a lockfile is required, .gitignore must not exclude it, which would
- *    make it untrackable no matter how careful anyone is afterwards.
+ * A tracked package.json or composer.json declaring dependencies without a
+ * tracked lockfile, or with one .gitignore excludes. Workspace members use the
+ * root's lockfile; platform packages (php, ext-*) are no dependencies.
  */
 final class LockfileCheck implements Check
 {
@@ -55,10 +47,8 @@ final class LockfileCheck implements Check
     }
 
     /**
-     * Lockfile paths git would ignore, asked per location a lockfile can be
-     * required: next to each tracked manifest and at the root. Git answers via
-     * check-ignore (Context::isIgnored), so `*.lock`, negations and nested
-     * .gitignore files are resolved the way git resolves them.
+     * Lockfile paths git would ignore, asked via check-ignore next to each
+     * tracked manifest and at the root.
      *
      * @return list<string>
      */

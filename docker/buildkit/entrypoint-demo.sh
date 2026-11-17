@@ -1,13 +1,6 @@
 #!/bin/bash
-# Entrypoint for the single-container DEMO images (civikitchen:*-demo).
-# Unlike docker/buildkit/entrypoint.sh (external DB + fast `civibuild
-# reinstall` on first boot), the demo image carries an EMBEDDED MariaDB whose
-# data dir was baked at build time (the civibuild `-demo` site). So first boot
-# is just: start MariaDB on the baked data → run the shared opt-in
-# provisioning (incl. an optional CIVIKITCHEN_PROFILE apply, e.g. common) →
-# start Apache. No external DB, no reinstall, no 127.0.0.1->host rewrite (the
-# DB host is 127.0.0.1 at both bake and run time, so the baked grants stay
-# valid).
+# Entrypoint of the demo images: start the embedded MariaDB on the baked data,
+# run the shared provisioning, start Apache.
 set -e
 
 export PATH="/home/buildkit/buildkit/bin:${PATH}"
@@ -17,10 +10,7 @@ export PATH="/home/buildkit/buildkit/bin:${PATH}"
 
 CIVICRM_SITE_TYPE="${CIVICRM_SITE_TYPE:-${CIVICRM_SITE_TYPE_DEFAULT:-drupal10-demo}}"
 
-# The site was baked at --url http://localhost (port 80). Without
-# CIVIKITCHEN_SITE_URL the demo expects `-p 80:80`; with it, the baked base
-# URL is rewritten below (after the DB is up), so any host port works —
-# e.g. `-p 8080:80` + CIVIKITCHEN_SITE_URL=http://localhost:8080.
+# Baked at http://localhost; CIVIKITCHEN_SITE_URL rewrites it for another port.
 if [[ -z "${CIVIKITCHEN_SITE_URL:-}" ]]; then
     CIVIKITCHEN_SITE_URL="http://localhost"
 fi
@@ -45,14 +35,8 @@ done
 echo "Database is ready."
 
 # --- Apply CIVIKITCHEN_SITE_URL --------------------------------------------
-# Every absolute URL CiviCRM composes (asset paths, redirects, WordPress's
-# siteurl/home) carries the bake-time base URL; on a different host port the
-# UI breaks (assets 404). Rewrite the baked base to CIVIKITCHEN_SITE_URL in
-# the flavor's civicrm.settings.php file(s) and — WordPress only — the DB
-# options. The currently applied URL is recorded in a marker file, so a
-# changed env var on a later boot re-applies cleanly (old -> new) and an
-# unchanged boot is a no-op. Runs after MariaDB (WP options + cv flush need
-# the DB) and before provisioning (profiles print URLs to the logs).
+# Rewrite the baked base URL in the settings files and WordPress's options; the
+# applied URL is kept in a marker, so a changed value re-applies old -> new.
 CK_SITE_URL_MARKER="/home/buildkit/.civikitchen-site-url"
 SITE_ROOT="/home/buildkit/buildkit/build/site"
 ck_demo_apply_site_url() {
@@ -74,9 +58,8 @@ ck_demo_apply_site_url() {
         src/civicrm/admin/civicrm.settings.php; do
         [[ -f "${SITE_ROOT}/${f}" ]] && sed -i "s@${old}@${new}@g" "${SITE_ROOT}/${f}"
     done
-    # WordPress additionally stores the base URL in the database. If that
-    # update fails, do NOT record the new URL — the marker would claim success
-    # and every later boot would no-op while WordPress 301s to the stale base.
+    # WordPress keeps the base URL in the database too; on failure the marker
+    # must not record the new URL.
     if [[ -f "${SITE_ROOT}/web/wp-load.php" ]]; then
         if ! su -s /bin/bash buildkit -c "cd '${SITE_ROOT}/web' && /home/buildkit/buildkit/bin/cv ev \"update_option('siteurl', '${new}'); update_option('home', '${new}');\""; then
             echo "WARNING: could not update WordPress siteurl/home — will retry on next boot" >&2
@@ -90,11 +73,7 @@ ck_demo_apply_site_url() {
 }
 ck_demo_apply_site_url
 
-# Shared first-boot provisioning (SMTP, CIVIKITCHEN_PROFILE,
-# extension knobs, init.d hooks, readiness marker) — identical for the dev and
-# demo images, so it lives in entrypoint-common.sh. For a demo the base site is
-# already baked, so these are mostly opt-in knobs; a CIVIKITCHEN_PROFILE apply
-# (git clones + seeds) makes first boot take minutes instead of seconds.
+# Shared first-boot provisioning of the dev and demo images.
 . /usr/local/share/civikitchen/entrypoint-common.sh
 
 # Start Apache (needs root for port 80).

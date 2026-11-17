@@ -1,15 +1,9 @@
 <?php
 
 /**
- * Post-(re)enable settings metadata check for cklifecycle. Run through `cv scr`
- * while the extension is installed; parameters arrive in the environment.
- *
- * A malformed 'pseudoconstant' on a setting (e.g. snake_case keys core does not
- * read) does not fail install or `cklint` — it fatals the first time CiviCRM
- * loads OPTIONS for settings, which happens for every setting on every visit
- * to /civicrm/admin/theme (it loads options for ALL settings) and on the
- * extension's own settings pages. ckconform's static settings-metadata check
- * catches the common shapes from source; this exercises the real call.
+ * Post-(re)enable settings metadata check for cklifecycle: loads the options of
+ * every setting, which fatals on a malformed 'pseudoconstant'. Run through
+ * `cv scr` while the extension is installed; parameters arrive in the environment.
  */
 
 $dir = getenv('CK_LC_DIR') ?: '';

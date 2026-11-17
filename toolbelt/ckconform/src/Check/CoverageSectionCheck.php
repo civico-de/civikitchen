@@ -9,13 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * Coverage has to be measurable before it can be demanded: without an include
- * list `phpunit --coverage-text` reports on nothing, which reads like a passing
- * gate. The toolbelt runs PHPUnit 9, which reads the list from <coverage> or the
- * legacy <filter><whitelist> and ignores PHPUnit 10's <source>.
- *
- * The config is parsed as XML and a real element is required: a commented-out
- * `<!-- <coverage> -->` must not satisfy the gate.
+ * A phpunit config without a real coverage include list (<coverage> or legacy
+ * <filter><whitelist>; PHPUnit 9 ignores PHPUnit 10's <source>), parsed as XML.
  */
 final class CoverageSectionCheck implements Check
 {

@@ -5,19 +5,14 @@ declare(strict_types=1);
 namespace CiviKitchen\Ckconform;
 
 /**
- * The scan surface shared by the hook checks: which prefixes this extension
- * legitimately dispatches under, which files may declare hooks, and the global
- * functions a file defines. Extracted from HookDispatchNameCheck when
- * HookStyleCheck needed the identical three answers.
+ * The scan surface shared by the hook checks: legitimate hook prefixes, the
+ * files that may declare hooks, and the global functions a file defines.
  */
 final class HookSurface
 {
     /**
-     * Every prefix under which a hook may legitimately be declared: the `<file>`
-     * from info.xml, the last segment of the `<key>`, and the basename of a
-     * root-level `<shortname>.php` main file. All three normally coincide; when
-     * they do not, any of them is plausible enough that failing would be noise.
-     * The first entry is the canonical one, and the one messages should name.
+     * Every legitimate hook prefix: info.xml's `<file>`, the key's last segment
+     * and the root main file's basename. The first entry is the canonical one.
      *
      * @return list<string>
      */
@@ -38,10 +33,8 @@ final class HookSurface
             $segments = explode('.', $key);
             $prefixes[] = (string) end($segments);
         }
-        // The main file on disk, recognised by its civix twin: an extension whose
-        // root holds both `foo.php` and `foo.civix.php` dispatches under `foo`,
-        // whatever info.xml claims. Cheap, and it saves a false FAIL on a repo
-        // whose info.xml `<file>` has drifted from the file that is loaded.
+        // The main file, recognised by its civix twin: root `foo.php` plus
+        // `foo.civix.php` dispatches under `foo`, whatever info.xml claims.
         foreach ($context->isGitRepo() ? $context->trackedFiles() : $context->findFiles('') as $candidate) {
             if (preg_match('#^([A-Za-z0-9_]+)\.civix\.php$#', $candidate, $m) === 1
                 && $context->exists($m[1] . '.php')
@@ -68,9 +61,7 @@ final class HookSurface
     }
 
     /**
-     * Tracked *.php outside tests/ and vendor/. Generated civix glue declares
-     * hooks whose prefix civix itself owns, and vendored code is nobody's to
-     * rename here.
+     * Shipped *.php source files, minus the generated civix glue.
      *
      * @return list<string>
      */
@@ -84,12 +75,8 @@ final class HookSurface
     }
 
     /**
-     * The hook suffixes an extension directory dispatches — the hooks it
-     * invents. Read from the dispatch sites themselves, because that is the
-     * only place a hook is defined: `dispatch('hook_civicrm_x', …)` (the
-     * listener-era form) and `CRM_Utils_Hook::singleton()->invoke([...], …,
-     * 'civicrm_x')` (the classic form, whose last argument is the name).
-     * Tests, vendored and generated code are skipped like everywhere else.
+     * The hook suffixes an extension directory dispatches, read from
+     * `dispatch('hook_civicrm_x', …)` and `invoke([...], …, 'civicrm_x')` sites.
      *
      * @return list<string>
      */
@@ -186,13 +173,8 @@ final class HookSurface
     }
 
     /**
-     * Top-level function names with their declaration line, by token scan.
-     *
-     * Brace depth is the whole trick: a `function` seen at depth 0 is global,
-     * anything deeper is a method or a nested closure. Interpolation tokens
-     * (`T_CURLY_OPEN`, `${`) open a brace that `}` closes, so they have to be
-     * counted or a string like "{$a}" would unbalance the rest of the file.
-     * A `function` followed by `(` is an anonymous function and has no name.
+     * Top-level function names with their declaration line, by brace depth.
+     * Interpolation tokens (`{$`, `${`) open a brace too and must be counted.
      *
      * @return array<string, int> function name => line
      */

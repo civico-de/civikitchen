@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace CiviKitchen\PHPStan;
 
 /**
- * Which CRM_/Civi\ classes an extension may depend on: core (per the
- * generated CoreNamespaceCatalog), its own prefixes and those of every
- * extension its info.xml <requires>, when that checkout is found. Shared by
- * the phpat rules and the mago extension.
+ * Which CRM_/Civi\ classes an extension may depend on: core (CoreNamespaceCatalog),
+ * its own prefixes and those of each found <requires> checkout. Shared by the
+ * phpat rules and the mago extension.
  */
 final class ExtensionBoundary
 {
@@ -64,10 +63,8 @@ final class ExtensionBoundary
     }
 
     /**
-     * Where a required extension's checkout is, or null when none of the
-     * candidate directories holds an info.xml declaring exactly that key.
-     * Tried in order: a sibling checkout, the shared CI's sibling mount
-     * (.civikitchen-siblings/, see extension-ci.yml), the image's ext dir.
+     * Where a required extension's checkout is: a sibling checkout, the shared
+     * CI's .civikitchen-siblings/ mount, or the image's ext dir; null if none matches.
      */
     public static function locateExtension(string $extensionDir, string $key): ?string
     {
@@ -127,9 +124,8 @@ final class ExtensionBoundary
             $regexes[] = '~^Civi\\\\' . preg_quote($name, '~') . '(\\\\|$)~';
         }
 
-        // Non-standard roots (e.g. psr4 Civi\Acme\ => src/) only show up in
-        // the classloader declaration; the generic civix CRM_/Civi\ entries
-        // would whitelist everything and are skipped.
+        // Non-standard roots (psr4 Civi\Acme\ => src/) come from the classloader;
+        // the generic civix CRM_/Civi\ entries would allow everything.
         foreach ($info->xpath('/extension/classloader/*[@prefix]') ?: [] as $loader) {
             $prefix = trim((string) $loader['prefix'], '\\_');
             if ($prefix === 'CRM' || $prefix === 'Civi' || $prefix === '') {

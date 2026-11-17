@@ -34,8 +34,8 @@ final class RiverleaCustomPropertyCheckTest extends CheckTestCase
     }
 
     /**
-     * The case the rule exists for: a fallback that hides a name Riverlea never
-     * had. The suggestion follows the words, not the one-letter neighbour --crm-c-ink.
+     * A fallback hides a name Riverlea never had. The suggestion follows the
+     * words, not the one-letter neighbour --crm-c-ink.
      */
     public function testAnUnknownNameWithAFallbackFailsWithItsLineAndASuggestion(): void
     {

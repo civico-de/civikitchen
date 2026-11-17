@@ -1,12 +1,6 @@
-# The entry point for working on civikitchen locally, and the implementation
-# .github/workflows/lint.yml calls — one implementation, reachable from both
-# sides. Before it, the fast test suites could be run in exactly one place:
-# GitHub Actions. Both sides run it in the same container, as
-# scaffold/ck make <target>.
-#
-# Every named target is .PHONY: only the fetched tools and install stamps are
-# files, all spelled $(VARIABLE), so Make contributes no dependency graph — it
-# contributes being installed everywhere and `make help`.
+# Local and CI entry point (.github/workflows/lint.yml), run in the toolchain
+# container as `scaffold/ck make <target>`. Every named target is .PHONY; only
+# fetched tools and install stamps are files.
 
 # docker/cli/Dockerfile (target toolchain) sets CK_TOOLCHAIN: the PHP, make and bash these recipes
 # expect, on every host.
@@ -18,14 +12,11 @@ endif
 SELF := $(lastword $(MAKEFILE_LIST))
 include toolbelt/versions.env
 
-# Strict bash for every recipe: `set -eu -o pipefail` is what the shell in this
-# repo already runs under, and a recipe that swallows a failing stage in a pipe
-# is exactly the kind of green-but-untested that this file exists to end.
+# Strict bash for every recipe, so a failing pipe stage fails the recipe.
 SHELL := bash
 .SHELLFLAGS := -eu -o pipefail -c
 
-# Downloads land here rather than in /tmp so a second run reuses them, and so
-# `make clean` has one thing to remove. CI overrides nothing: same paths.
+# Downloads land here so a second run reuses them; `make clean` removes it.
 CACHE := .cache
 PHPUNIT := $(CACHE)/phpunit-$(CK_PHPUNIT_VERSION).phar
 SHARED_PHP_COVERAGE := $(CACHE)/shared-php-coverage.xml
@@ -33,17 +24,12 @@ SHARED_PHP_COVERAGE_MIN := 74
 VENDOR_STAMP := vendor/.civikitchen-installed
 OXLINT_STAMP := toolbelt/oxlint/node_modules/.civikitchen-installed
 
-# The pinned release IN the path: a catalog bump must invalidate the cached
-# tree, or the drift gates keep testing the old core until a `make clean`.
-# The four-pin agreement check stays in the recipe, which still fails loudly
-# when the catalogs disagree among themselves.
+# The pinned release is in the path, so a catalog bump invalidates the cached tree.
 CORE_VERSION := $(shell php -r 'require "toolbelt/ckconform/src/HookCatalog.php"; echo CiviKitchen\Ckconform\HookCatalog::CORE_VERSION;')
 CORE := $(CACHE)/civicrm-core-$(CORE_VERSION)
 
-# Pinned here, not in versions.env: this is their only consumer. actionlint's
-# installer is a shell script piped into bash, so it gets the same treatment as
-# the phars — pinned tag AND pinned content. Re-derive after a bump with
-# `curl -fsSL <url> | sha256sum`.
+# Pinned here, their only consumer. The actionlint installer is pinned by
+# content too; re-derive with `curl -fsSL <url> | sha256sum`.
 CK_ACTIONLINT_VERSION := 1.7.12
 CK_ACTIONLINT_INSTALLER_SHA256 := 72fa3e45ac20f3c3a512d6747b4fcf719e21f890e8c43e78d48a41fdfb900c4e
 CK_ZIZMOR_VERSION := 1.29.0
@@ -59,9 +45,7 @@ pyrun = $(UVX) $(1)@$(2)
 ARCH := $(shell uname -m)
 PLATFORM := linux_$(ARCH)
 
-# shellcheck is fetched and pinned like the phars, because the sweep's verdict
-# depends on the version: 0.10 grew checks 0.9 never ran, so a laptop's distro
-# shellcheck and CI's disagreeing turns "one implementation for both" into two.
+# shellcheck is pinned: its verdict depends on the version.
 CK_SHELLCHECK_VERSION := 0.11.0
 CK_SHELLCHECK_SHA256_linux_x86_64 := 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
 CK_SHELLCHECK_SHA256_linux_aarch64 := 12b331c1d2db6b9eb13cfca64306b1b157a86eb69db83023e261eaa7e7c14588
@@ -102,16 +86,8 @@ export UV_PYTHON_INSTALL_DIR := $(abspath $(CACHE))/uv-python
 export UV_CACHE_DIR := $(abspath $(CACHE))/uv-cache
 export COMPOSER_CACHE_DIR := $(abspath $(CACHE))/composer-cache
 
-# What gets linted is decided by WHAT A FILE IS, never by where it lives.
-#
-# A directory list fails OPEN: a file it does not match is not reported as
-# unchecked, it is simply absent, and the run says "clean". That happened twice
-# here — a *.sh-only glob skipped every ck* tool, and the directory list that
-# replaced it omitted template/, leaving three template-MANAGED files (stamped
-# byte-identical into every extension repo) ungated.
-#
-# `if`, not `cmd && printf`: under `set -e` a non-matching grep fails the whole
-# AND-list and kills the loop, silently and short. An `if` condition is exempt.
+# Files are selected by what they are, never by where they live: a directory
+# list fails open. `if`, not `&&`: under set -e a failed AND-list ends the loop.
 WORKTREE_FILES = git ls-files --cached --others --exclude-standard
 SHELL_FILES = $(WORKTREE_FILES) | while read -r f; do \
 	  case "$$f" in (*.sh) printf '%s\n' "$$f"; continue ;; esac ; \
@@ -122,10 +98,7 @@ SHELL_FILES = $(WORKTREE_FILES) | while read -r f; do \
 	done
 PHP_FILES = $(WORKTREE_FILES) -- '*.php'
 
-# A selector that matches nothing must be an error, not a pass. Otherwise the
-# fail-open bug just moves up a level: a broken pattern would lint zero files
-# and report success, which is precisely the failure mode these selectors were
-# rewritten to end.
+# A selector that matches nothing is an error, not a pass.
 define require_nonempty
 [ -n "$(1)" ] || { echo "no $(2) files matched — the selector is broken" >&2; exit 1; }
 endef
@@ -157,10 +130,7 @@ test-shared-php-coverage: $(PHPUNIT) $(VENDOR_STAMP) ## Shared PHP unit tests an
 	php tests/shared-php/assert-coverage.php $(SHARED_PHP_COVERAGE) $(SHARED_PHP_COVERAGE_MIN)
 	php tests/shared-php/test-assert-coverage.php
 
-# The catalogs are generated from a CiviCRM release and rot on their own: core
-# adds hooks and namespaces every release, and a stale catalog reports them as
-# typos. The drift tests regenerate and diff — but they SKIP without a core
-# checkout, so without $(CORE) the suite goes green while the gate never runs.
+# The catalog drift tests skip without a core checkout, so $(CORE) is required.
 test-ckconform: $(PHPUNIT) $(CORE) $(VENDOR_STAMP) ## ckconform's check fixtures + catalog drift gates
 	CIVICRM_CORE_DIR=$(abspath $(CORE)) \
 	  php $(PHPUNIT) -c toolbelt/ckconform/phpunit.xml.dist
@@ -189,9 +159,7 @@ test-mago-stubs: $(CORE) ## The mago stubs declare every member of the pinned co
 test-rector: $(PHPUNIT) $(VENDOR_STAMP) ## The rector rules' fixture tests
 	php $(PHPUNIT) -c toolbelt/rector/phpunit.xml.dist
 
-# ckinit stamps the template into every extension repo and its --check mode
-# gates those repos' CI, so a silent regression here either rewrites files it
-# must not touch or waves drift through.
+# ckinit stamps the template into every extension repo; --check gates their CI.
 test-ckinit: $(VENDOR_STAMP) ## ckinit seed/update/check integration checks, ckup port picking, the ckx and ck wrappers, the ck image entrypoint
 	bash tests/ckinit/test-ckinit.sh
 	bash tests/ckinit/test-ckinit-wrapper.sh
@@ -269,9 +237,7 @@ test-ck-headless-phpstan: $(CORE) $(VENDOR_STAMP) ## The managed ckHeadless.php 
 test-phpstan-bootstrap: ## phpstanBootstrap.php autoloads mounted <requires> extensions (stubbed core)
 	bash tests/toolbelt/test-phpstan-bootstrap.sh
 
-# `vendored_paths` decides what the linters never see; a regression there is
-# silent by construction — the run says "clean" about files it skipped, or
-# reformats third-party source that must stay byte-identical.
+# `vendored_paths` decides what the linters never see; a regression is silent.
 test-vendored-paths: ## civikitchen.yaml vendored_paths file-list exclusion
 	bash tests/toolbelt/test-vendored-paths.sh
 
@@ -289,15 +255,13 @@ test-make-phony: ## A file named like a target cannot satisfy it
 test-make-downloads: ## A download that fails its checksum leaves no tool behind
 	MAKE='$(MAKE)' bash tests/toolbelt/test-make-downloads.sh
 
-# A lock that installs is not a lock that runs: resolved against a newer PHP
-# than the images ship, a tool tree can pick a transitive that dies at startup
-# on an 8.1/8.2 image. No build catches that — this does, without Docker.
+# A lock resolved against a newer PHP can pick a transitive that dies at startup
+# on an 8.1/8.2 image.
 test-tool-locks: $(COMPOSER) ## Tool lockfiles: in sync, and resolved against the PHP floor
 	bash tests/toolbelt/test-tool-locks.sh
 
-# Two jobs of one run sharing a compose project means the second one's
-# `down -v` kills the first one's containers. Only reproducible where jobs
-# share a Docker daemon, i.e. never on the runner this suite runs on.
+# Two jobs sharing a compose project kill each other's containers on `down -v`
+# when they share a Docker daemon.
 test-compose-isolation: $(VENDOR_STAMP) ## Per-job compose project names in the workflows
 	bash tests/parity/test-compose-project-isolation.sh
 
@@ -428,9 +392,7 @@ lint-shell-portability: ## Reject host-incompatible BSD sed in-place syntax
 	  $(call require_nonempty,$$files,shell) ; \
 	  scripts/lint-shell-portability.sh $$files
 
-# actionlint reads workflows as YAML+shell; zizmor reads them as a threat model
-# — unpinned actions, expression injection into run blocks, tokens wider than
-# the job needs. Exemptions and their reasons live in zizmor.yml.
+# zizmor exemptions and their reasons live in zizmor.yml.
 lint-actions: $(ACTIONLINT) $(UVX) ## actionlint + zizmor over the workflows
 	$(ACTIONLINT) -color
 	$(call pyrun,zizmor,$(CK_ZIZMOR_VERSION)) --no-online-audits --config zizmor.yml \
@@ -469,10 +431,8 @@ lint-phpstan: $(PHPUNIT) $(CORE) $(VENDOR_STAMP) ## phpstan over the repository'
 	CIVICRM_CORE_DIR=$(abspath $(CORE)) CK_PHPUNIT_PHAR=$(abspath $(PHPUNIT)) \
 	  vendor/bin/phpstan analyse --no-progress --memory-limit=2G
 
-# The schemas are published contracts, so validate both the schemas themselves
-# and every repository-owned example/fixture. Keeping fixtures in this gate is
-# important: runtime tests must not be the first place an external profile or
-# scenario discovers that it drifted from its canonical format.
+# The schemas are published contracts: validate them and every repository-owned
+# instance.
 lint-schema: $(UVX) ## Validate the profile/scenario schemas and every repository-owned instance
 	$(call pyrun,check-jsonschema,$(CK_CHECK_JSONSCHEMA_VERSION)) --check-metaschema \
 	  packages/civicrm-profile-schema/profile.schema.json \
@@ -584,10 +544,8 @@ $(ACTIONLINT):
 	bash $(CACHE)/download-actionlint.bash $(CK_ACTIONLINT_VERSION) $(CACHE)
 	mv $(CACHE)/actionlint $@
 
-# All four catalogs must pin the SAME release, or the drift gates would each
-# test a different core and none of them would say so. The namespace generator
-# scans the whole tree (CRM/, Civi/, ext/), hence a source tree rather than
-# single files.
+# All four catalogs must pin the same release. The namespace generator scans
+# CRM/, Civi/ and ext/, hence a whole source tree.
 $(CORE):
 	@set -eu; \
 	ver="$(CORE_VERSION)"; \

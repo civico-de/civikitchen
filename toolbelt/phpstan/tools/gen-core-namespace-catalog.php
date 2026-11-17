@@ -8,17 +8,9 @@ declare(strict_types=1);
  * Usage:
  *   php tools/gen-core-namespace-catalog.php <core-dir> [out-file]
  *
- * Collects the CRM_* components and Civi\* top-level namespaces that core
- * OWNS — the boundary rule treats every other CRM_/Civi\ symbol as another
- * extension's internals. Scanned by directory, not by parsing classes: the
- * classloader maps CRM/<X>/ to CRM_<X>_* and Civi/<X>/ to Civi\<X>\*, so the
- * directory names ARE the namespace surface.
- *
- * Core-shipped extensions (ext/, including nested ones like afform/core)
- * count as core: SearchKit, Afform, Authx and friends are core-maintained
- * and depending on them is house style, not a boundary violation. Only dirs
- * whose parent holds an info.xml are classloader roots — that is what keeps
- * templates/CRM/ (Smarty trees, not classes) out of the catalog.
+ * Collects the CRM_* and Civi\* top-level namespaces core owns, from the
+ * directory names of each classloader root (core plus ext/ dirs with an
+ * info.xml, so templates/CRM/ stays out). Core-shipped extensions count as core.
  */
 
 require_once __DIR__ . '/catalog-common.php';

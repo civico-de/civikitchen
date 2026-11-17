@@ -9,31 +9,9 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * An APIv4 entity called by name from JavaScript that exists nowhere.
- *
- * Api4EntityCheck reads PHP and asks core about `\Civi\Api4\Foo`. It is blind to
- * a React component calling `getEntities('LedgerAdapter', ...)` for an entity
- * nobody ever wrote: every request 500s, and a `catch {}` with a hardcoded
- * fallback list makes that read as deliberate for as long as nobody looks.
- *
- * A string counts as an entity name only where APIv4 receives one: the entity
- * argument of `CRM.api4()` / `crmApi4()`, the segment after `ajax/api4/` in a
- * literal URL, and the matching argument of every wrapper the repo defines
- * around those. Wrappers are found by following parameters, to a fixpoint:
- * `getEntities(entity)` -> `apiCall(entity, action)` -> `${API_BASE}/${entity}`.
- * An event name handed to `emit('FormSaved')` never reaches such a position.
- *
- * A wrapper is a declared function (`function f`, `const f =`) or one assigned
- * to a named object (`api.f = ...`). A call reaches it in its own file, or in a
- * file that imports it from a repo path (`import { f } from '@/api'`,
- * `import * as api from './api'`, a default import), also through re-exports
- * (`export * from './civicrm'`). Relative paths resolve exactly; `@/` and `~/` take
- * the nearest file whose path ends in the rest. Object and class methods are not
- * followed: their names (`get`, `load`) are shared by every Map and loader.
- * Neither are wrappers from a package, nor functions declared inside a named
- * function: those, like any local binding, only hide a same-named wrapper.
- * Beyond its position, a finding needs a multi-word CamelCase name
- * (LedgerAdapter, not Email) that neither core nor this extension defines.
+ * An APIv4 entity called by name from JavaScript that neither core nor the
+ * extension defines: a multi-word CamelCase literal in the entity argument of
+ * `CRM.api4()`, `crmApi4()`, an `ajax/api4/` URL, or a repo wrapper around them.
  */
 /**
  * Declared wrapper names by file, each file's default export, its imports
@@ -464,11 +442,8 @@ final class Api4SelfEntityCheck implements Check
     }
 
     /**
-     * What a module imports from and re-exports out of the repo's own files
-     * (relative, `@/` or `~/` paths): named imports by local name with the
-     * exported name, namespace aliases, and exports as [name, original, path],
-     * the path null for the module's own names. Statements inside strings do not count.
-     *
+     * Named imports, namespace aliases and exports ([name, original, path]) of
+     * the repo's own modules; statements inside strings do not count.
      * @return array{array<string, array{string, string}>, array<string, string>, list<array{string, string, ?string}>}
      */
     private static function imports(string $text, string $code): array
@@ -522,9 +497,8 @@ final class Api4SelfEntityCheck implements Check
     }
 
     /**
-     * Functions: wrapper key (null when it cannot be called by a known name),
-     * parameter names (null when destructured), body offsets, and every name
-     * the parameter list binds, destructured ones included.
+     * Functions: wrapper key (null when not callable by a known name), parameter
+     * names (null when destructured), body offsets, and every name the list binds.
      *
      * @return list<array{?string, list<?string>, int, int, list<string>}>
      */
@@ -611,9 +585,8 @@ final class Api4SelfEntityCheck implements Check
     }
 
     /**
-     * Block-scoped redeclarations between $start and $end: the name and the
-     * range it hides the outer one in, `const`/`let`/`var` (destructured too)
-     * and `catch` bindings; a `for (const x ...)` binding covers the loop only.
+     * Block-scoped redeclarations between $start and $end: name and the range it
+     * hides the outer one in; a `for (const x ...)` binding covers the loop only.
      *
      * @return list<array{string, int, int}>
      */
@@ -650,9 +623,8 @@ final class Api4SelfEntityCheck implements Check
     }
 
     /**
-     * The wrapper key of a function from the code before its parameters: `name`
-     * when declared, `owner.name` when assigned to an object's property, null
-     * for anything else that is a function, false when it is not one.
+     * Wrapper key from the code before the parameters: `name`, `owner.name`,
+     * null for another function, false when it is not one.
      */
     private static function key(string $head): string|false|null
     {
@@ -836,10 +808,9 @@ final class Api4SelfEntityCheck implements Check
     }
 
     /**
-     * The source with comments, and optionally string and regex contents,
-     * replaced by spaces: brackets and commas inside them stop counting,
-     * offsets stay put. JSX text is code to this scanner, so a quote right
-     * after a letter (`don't`), `://` and `src/*` start nothing.
+     * The source with comments, and optionally string and regex contents, blanked
+     * to spaces at the same offsets. A quote right after a letter (`don't`), `://`
+     * and `src/*` start nothing, since JSX text counts as code here.
      */
     private static function blank(string $source, bool $strings): string
     {
@@ -964,9 +935,8 @@ final class Api4SelfEntityCheck implements Check
         if (Context::isUnder($file, self::SKIP)) {
             return false;
         }
-        // Assertion DSLs put arbitrary strings in first-argument position —
-        // `expect(text).not.toBe('TitleParagraph')` is not an API call. Only
-        // shipped code can 500 in a browser, so that is what this reads.
+        // Only shipped code can 500 in a browser; test DSLs put arbitrary strings
+        // in first-argument position.
         if (Context::isUnder($file, ['test', 'tests', '__tests__'])
             || preg_match('/\.(test|spec)\.[jt]sx?$/', $file) === 1) {
             return false;

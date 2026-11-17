@@ -99,9 +99,8 @@ final class ContextTest extends CheckTestCase
         self::assertSame([['Civi/Later.php']], array_map(static fn (array $c): array => $c['files'], $commits));
     }
     /**
-     * The shape ckinit generates: managed markers are comments, the header's END
-     * marker sits at column 0 right after `jobs:`, a repo-owned input follows a
-     * job's END marker, and a dotted directory has a sanitised job id.
+     * The shape ckinit generates: comment markers at column 0 after `jobs:` and
+     * between a job's lines, and a sanitised job id for a dotted directory.
      */
     private const GENERATED_ROOT = <<<'YAML'
         name: CI

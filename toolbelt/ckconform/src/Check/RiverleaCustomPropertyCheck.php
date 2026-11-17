@@ -9,18 +9,9 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A `var(--crm-…)` reference to a custom property nothing defines.
- *
- * `color: var(--crm-c-link, #1b5e8a)` looks right in the light theme, because
- * the fallback happens to fit it; Riverlea's name is `--crm-link-color`, so the
- * fallback renders in every stream and dark mode keeps the light colour. A
- * fallback therefore does not excuse an unknown name — it is what hides it.
- *
- * The catalogue is read from the core the check runs against: every `--crm-*`
- * declared anywhere in core (Riverlea's streams, core CSS, inline styles in
- * templates) plus the names Riverlea sets at runtime from PHP and JS, including
- * the stream editor's inputs. Names the repository declares or sets itself count
- * as defined. A name only some streams declare passes: it is part of the theme.
+ * A `var(--crm-…)` reference to a custom property neither core (any Riverlea
+ * stream, CSS, templates, runtime setters) nor the repo defines; a fallback
+ * value does not excuse an unknown name.
  */
 final class RiverleaCustomPropertyCheck implements Check
 {

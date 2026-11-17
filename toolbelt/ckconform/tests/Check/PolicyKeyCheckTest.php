@@ -157,10 +157,8 @@ final class PolicyKeyCheckTest extends CheckTestCase
     }
 
     /**
-     * The inventory is only useful if it is complete: a key a tool reads but
-     * KEYS does not list would be reported as unknown in every repo using it.
-     * Every PHP file of the tool belt, read as tokens so prose never counts:
-     * the checks' policyValue() calls and Repository\Policy's value()/values().
+     * Every key the tool belt reads (policyValue() calls and Repository\Policy's
+     * value()/values(), read as tokens) must be listed in KEYS, or it reads as unknown.
      */
     public function testInventoryCoversEveryKeyTheToolbeltReads(): void
     {

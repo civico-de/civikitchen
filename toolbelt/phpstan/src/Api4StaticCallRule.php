@@ -10,10 +10,8 @@ use PHPStan\Analyser\Scope;
 use PHPStan\Rules\Rule;
 
 /**
- * `\Civi\Api4\Entity::action()` — the entity and action half of the fluent form.
- *
- * The action is a magic static, so php itself never sees the typo; only
- * __callStatic does, at runtime, on the site that calls it.
+ * `\Civi\Api4\Entity::action()`: the entity and action half of the fluent
+ * form, a magic static PHP itself cannot check.
  *
  * @implements Rule<StaticCall>
  */

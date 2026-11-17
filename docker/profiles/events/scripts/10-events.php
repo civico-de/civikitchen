@@ -1,11 +1,7 @@
 <?php
-// Seed the events world: the host org, past + upcoming events open for online
-// registration with core's registration profile, and participants in varied
-// statuses (Registered / Attended / Cancelled), so the event dashboards,
-// participant searches, and reports all have data. Runs via `cv scr` with
-// CiviCRM booted. Idempotent: when the host org exists, it only adds missing
-// registration profiles. Dates are relative to the generation day; titles carry
-// no year, because a restore moves every event by the days since then.
+// Seed a host org, past and upcoming events and participants. With the org
+// present it only adds missing registration profiles. Titles carry no year, as
+// a restore shifts every date.
 
 require_once __DIR__ . '/../../seed-lib.php';
 

@@ -134,9 +134,8 @@ final class ReleaseTagsCheckTest extends CheckTestCase
     }
 
     /**
-     * The state a default `actions/checkout` produces, made the way CI makes
-     * it: a depth-1 clone has neither the tags nor the info.xml history, so
-     * without the shallow guard the rule would report a clean repo.
+     * A depth-1 clone, as `actions/checkout` makes it, has neither tags nor
+     * info.xml history; without the shallow guard it would report clean.
      */
     public function testWarnsUnevaluatedOnADepthOneCloneOfARepoThatSkippedATag(): void
     {
@@ -178,9 +177,8 @@ final class ReleaseTagsCheckTest extends CheckTestCase
     }
 
     /**
-     * A commit that deletes info.xml is in `git log -- info.xml` but has no
-     * blob to read a version from — the history skips it instead of treating
-     * the gap as a version of its own.
+     * A commit that deletes info.xml has no blob to read a version from and is
+     * skipped, not treated as a version of its own.
      */
     public function testSkipsCommitsThatCarryNoInfoXml(): void
     {

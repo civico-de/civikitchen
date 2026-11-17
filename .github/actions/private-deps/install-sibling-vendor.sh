@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# Build vendor/ in every sibling whose committed composer.lock carries runtime
-# packages. Siblings are mounted read-only and as is, so a sibling that loads
-# its own autoloader would not boot without it. --no-dev: only the runtime tree
-# a release ships; the sibling's own tests and tools never run here.
+# Build vendor/ (--no-dev) in every sibling whose composer.lock carries runtime
+# packages: siblings are mounted read-only and load their own autoloader.
 set -euo pipefail
 set -f
 cd "${GITHUB_WORKSPACE:-.}"

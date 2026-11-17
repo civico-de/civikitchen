@@ -17,9 +17,8 @@ final class Policy
     }
 
     /**
-     * Every value of $key, each with its ` -- reason`. An unreadable file
-     * throws: a coverage floor that reads as unset is no floor. A warning
-     * PHP logs to stderr is no value.
+     * Every value of $key with its ` -- reason`; stderr is never a value. An
+     * unreadable file throws: a coverage floor that reads as unset is no floor.
      *
      * @return list<string>
      */

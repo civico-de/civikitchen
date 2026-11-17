@@ -1,15 +1,5 @@
-# CiviCRM on a CUSTOM / OLDER version — baked LOCALLY via civibuild, not pulled
-# from Docker Hub.
-#
-# Use this when you need a CiviCRM version the published images don't offer:
-# Standalone only exists from ~5.69, so to mirror an older production server
-# (e.g. CiviCRM 5.78.2 on Drupal 10 / PHP 8.1) you build the image yourself.
-#
-# This stack builds civikitchen's buildkit image with `civibuild --civi-ver`,
-# using the Drupal 10 civibuild site type — the right fit for modern older
-# installs such as CiviCRM 5.78.x. Older pre-Drupal-10 CiviCRM versions should
-# switch to a Drupal 9 / 7 civibuild site type. No reliance on any prebuilt
-# civicrm/civicrm image.
+# CiviCRM at a version the published images do not offer, built locally with
+# `civibuild --civi-ver` on Drupal 10 (Standalone exists from ~5.69 only).
 #
 #   # first run builds the image (~10-15 min: civibuild downloads CMS + Civi)
 #   CIVICRM_VERSION=5.78.2 docker compose up -d --build
@@ -22,9 +12,7 @@
 # to match your target server. For CiviCRM older than ~5.47 (pre-Drupal-10),
 # switch DEFAULT_SITE_TYPE to a Drupal 9 / 7 civibuild type and lower PHP_VERSION.
 
-# Distinct compose project name (rather than the CWD-derived default, e.g.
-# 'standalone') so parallel civikitchen examples don't collide on container
-# names / networks.
+# Own project name, so parallel examples do not collide on names and networks.
 name: civikitchen-custom-version
 
 services:
@@ -54,9 +42,8 @@ services:
       # CIVIKITCHEN_EXTRA_EXTENSIONS: de.systopia.xcm
       # Enable extensions you bind-mount below (comma-separated keys):
       # CIVIKITCHEN_ENABLE_EXTENSIONS: myextension
-    # Mount your extension under development. NOTE: on the buildkit CMS
-    # flavor the extension dir is the CMS extensionsDir, NOT /var/www/html/ext
-    # (that path is standalone-only). For this drupal10 image it is:
+    # Mount your extension into the CMS extensionsDir (/var/www/html/ext is
+    # standalone-only):
     # volumes:
     #   - ../../../path/to/myextension:/home/buildkit/buildkit/build/site/web/sites/default/files/civicrm/ext/myextension
 

@@ -9,25 +9,9 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A Page/Form class whose Smarty template the extension does not ship.
- *
- * CRM_Core_Page::getTemplateFileName() derives the template from the class name
- * — CRM_Foo_Page_Bar renders templates/CRM/Foo/Page/Bar.tpl — and Smarty raises
- * an unrecoverable error when that file is absent. Nothing loads the template at
- * install time, so the gap only shows up as a fatal for the first user who opens
- * the page. Forgetting the .tpl in `git add`, or renaming the class without the
- * template, gives precisely that.
- *
- * A class that overrides getTemplateFileName()/getTemplate(), or that extends
- * another of the extension's own Page/Form classes (and so inherits a template
- * that is checked at its own definition), is exempt. So is a class that
- * overrides run() without ever calling parent::run(): the parent's run() is
- * the only path that feeds the derived template to Smarty, so a redirect or
- * JSON endpoint never renders and needs no .tpl. Only a declared class that
- * derives its template is judged: a trait or a static AJAX holder renders
- * nothing, and a core parent overriding getTemplateFileName() (CRM_Report_Form,
- * CRM_Import_Form_DataSource) supplies one. Without a core checkout only direct
- * CRM_Core_Page/CRM_Core_Form children are judged.
+ * A Page/Form class whose derived Smarty template (CRM_Foo_Page_Bar ->
+ * templates/CRM/Foo/Page/Bar.tpl) is not shipped. Overrides of the template
+ * methods, run() without parent::run() and own-class parents are exempt.
  */
 final class TemplateReferenceCheck implements Check
 {

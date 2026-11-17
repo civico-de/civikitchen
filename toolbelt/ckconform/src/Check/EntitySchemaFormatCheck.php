@@ -9,16 +9,9 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * Legacy entity schema formats that a modern floor no longer needs.
- *
- * `schema/*.entityType.php` (loaded by entity-types-php@2, core 5.73+) became
- * the canonical entity format in core 5.75; the XML schema documentation is
- * archived. XML keeps working — core promises compatibility — so both findings
- * are WARNs, and both are version-aware: an extension whose compatibility
- * floor is below 5.75 may legitimately stay on the old format.
- *
- * Migration is `civix upgrade` + `civix convert-entity`, and it touches the
- * mixin, the upgrader and the DAO stubs — verify fresh install AND upgrade.
+ * Legacy XML entity schemas where the compatibility floor is 5.75 or later,
+ * which makes `schema/*.entityType.php` canonical; WARNs. Migration is
+ * `civix upgrade` + `civix convert-entity`; verify fresh install and upgrade.
  */
 final class EntitySchemaFormatCheck implements Check
 {

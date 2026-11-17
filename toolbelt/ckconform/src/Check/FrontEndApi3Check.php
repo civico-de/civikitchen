@@ -9,16 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * CRM.api3, and core's Angular wrapper crmApi() around it, in JS/TS/Smarty.
- *
- * The NoLegacyCall sniff only reads PHP, so an APIv3 call in a template or a
- * bundle survives a whole migration unnoticed. Some entities genuinely have no
- * APIv4 form yet, so there is an escape hatch — but it costs a written reason,
- * like every other ignore in this toolchain.
- *
- * Tracked files only: an untracked scratch file cannot break anyone's build.
- * Vendored and generated front-end code is skipped, since nobody migrates a
- * minified bundle by hand.
+ * CRM.api3, and core's Angular wrapper crmApi() around it, in tracked JS/TS/Smarty
+ * outside vendored and generated code; an ignore needs a written reason.
  */
 final class FrontEndApi3Check implements Check
 {
@@ -92,9 +84,8 @@ final class FrontEndApi3Check implements Check
     }
 
     /**
-     * The annotation may sit anywhere in the file, but needs a non-empty reason
-     * after the '--'. Matched line by line, because grep is line-based and a
-     * whole-file match would let the reason come from the next line.
+     * The annotation may sit anywhere in the file with a non-empty reason after
+     * '--' on the same line.
      */
     private function hasDocumentedReason(string $contents): bool
     {

@@ -1,20 +1,11 @@
-# The build context is the REPO ROOT, so a Dockerfile can COPY from both
-# toolbelt/ and docker/.
-#
-# Exclude a path only if no COPY needs it AND copying it would be wrong
-# (host-built artifacts, VCS metadata). Excluding merely-unused trees buys
-# nothing: a COPY layer is invalidated by the files it copies, not by the size
-# of the context.
+# The build context is the repo root. Exclude only what no COPY needs and would
+# be wrong to copy (host-built artifacts, VCS metadata).
 
 # The largest thing in the context, and no build step reads it.
 .git
 
-# oxlint/oxfmt are a package.json + lockfile and a baseline config; the tree
-# they describe is installed INSIDE the image by install-dev-tools.sh
-# (`npm ci`). A node_modules/ left there by someone running the toolchain from
-# a checkout would otherwise be copied into the context — megabytes of
-# host-built binaries that `npm ci` deletes on its first line anyway, and that
-# carry the host's platform rather than the image's.
+# The image installs this tree with `npm ci`; a host-built one carries the
+# host's platform.
 toolbelt/oxlint/node_modules
 toolbelt/oxfmt/node_modules
 

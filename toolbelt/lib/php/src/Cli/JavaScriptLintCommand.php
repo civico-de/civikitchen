@@ -166,10 +166,8 @@ final class JavaScriptLintCommand implements Command
     }
 
     /**
-     * The type check for a repo without a tsconfig.json, as a second pass that
-     * reports TypeScript's diagnostics only: tsgolint checks just the files
-     * under a tsconfig in their own tree, so it runs over a copy of the
-     * tracked source beside the CiviKitchen tsconfig.
+     * The type check for a repo without a tsconfig.json: tsgolint only checks
+     * files under a tsconfig, so it runs over a copy beside CiviKitchen's.
      *
      * @param non-empty-list<string> $report
      * @param list<string> $sourceFiles

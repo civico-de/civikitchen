@@ -9,11 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A CI job that runs the suite but never measures it tells you the tests still
- * pass and nothing about whether they still cover anything.
- *
- * Scope is Context::scopedWorkflows(): every workflow file, and in a repository
- * of several extensions only the caller job that runs this one.
+ * A CI job that runs the suite without measuring coverage, judged over
+ * Context::scopedWorkflows().
  */
 final class CiCoverageCheck implements Check
 {

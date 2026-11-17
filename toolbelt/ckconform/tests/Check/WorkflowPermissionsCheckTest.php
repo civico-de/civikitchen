@@ -35,8 +35,7 @@ final class WorkflowPermissionsCheckTest extends CheckTestCase
     }
 
     /**
-     * A job-level `permissions:` is indented, so it does not satisfy the
-     * column-0 `^permissions:` match — intentionally, per the bash original.
+     * A job-level `permissions:` is indented and does not satisfy the column-0 match.
      */
     public function testJobLevelIndentedPermissionsDoesNotCount(): void
     {

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# First-boot provisioning turns off core's calls to civicrm.org: the
-# version_check job goes inactive and a settings file sets ext_repo_url to
-# boolean false (a string "false" or "" leaves the feed on). Fake cv records args.
+# First boot disables version_check and sets ext_repo_url to boolean false
+# (a string "false" or "" leaves the feed on). Fake cv records args.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

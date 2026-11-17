@@ -127,8 +127,8 @@ final class TemplateReferenceCheckTest extends CheckTestCase
     }
 
     /**
-     * Smarty-5 tag compatibility moved to SmartyCompatCheck, which knows about
-     * {literal} and reports a line number; this check is about missing files.
+     * Smarty 5 tag compatibility is SmartyCompatCheck's; this check is about
+     * missing files.
      */
     public function testAPhpBlockIsNotThisChecksBusiness(): void
     {

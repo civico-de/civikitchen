@@ -14,13 +14,9 @@ final class ExtensionUtilStub
     private static array $names = ['', ''];
 
     /**
-     * Autoload stub for any CRM_*_ExtensionUtil so `use ... as E; E::ts()`
-     * works outside a CiviCRM boot. ts() returns the literal; every other
-     * static returns the first argument or ''. The civix constants SHORT_NAME,
-     * LONG_NAME and CLASS_PREFIX come from $context's info.xml. Bare ts()
-     * calls appear in .aff.php metadata too, so a global ts() is defined as
-     * well, and CRM_Core_Component::isEnabled() (core's guard in mgd files)
-     * answers true so a guarded file still yields its records.
+     * Autoload stub for any CRM_*_ExtensionUtil: ts() returns the literal, other
+     * statics the first argument or '', constants come from info.xml. Also
+     * defines a global ts() and a CRM_Core_Component::isEnabled() answering true.
      */
     public static function register(?Context $context = null): void
     {

@@ -9,23 +9,14 @@ use CiviKitchen\Ckconform\ExtensionUtilStub;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * Evaluates the extension's `*.mgd.php` files for the managed-entity checks.
- *
- * mgd files are `return [...]` PHP with at most an ExtensionUtil dependency, so
- * they can be run with a stubbed ExtensionUtil; a file that throws anyway is
- * reported as a warning rather than silently skipped — $subject names what went
- * unchecked. Tracked files only (repo principle); mgd files live under managed/
- * by convention but nothing enforces that, so the whole tree is scanned.
+ * Evaluates the extension's tracked `*.mgd.php` files (anywhere in the tree)
+ * with a stubbed ExtensionUtil; a file that throws is a warning naming $subject.
  */
 final class ManagedFiles
 {
     /**
-     * The evaluated records of every mgd file, as [file, records] pairs.
-     *
-     * A file that does not return an array yields nothing; a check that wants
-     * to report that case passes $onNotArray, called with the file path.
-     *
-     * A file that throws is reported as a warning and passed to $onUnevaluated.
+     * The evaluated records of every mgd file, as [file, records] pairs. A
+     * non-array file goes to $onNotArray, a throwing one warns and goes to $onUnevaluated.
      *
      * @param  callable(string): void|null            $onNotArray
      * @param  callable(string): void|null            $onUnevaluated

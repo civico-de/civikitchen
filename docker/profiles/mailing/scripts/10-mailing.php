@@ -1,9 +1,6 @@
 <?php
-// Seed the mailing world: the sender org, segmented newsletter groups with
-// subscribers, and a draft mailing addressed to the main newsletter group, so
-// CiviMail's screens (and Mosaico, once a template is picked) start with real
-// recipients. Runs via `cv scr` with CiviCRM booted. Idempotent: skips
-// entirely when the sender org already exists.
+// Seed a sender org, newsletter groups with subscribers and a draft mailing;
+// skipped when the sender org exists.
 
 require_once __DIR__ . '/../../lib.php';
 

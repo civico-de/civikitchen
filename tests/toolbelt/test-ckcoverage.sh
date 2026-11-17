@@ -17,10 +17,8 @@ EOF
 cat > "$work/ext/phpunit.xml.dist" <<'EOF'
 <phpunit><coverage/></phpunit>
 EOF
-# Stands in for phpunit: writes clover metrics plus a junit log holding
-# CK_FIXTURE_TESTS run and CK_FIXTURE_SKIPPED skipped cases, and exits 0 the way
-# phpunit does on an empty or entirely skipped run. The LAST --log-junit wins,
-# as in phpunit.
+# Fake phpunit: writes clover metrics and a junit log with CK_FIXTURE_TESTS run
+# and CK_FIXTURE_SKIPPED skipped cases, exits 0; the last --log-junit wins.
 cat > "$work/bin/ckphpunit" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -94,8 +92,7 @@ mkdir "$work/ext/src"
 out=$(cd "$work/ext" && PATH="$work/bin:$PATH" TMPDIR="$work/tmp" "$root/toolbelt/bin/ckcoverage")
 grep -q '75.00% line coverage (6/8 statements)' <<<"$out"
 # The caller's scan directories stay in front; an empty variable scans nothing.
-# ckcoverage itself runs on one ini holding everything the host loads, since
-# the fixture values would strip its own extensions (simplexml on Debian).
+# One host ini keeps ckcoverage's own extensions (simplexml on Debian).
 php -r 'foreach (array_merge([php_ini_loaded_file()], array_map("trim", explode(",", (string) php_ini_scanned_files()))) as $f) { if ($f) { readfile($f); echo "\n"; } }' >"$work/host.ini"
 out=$(cd "$work/ext" && PATH="$work/bin:$PATH" TMPDIR="$work/tmp" PHP_INI_SCAN_DIR=/caller/ini \
   CK_FIXTURE_SCAN_HEAD=/caller/ini: php -c "$work/host.ini" "$root/toolbelt/bin/ckcoverage")

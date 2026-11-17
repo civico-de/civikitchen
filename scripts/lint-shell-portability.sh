@@ -6,10 +6,8 @@ if [ "$#" -eq 0 ]; then
   exit 2
 fi
 
-# BSD sed requires an empty backup suffix after -i, while GNU sed treats that
-# empty argument as the program and then tries to open the actual program as a
-# file. POSIX specifies no -i option, so host-portable scripts must rewrite via
-# a temporary file instead.
+# BSD sed needs an empty suffix after -i, GNU sed takes it as the program;
+# portable scripts rewrite through a temporary file.
 readonly bsd_sed_in_place="(^|[;&|()[:space:]])sed[[:space:]]+-i[[:space:]]+(''|\"\")"
 status=0
 

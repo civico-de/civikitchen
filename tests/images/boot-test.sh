@@ -1,12 +1,6 @@
 #!/bin/bash
-# Boot test for the buildkit-backed CMS dev images.
-#
-# Unlike test-dev-tools.sh (which runs WITH the entrypoint overridden and only
-# checks the bundled tools), this exercises the real first-boot path end to end:
-# start an external MariaDB, boot the image against it, and assert the baked
-# site comes up. It guards the bake → runtime `civibuild reinstall` flow — in
-# particular that the build-time DB host (127.0.0.1) gets repointed at the
-# external sidecar (regression: "[2002] Connection refused" on first boot).
+# Boot test for the buildkit-backed CMS dev images: the real first boot against
+# an external MariaDB, including the repoint of the build-time DB host (127.0.0.1).
 #
 # Usage:
 #   bash tests/images/boot-test.sh <image> <site_type>
@@ -21,10 +15,8 @@ set -euo pipefail
 IMAGE="${1:?usage: boot-test.sh <image> <site_type>}"
 SITE_TYPE="${2:?usage: boot-test.sh <image> <site_type>}"
 
-# Unique names so parallel CI matrix legs / local runs don't collide. The DB
-# container name doubles as its DNS hostname on the test network, and DNS
-# labels are capped at 63 chars — CI image refs carry a 40-char sha tag, so
-# keep a short readable prefix and a checksum for uniqueness.
+# Unique per run; the DB name is a DNS label (<63 chars) and CI tags carry a
+# 40-char sha, hence prefix plus checksum.
 RAW="$(echo "${IMAGE}_${SITE_TYPE}" | tr -c 'a-z0-9' '-')"
 SLUG="boottest-$(echo "${RAW}" | cut -c1-32)$(echo "${RAW}" | cksum | cut -d' ' -f1)"
 NET="${SLUG}-net"
@@ -58,10 +50,8 @@ wait_healthy "${APP}" "${HEALTH_TIMEOUT}" || exit 1
 code=$(docker exec "${APP}" curl -s -o /dev/null -w '%{http_code}' -L http://localhost/ 2>/dev/null || echo 000)
 check "home page serves HTTP 200 (got ${code})" "[ '${code}' = '200' ]"
 
-# 2) CiviCRM is live against the EXTERNAL db (the thing the host-rewrite fixes).
-# cv works on every flavor including Joomla now — the buildkit images ship a
-# civicrm.settings.d bootstrap shim (joomla-cli-bootstrap.php) that loads
-# Joomla's framework for cv — so no DB-direct fallback is needed.
+# 2) CiviCRM is live against the external db; on Joomla cv boots through the
+# civicrm.settings.d shim joomla-cli-bootstrap.php.
 ver=$(docker exec -u buildkit -w /home/buildkit/buildkit/build/site/web "${APP}" \
     bash -lc 'export PATH=/home/buildkit/buildkit/bin:$PATH; cv api4 Domain.get +s version 2>/dev/null' \
     | tr -d '[:space:]' || true)
@@ -80,19 +70,9 @@ check "init.d: a later hook finds the installed tool" "docker logs '${APP}' 2>&1
 tool=$(docker exec "${APP}" ckinittool 2>&1 || true)
 check "init.d: docker exec finds the installed tool (got ${tool:-absent})" "[ '${tool}' = 'ckinittool-ok' ]"
 
-# 3) Joomla only: the option=com_civicrm route must be registered. cv (check 2)
-# boots via the settings.d shim regardless of Joomla's component registration,
-# so it CANNOT catch a half-finished install — but that registration is exactly
-# what the dev image's first-boot finish restores (joomla-finish.sh, re-run after
-# `civibuild reinstall` wipes civibuild's incomplete state) and what the admin UI
-# and api_key HTTP API depend on. An unregistered component makes Joomla 404 the
-# route; a registered one routes into CiviCRM (200/redirect/permission, never a
-# Joomla 404). This is the regression guard for the dev :joomla finish.
-#
-# Gate on the SITE_TYPE arg, NOT a cv-derived UF: this must fail-closed — the
-# guard has to run on the Joomla image even if cv itself can't boot (that case
-# is already caught by check 2). It is the same flavor signal entrypoint.sh and
-# bake.sh gate the finish on.
+# 3) Joomla only: joomla-finish.sh registers the com_civicrm component, which
+# cv's shim does not need; unregistered, Joomla 404s the route.
+# Gated on SITE_TYPE, not a cv-derived UF, so it runs even when cv cannot boot.
 if [[ "${SITE_TYPE}" == joomla* ]]; then
     jcode=$(docker exec "${APP}" curl -s -o /dev/null -w '%{http_code}' \
         'http://localhost/index.php?option=com_civicrm' 2>/dev/null || echo 000)

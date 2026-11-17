@@ -1,8 +1,6 @@
 <?php
-// A working donation page at civicrm/contribute/transact: a Dummy payment
-// processor (live and test) and a quick-config price set with three amounts
-// and an other amount; core adds the email field. One transaction, so a failed
-// run leaves nothing behind and the retry builds the page again.
+// A donation page with a Dummy payment processor and a quick-config price set,
+// in one transaction, so a failed run leaves nothing behind.
 
 use Civi\Api4\ContributionPage;
 use Civi\Api4\PaymentProcessor;

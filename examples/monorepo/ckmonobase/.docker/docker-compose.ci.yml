@@ -1,31 +1,15 @@
-# CI stack — standalone, NOT an override of docker-compose.yml. App + db
-# only: no ports and no SMTP sink (unit tests use stub mailers, integrations
-# are covered by the E2E suites, which run locally against the full dev stack).
+# CI stack, not an override of docker-compose.yml: app + db, no ports.
 #
 #   docker compose -f .docker/docker-compose.ci.yml up -d --wait
 #   docker compose -f .docker/docker-compose.ci.yml exec -T -u www-data \
 #     -w /var/www/html/ext/ckmonobase app ck ci
 #
-# `ck ci` runs every in-container gate of the shared CI workflow, in its order.
-# In a repository of several extensions the repository root is mounted at
-# /civikitchen-repo; the git-reading gates run from there, so pass
+# In a repository of several extensions, also pass
 # -e CK_TOOL_PATH=/civikitchen-repo/<directory> to the exec.
 #
-# Keep image tag and db version in sync with docker-compose.yml.
-#
-# :v1 is the released contract image — the same version the CI workflow is
-# pinned to (@v1). Set CIVIKITCHEN_IMAGE to override, either in the environment
-# or via the shared workflow's `image` input.
-
-# Explicit project name: compose otherwise derives it from the directory, and
-# every extension keeps its stacks in .docker/ — unnamed, they all become one
-# project called "docker" and share volumes across checkouts.
-#
-# The two marked blocks are template-managed (ckinit --update refreshes them);
-# between them the repo adds what only it needs, e.g. a sibling mount:
+# The marked blocks are template-managed; between them the repo adds its own
+# lines, e.g. a sibling mounted at its extension key:
 #       - ../../sibling:/var/www/html/ext/de.example.sibling:ro
-# The mount target is the sibling's extension KEY: that is where a <requires>
-# entry is looked up.
 # BEGIN CIVIKITCHEN MANAGED app
 name: ckmonobase-ci
 
@@ -61,7 +45,7 @@ services:
     # logging the server refuses that unless it trusts non-SUPER creators.
     command: --log-bin-trust-function-creators=1
     # The test database is thrown away with the stack; in RAM no commit waits
-    # for an fsync, which slow CI disks charge for every CiviCRM request.
+    # for an fsync.
     tmpfs:
       - /var/lib/mysql
     environment:

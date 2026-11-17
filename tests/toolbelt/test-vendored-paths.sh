@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# `policy.vendored_paths` in civikitchen.yaml keeps third-party source a repo carries
-# verbatim out of the file lists cklint/ckfmt/ckanalyze build (Repository\Files). Without it a repo
-# can only choose between a permanently red gate and reformatting code that has
-# to stay byte-identical to its upstream.
+# `policy.vendored_paths` keeps verbatim third-party source out of the file lists
+# cklint/ckfmt/ckanalyze build (Repository\Files).
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

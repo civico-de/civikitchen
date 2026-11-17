@@ -1,27 +1,6 @@
-# CiviCRM Buildkit Development Image
-#
-# Used for Drupal 10, Drupal 11, WordPress, and Joomla dev images — the only
-# difference is the default civibuild site type, set via the DEFAULT_SITE_TYPE
-# build arg.
-# Pre-built CiviCRM site via buildkit for instant startup on first run.
-# Requires external MariaDB (not embedded).
-#
-# Base image: php:${PHP_VERSION}-apache (same family as standalone, which
-# inherits from civicrm/civicrm → php:apache). Keeps PHP-config paths and
-# extension-install flow consistent across both images.
-#
-# Build context: the repo root, so this can COPY from both toolbelt/ (what gets
-# baked in) and docker/ (this image's own runtime files). See docs/building.md.
-#
-# Build (all four flavors, and the run recipe: docs/building.md):
-#   docker build -f docker/buildkit/Dockerfile \
-#                --build-arg DEFAULT_SITE_TYPE=drupal10-demo \
-#                -t civikitchen:drupal10 .
-#
-# Run (needs MariaDB):
-#   docker run -d -p 8080:80 \
-#     -e CIVICRM_DB_HOST=db -e CIVICRM_DB_ROOT_PASSWORD=root \
-#     civikitchen:drupal10
+# CiviCRM buildkit image for the CMS flavors, with a civibuild site baked in;
+# DEFAULT_SITE_TYPE picks the flavor. Needs an external MariaDB. Build context
+# is the repo root; build and run recipes are in docs/building.md.
 
 ARG PHP_VERSION=8.3
 # Local-build fallback only: CI resolves the current stable from
@@ -32,30 +11,15 @@ ARG DEFAULT_SITE_TYPE=drupal10-demo
 # =============================================================================
 # Stage 1: Base system with PHP, Apache, and tools
 # =============================================================================
-# Pin to -bookworm (Debian 12) explicitly. Trixie (Debian 13, the rolling
-# default) ships mariadb-client 11.8 which enforces TLS by default and breaks
-# every dev MariaDB sidecar that doesn't have a cert configured (drush, amp,
-# civibuild all fail with "ERROR 2026 ... SSL is required, but the server
-# does not support it"). Bookworm's mariadb-client is 10.11, the same as the
-# standalone image's base. Revisit when MariaDB 11.4+ servers are the norm.
+# Bookworm, not trixie: trixie's mariadb-client 11.8 requires TLS and fails
+# against cert-less dev MariaDB sidecars ("ERROR 2026 ... SSL is required").
 FROM php:${PHP_VERSION}-apache-bookworm AS base
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-# OS-level deps. The php:apache base ships PHP + Apache; we add:
-# - git/unzip/zip: composer source/dist installs
-# - rsync/patch/acl/bzip2/jq: civibuild and its site templates use these
-# - default-mysql-client: civibuild + entrypoint DB probe
-# - nodejs: extensions with Angular/JS assets, and civicrm-buildkit's own
-#   civi-download-tools. 24.x is the current LTS line; npm is upgraded past
-#   what the distro package ships in install-dev-tools.sh (NPM_VERSION).
-# apt-get upgrade: security updates come from Debian at build time; the base
-# image ships none. The daily rebuild runs without cache, so they land.
-# PHP extensions, plus pcov (loaded but disabled, as in the standalone image;
-# ckcoverage enables it) and xdebug (installed, enabled by the entrypoint when
-# XDEBUG_MODE is set). Their -dev headers are purged in the
-# same layer, keeping the libraries the built .so files link against, as in
-# the standalone image; test-dev-tools.sh loads them.
+# OS packages, Node 24 and the PHP extensions; pcov is loaded but disabled
+# (ckcoverage enables it), xdebug is enabled by the entrypoint on XDEBUG_MODE.
+# -dev headers are purged in the same layer, keeping the libraries the .so link.
 RUN apt-get update && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends \
         ca-certificates curl git unzip zip rsync patch acl bzip2 jq \
@@ -84,15 +48,8 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Shared dev-tools install (composer, civix, phpunit, phpstan, mago,
-# rector/ckmodernize, the ckdeps analyser).
-# Lives in toolbelt/ so the standalone image uses the same script.
-# Composer-installable tools are pinned in the committed root composer.lock;
-# what is left below is what needs a phar, a binary release or a git ref, and
-# those stay overridable per --build-arg.
-# Overriding a phar *_VERSION requires overriding its *_SHA256 too — the
-# install script fails a mismatch on purpose. Each ARG reaches the script as an
-# environment variable; one left unset keeps the script's default.
+# Dev tools, shared with the standalone image. Overriding a *_VERSION needs its
+# *_SHA256 too; an unset ARG keeps the install script's default.
 ARG CIVIX_VERSION
 ARG CIVIX_SHA256
 ARG PHPUNIT_VERSION
@@ -104,13 +61,10 @@ ARG NPM_VERSION
 ARG INFECTION_VERSION
 # The one composer root of the toolbelt; install-dev-tools.sh installs from it.
 COPY composer.json composer.lock /opt/civikitchen/
-# The toolbelt, laid out as in a checkout, as in the standalone image — minus
-# the standalone-only helpers: cktestreset reseeds the standalone scratch DB,
-# ckcoretest runs core suites against its dist core, ckboot provisions the
-# standalone site inside a CI job container.
+# The toolbelt as in a checkout, minus the standalone-only cktestreset,
+# ckcoretest and ckboot.
 COPY toolbelt /opt/civikitchen/toolbelt
-# composer_auth is an optional BuildKit secret holding a COMPOSER_AUTH JSON. CI passes
-# its job token so GitHub dist downloads are not rate-limited; local builds run without.
+# Optional composer_auth secret (COMPOSER_AUTH JSON) against GitHub rate limits.
 RUN --mount=type=secret,id=composer_auth,env=COMPOSER_AUTH rm /opt/civikitchen/toolbelt/bin/cktestreset /opt/civikitchen/toolbelt/bin/ckcoretest \
         /opt/civikitchen/toolbelt/bin/ckboot \
     && bash /opt/civikitchen/toolbelt/install-dev-tools.sh
@@ -123,42 +77,27 @@ RUN { \
         echo 'max_execution_time = 300'; \
     } > /usr/local/etc/php/conf.d/civikitchen.ini
 
-# Joomla CLI bootstrap shim (see the file header). Inert on every other flavor
-# (CLI + CIVICRM_UF==Joomla guarded), so it ships on all buildkit images. The
-# civibuild site settings auto-load /etc/civicrm.settings.d/post.d/*.php, which
-# is what makes cv/civibuild/phpunit able to boot CiviCRM on Joomla at all —
-# during the build-time bake (builder stage) and at runtime (demo + final).
+# Joomla CLI bootstrap shim, auto-loaded by the site settings; inert on other
+# flavors.
 COPY docker/buildkit/joomla-cli-bootstrap.php /etc/civicrm.settings.d/post.d/000-joomla-cli-bootstrap.php
 # Headless (CIVICRM_UF=UnitTests) boots cache in the test DB whatever cache
 # class the site settings pick (see the file header). pre.d loads before them.
 COPY docker/buildkit/test-db-cache.php /etc/civicrm.settings.d/pre.d/000-civikitchen-test-db-cache.php
 
-# Joomla "finish install" helpers, shipped in the shared dir so the SAME script
-# runs both at build time (bake.sh, builder stage) and at runtime (entrypoint.sh,
-# after the dev image's first-boot `civibuild reinstall`). Putting them in the
-# `base` stage makes them present in builder (bake), demo, and final (dev) alike.
-# Inert on non-Joomla flavors (joomla-finish.sh self-guards on CIVICRM_UF).
+# Joomla finish-install helpers for both bake.sh and the runtime reinstall;
+# inert on other flavors.
 COPY docker/buildkit/joomla-finish.sh /usr/local/share/civikitchen/joomla-finish.sh
 COPY docker/buildkit/joomla-enable-plugins.php /usr/local/share/civikitchen/joomla-enable-plugins.php
 COPY docker/buildkit/ext/ckjoomlaidentity /usr/local/share/civikitchen/ext/ckjoomlaidentity
 
-# CiviKitchen-provided civibuild site types upstream buildkit lacks (currently
-# drupal11-demo). bake.sh installs them into the buildkit clone's app/config
-# before `civibuild create`; shipped in the base stage so the builder bake and
-# any runtime `civibuild` invocation see the same definition.
+# civibuild site types upstream lacks (drupal11-demo); bake.sh installs them.
 COPY docker/buildkit/site-types /usr/local/share/civikitchen/site-types
 
 # The scenario CLI's schema and loader; its YAML parser is in the root vendor/.
 COPY packages/civikitchen-scenario-schema /opt/civikitchen/packages/civikitchen-scenario-schema
 
-# buildkit user owns the site tree so civibuild can write to it. Apache is
-# reconfigured to run as buildkit so the served files match the writer's uid
-# — otherwise Civi's runtime cache writes (templates_c, files/civicrm) from
-# Apache fail with "does not have permission to write temp files".
-#
-# The php:apache envvars file uses POSIX default-assignment syntax
-# (: ${APACHE_RUN_USER:=www-data}), so an `ENV` here wins over the default
-# without the in-place sed dance Ubuntu's apache2 package required.
+# Apache runs as buildkit, the owner of the site tree, so Civi's runtime cache
+# writes succeed.
 ENV APACHE_RUN_USER=buildkit \
     APACHE_RUN_GROUP=buildkit
 # No MultiViews: Backdrop keeps civicrm.settings.php in the web root, and content
@@ -192,10 +131,7 @@ ARG CIVICRM_VERSION
 USER buildkit
 WORKDIR /home/buildkit
 
-# Clone buildkit + download its tools (composer, drush, cv, node, ...). Both pull
-# from github.com / CDNs with no built-in resilience, so a single transient 5xx
-# would fail the whole image. Retry the network-heavy setup; --depth 1 trims
-# the clone (its .git is dropped anyway) to shrink the failure surface.
+# Clone buildkit and download its tools, retried against transient 5xx.
 # No composer_auth here or in the bake: buildkit's pinned composer predates the
 # ghs_<id>_<jwt> token format, rejects it and prints the token.
 RUN for attempt in 1 2 3; do \
@@ -215,19 +151,14 @@ ENV PATH="/home/buildkit/buildkit/bin:${PATH}"
 # =============================================================================
 # Stage 3: Bake the civibuild site at BUILD time (the slow part)
 # =============================================================================
-# civibuild downloads the CMS + CiviCRM (~3-4 min) and installs a site. We run
-# it HERE against a THROWAWAY MariaDB started just for this layer, so the heavy
-# codebase is baked into the image. The DB data (/var/lib/mysql) is NOT carried
-# into the final image — at runtime the entrypoint does a fast `civibuild
-# reinstall` (~60s) against the external DB instead of a full create.
+# civibuild against a throwaway MariaDB; the dev image keeps the codebase but
+# not the data, and runs a `civibuild reinstall` (~60s) at first boot.
 FROM buildkit-setup AS builder
 
 ARG CIVICRM_VERSION
 ARG CIVICRM_BUILD_VERSION
 ARG DEFAULT_SITE_TYPE
-# KEEP_GIT=1 keeps the ~550MB of git history civibuild clones into the site
-# (vendor/civicrm/civicrm-core etc.). Default strips it — the published images
-# target extension development; build your own image to work on core.
+# KEEP_GIT=1 keeps the ~550MB of git history civibuild clones into the site.
 ARG KEEP_GIT=0
 
 # procps provides pgrep, which bake.sh uses to verify the clean DB shutdown.
@@ -236,9 +167,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends mariadb-server procps \
     && rm -rf /var/lib/apt/lists/*
 
-# Bake the site (logic in buildkit/bake.sh to keep the shell quoting sane). Its
-# joomla-demo path calls /usr/local/share/civikitchen/joomla-finish.sh, baked in
-# the base stage above (shared with the runtime dev-image path).
+# Bake the site.
 COPY docker/buildkit/bake.sh /tmp/bake.sh
 RUN CIVICRM_VERSION="${CIVICRM_VERSION}" CIVICRM_BUILD_VERSION="${CIVICRM_BUILD_VERSION}" \
         DEFAULT_SITE_TYPE="${DEFAULT_SITE_TYPE}" \
@@ -248,15 +177,8 @@ RUN CIVICRM_VERSION="${CIVICRM_VERSION}" CIVICRM_BUILD_VERSION="${CIVICRM_BUILD_
 # =============================================================================
 # Stage 4: Demo image — single-container, embedded MariaDB, baked demo data
 # =============================================================================
-# Reuses the `builder` stage's baked civibuild site AND its populated
-# /var/lib/mysql (which the dev `final` stage discards via a selective COPY).
-# The demo therefore boots in seconds: start the embedded MariaDB on the baked
-# data + Apache — no external DB, no `civibuild reinstall`. `docker run -p 80:80
-# IMAGE` → a working CiviCRM with demo data. Built with `--target demo`.
-#
-# Profiles (extensions + seeds + API users, e.g. eu-ngo) are NOT baked — they
-# apply at first boot via `-e CIVIKITCHEN_PROFILE=<name>` (see docker/profiles/
-# and provision.sh's ck_apply_profile). That keeps one image per CMS flavor.
+# Keeps the builder's baked database and boots it with an embedded MariaDB.
+# Built with `--target demo`; profiles apply at first boot, not at build.
 FROM builder AS demo
 
 ARG DEFAULT_SITE_TYPE
@@ -270,19 +192,14 @@ ENV PATH="/home/buildkit/buildkit/bin:${PATH}" \
 # The demo stays root: its entrypoint starts the embedded MariaDB service.
 USER root
 
-# Standalone serves CiviCRM directly: anonymous `/` (→ /civicrm/home) returns
-# 403 under the standaloneusers extension, so bounce bare-/ to the login form
-# (the same rule the standalone dev image ships). drupal10/wp serve their CMS
-# front page at `/`, so only add the redirect for the standalone flavor.
+# Standalone answers an anonymous `/` with 403; send it to the login form.
 RUN if [ "${DEFAULT_SITE_TYPE}" = "standalone-demo" ]; then \
         echo 'RedirectMatch 302 ^/$ /civicrm/login' \
             > /etc/apache2/conf-available/civikitchen-demo.conf \
         && a2enconf civikitchen-demo; \
     fi
 
-# Shared xdebug toggle + provisioning library — same files the dev images use.
-# The demo runs provision.sh too, so its opt-in knobs (SMTP, mounted-extension
-# enabling, CIVIKITCHEN_PROFILE, /civikitchen-init.d hooks) work here as well.
+# Shared xdebug toggle and provisioning library, as in the dev images.
 COPY docker/runtime/xdebug-toggle.sh /usr/local/share/civikitchen/xdebug-toggle.sh
 COPY docker/runtime/provision.sh /usr/local/share/civikitchen/provision.sh
 COPY docker/buildkit/entrypoint-common.sh /usr/local/share/civikitchen/entrypoint-common.sh
@@ -294,12 +211,8 @@ RUN chmod +x /home/buildkit/entrypoint.sh
 
 EXPOSE 80
 
-# The site + DB are baked, so a plain first boot is just "start embedded
-# MariaDB + provisioning + Apache" — fast. With CIVIKITCHEN_PROFILE set, first
-# boot also clones + enables + seeds the profile (minutes, needs network) —
-# hence the generous start period. The entrypoint writes the provisioned
-# marker before handing off to Apache, so the check also asks Apache for a non-error
-# HTTP answer.
+# The marker is written before Apache starts, so Apache is asked too. A profile
+# apply on first boot takes minutes, hence the start period.
 HEALTHCHECK --interval=10s --timeout=5s --start-period=600s --retries=18 \
     CMD test -f /home/buildkit/.civikitchen-provisioned \
         && curl -fsS -o /dev/null http://localhost/ || exit 1
@@ -309,13 +222,8 @@ ENTRYPOINT ["/home/buildkit/entrypoint.sh"]
 # =============================================================================
 # Stage 5: Final dev image — copies the baked site, NO embedded DB (default)
 # =============================================================================
-# This is the LAST stage, so a plain `docker build` (no --target) builds the dev
-# image; the demo above is opt-in via `--target demo`.
-#
-# FROM base (not buildkit-setup) on purpose: the COPY --from=builder below
-# brings the WHOLE of /home/buildkit (buildkit tools + baked site). Inheriting
-# buildkit-setup would mean its ~200MB buildkit-clone layer ships shadowed
-# underneath that COPY, inflating the image for nothing.
+# The last stage, so a plain `docker build` builds it. FROM base: the COPY below
+# brings all of /home/buildkit, and buildkit-setup's ~200MB layer would ship shadowed.
 FROM base AS final
 
 ARG DEFAULT_SITE_TYPE
@@ -330,12 +238,8 @@ USER root
 # Parity with the buildkit-setup-derived stages (base leaves /var/www/html).
 WORKDIR /home/buildkit
 
-# Bake: bring in the civibuild site tree + civibuild/amp registry built in the
-# `builder` stage. This is the heavy part (CMS + CiviCRM codebase) — having it
-# here means runtime only needs a fast `civibuild reinstall`. The builder's
-# throwaway MariaDB data is left behind (not copied). The baked ~/.my.cnf points
-# at the build-time localhost DB; the entrypoint overwrites it for the runtime
-# external DB.
+# The baked site and civibuild/amp registry, without the database. The baked
+# ~/.my.cnf points at the build DB; the entrypoint rewrites it.
 COPY --from=builder --chown=buildkit:buildkit /home/buildkit /home/buildkit
 
 # ckcompat and ckanalyze read core at /var/www/html/core, as in the standalone
@@ -344,10 +248,7 @@ RUN core="$(find /home/buildkit/buildkit/build/site -name Civi.php -printf '%h\n
     && test "$(printf '%s\n' "${core}" | wc -l)" -eq 1 && test -n "${core}" \
     && ln -s "${core}" /var/www/html/core
 
-# Shared xdebug toggle + provisioning library — sourced from the entrypoint,
-# also used by the standalone image so the two stay in lockstep. Profiles ship
-# here too: CIVIKITCHEN_PROFILE works on the dev images as well (applied after
-# the first-boot `civibuild reinstall`).
+# Shared xdebug toggle and provisioning library, as in the standalone image.
 COPY docker/runtime/xdebug-toggle.sh /usr/local/share/civikitchen/xdebug-toggle.sh
 COPY docker/runtime/provision.sh /usr/local/share/civikitchen/provision.sh
 COPY docker/buildkit/entrypoint-common.sh /usr/local/share/civikitchen/entrypoint-common.sh
@@ -363,12 +264,8 @@ RUN chmod +x /home/buildkit/entrypoint.sh \
 
 EXPOSE 80
 
-# Readiness signal: the entrypoint writes this marker after the first-boot
-# install + provisioning complete, before handing off to Apache — so the check
-# also asks Apache for a non-error HTTP answer. The site
-# codebase is baked, so first boot is a fast `civibuild reinstall` (~60s) +
-# provisioning — but a CIVIKITCHEN_PROFILE apply on top (git clones + seeds)
-# can take minutes, hence the generous start period.
+# The marker is written before Apache starts, so Apache is asked too. A profile
+# apply on first boot takes minutes, hence the start period.
 HEALTHCHECK --interval=10s --timeout=5s --start-period=600s --retries=18 \
     CMD test -f /home/buildkit/.civikitchen-provisioned \
         && curl -fsS -o /dev/null http://localhost/ || exit 1

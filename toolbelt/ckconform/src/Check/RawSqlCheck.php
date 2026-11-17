@@ -12,22 +12,10 @@ use CiviKitchen\Ckconform\Reporter;
 use CiviKitchen\Ckconform\Suppressions;
 
 /**
- * Raw SQL wants a reason.
- *
- * The sink list is deliberately narrow — the provable low-level executors on
- * CRM_Core_DAO. Not on it: the CRM_Utils_SQL_* builders (they parameterise),
- * compose-only helpers (toSQL, interpolate), and `->query()` on arbitrary
- * receivers (not statically provable). Upgraders are exempt from the
- * justification duty: the upgrade framework's own guidance recommends
- * low-level SQL there, because APIs and BAOs are unstable mid-upgrade.
- *
+ * Raw SQL wants a reason: low-level CRM_Core_DAO executor calls (upgraders
+ * exempt) and SQL arguments interpolating variables (upgraders included).
  * Two findings, both WARN, both escaped by `ckconform-ignore raw-sql -- <reason>`:
- *  - a sink call: say why APIv4 / the BAO / a SQL builder cannot express it —
- *    the ignore's reason IS the justification, and it is not optional;
- *  - a sink call whose SQL argument visibly interpolates or concatenates
- *    variables: bind via %1 parameters instead. This one fires in upgraders
- *    too — composition risk does not pause during upgrades. A token scan
- *    cannot prove the variable is tainted, so this stays a WARN, not a FAIL.
+ * the reason is the justification and is mandatory.
  */
 final class RawSqlCheck implements Check
 {
@@ -49,9 +37,8 @@ final class RawSqlCheck implements Check
             $isUpgrader = str_contains($file, 'Upgrader');
 
             foreach ($this->sinkCalls($contents) as [$method, $line, $interpolates]) {
-                // Suppression last: a plain sink in an upgrader is no finding,
-                // and consulting the ignore there would mark it consumed and
-                // hide SuppressionHygieneCheck's unused-ignore report.
+                // Suppression last: consulting it on a non-finding would mark it
+                // consumed and hide SuppressionHygieneCheck's unused-ignore report.
                 if ((!$interpolates && $isUpgrader) || $suppressions->suppressed($this->name(), $line)) {
                     continue;
                 }
@@ -75,12 +62,8 @@ final class RawSqlCheck implements Check
     }
 
     /**
-     * Sink calls with their line and whether the SQL argument visibly builds
-     * SQL out of variables: a variable inside a double-quoted/heredoc string,
-     * or an argument-level concatenation mixing literals and variables. A bare
-     * `$sql` variable is NOT flagged as interpolation — where it was built is
-     * beyond a token scan. Class and method names match case-insensitively,
-     * as PHP resolves them.
+     * Sink calls with their line and whether the SQL argument interpolates
+     * variables in a string or a concatenation; a bare `$sql` is not flagged.
      *
      * @return list<array{string, int, bool}> [method, line, interpolates]
      */

@@ -12,19 +12,7 @@ use CiviKitchen\Ckconform\Reporter;
 
 /**
  * APIv4 entities that do not exist, or that exist only in a core newer than the
- * one this extension claims to support.
- *
- * A `\Civi\Api4\Foo` reference resolves at runtime, so a migration can move code
- * onto an entity core never shipped — or shipped only @since a core newer than
- * the declared floor — and phpstan, the linters and every test that does not load
- * that page stay green while the page fatals on every live site.
- *
- * Hence two questions, not one:
- *   1. does the entity exist at all?
- *   2. does it exist in the OLDEST core we promise to run on?
- *
- * Only (1) is answerable from the container alone, and answering only (1) is a
- * check on our build rather than on the customer's site.
+ * extension's declared floor (`@since`).
  */
 final class Api4EntityCheck implements Check
 {
@@ -172,13 +160,8 @@ final class Api4EntityCheck implements Check
     }
 
     /**
-     * Entity names referenced as \Civi\Api4\Foo in the extension's shipped PHP.
-     * An entity is a class directly in Civi\Api4; a deeper name such as
-     * \Civi\Api4\Provider\ActionObjectProvider lives in a sub-namespace.
-     *
-     * Shipped source only: tests never run on a customer's site, so a test-only
-     * reference cannot fatal there, and test fixtures may name fake entities on
-     * purpose. A broken reference in a test fails that test in CI on its own.
+     * Entity names referenced as \Civi\Api4\Foo (a class directly in Civi\Api4)
+     * in shipped PHP; tests may name fake entities and fail on their own.
      *
      * @param array<string, true> $classUses names used as a class (`Name::`), filled in
      * @return list<string>
@@ -194,15 +177,10 @@ final class Api4EntityCheck implements Check
             if ($source === null || !str_contains($source, 'Civi\\Api4\\')) {
                 continue;
             }
-            // Strip comments first: `\Civi\Api4\Xxx` written in a docblock to
-            // name the pattern in prose ("rather than the concrete \Civi\Api4\Xxx
-            // classes") is not a reference to an entity, and Xxx does not exist.
-            // A check tripped by prose is the mirror of one satisfied by it.
+            // Prose naming `\Civi\Api4\Xxx` in a comment is not a reference.
             $source = PhpSource::withoutComments($source);
-            // Fully qualified (\Civi\Api4\Foo) or imported (use Civi\Api4\Foo).
-            // A bare `Civi\Api4\Foo` without the leading backslash is NOT a
-            // reference to the entity — inside a namespaced file it resolves
-            // relative to that namespace — so it is usually prose in a comment.
+            // Fully qualified (\Civi\Api4\Foo) or imported (use Civi\Api4\Foo); a bare
+            // `Civi\Api4\Foo` resolves relative to the file's namespace.
             preg_match_all('/\\\\Civi\\\\Api4\\\\([A-Z][A-Za-z0-9_]*)(?![\\\\\w])/', $source, $qualified);
             foreach ([...$qualified[1], ...$this->importedEntities($source)] as $name) {
                 $entities[$name] = true;
@@ -278,11 +256,8 @@ final class Api4EntityCheck implements Check
     }
 
     /**
-     * The @since tag from the class docblock.
-     *
-     * Read through the PHP tokenizer rather than by regex over the whole file: a
-     * version that comes back empty makes the check pass on every entity, and a
-     * rule that cannot fail is worse than no rule.
+     * The @since tag from the class docblock, read through the tokenizer: an
+     * empty version would pass every entity.
      */
     private function parseSince(string $file): ?string
     {
@@ -305,11 +280,7 @@ final class Api4EntityCheck implements Check
 
     /**
      * The extension key that provides this entity, when it is not core proper.
-     *
-     * Extensions tagged `mgmt:required` or `component` are core plumbing that is
-     * always present (search_kit, flexmailer, civi_mail) — no core extension
-     * declares those, and demanding it would be noise nobody reads. What is left
-     * is a genuine optional dependency: riverlea, and anything like it.
+     * `mgmt:required` and `component` extensions count as core: always present.
      */
     private function providingExtension(string $classFile): ?string
     {

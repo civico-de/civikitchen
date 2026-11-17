@@ -9,14 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A tool config that nothing in CI ever runs.
- *
- * A phpstan.neon.dist in a repo whose workflow never calls phpstan, a
- * phpunit.xml.dist no job invokes, a Playwright harness CI never touches: each
- * looks like coverage from the outside — the config is there, the badge is green.
- *
- * The check is deliberately indirect-aware (CiCommands): `ck ci`, the shared CI,
- * and an `npm test` or `composer test` count as running what they run.
+ * A tool config (phpstan, phpunit, Playwright) that nothing in CI runs; `ck ci`,
+ * the shared CI, `npm test` and `composer test` count as running theirs.
  */
 final class ConfigWithoutRunnerCheck implements Check
 {

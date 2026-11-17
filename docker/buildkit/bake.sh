@@ -1,18 +1,7 @@
 #!/bin/bash
-# Build-time site bake (runs in the Dockerfile `builder` stage).
-#
-# Starts a MariaDB inside this build layer, points amp/civibuild at it, and
-# runs `civibuild create` so the CMS + CiviCRM codebase (~3-4 min download) is
-# baked into the image. The dev `final` stage copies only the resulting code
-# tree and discards this DB (its entrypoint does a fast `civibuild reinstall`
-# against the external DB sidecar). The `demo` target however is `FROM builder`
-# and SHIPS this /var/lib/mysql as its embedded DB — hence the verified clean
-# shutdown at the end.
-#
-# Reads CIVICRM_VERSION + CIVICRM_BUILD_VERSION + DEFAULT_SITE_TYPE + KEEP_GIT
-# from the environment (Dockerfile ARGs). CIVICRM_BUILD_VERSION lets CI feed
-# civibuild a minor branch (e.g. 6.15) while labels still record the resolved
-# upstream stable patch (e.g. 6.15.4).
+# Build-time `civibuild create` against a MariaDB in this layer (Dockerfile
+# `builder` stage); the demo target ships this database. CIVICRM_BUILD_VERSION
+# may be a minor branch (6.15) while CIVICRM_VERSION labels the patch (6.15.4).
 set -euxo pipefail
 
 CIVICRM_CREATE_VERSION="${CIVICRM_BUILD_VERSION:-${CIVICRM_VERSION}}"
@@ -27,50 +16,29 @@ done
 # connects as root over the socket without one.
 mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED VIA unix_socket OR mysql_native_password USING PASSWORD('root'); FLUSH PRIVILEGES;"
 
-# Drupal 11.4+ (Standard profile) installs the new Navigation module instead of
-# Toolbar, so the 'access toolbar' permission no longer exists and upstream
-# buildkit's civicrm_apply_d8_perm_defaults (src/civibuild.lib.sh) hard-fails
-# the whole `civibuild create` on it — drush: "Permission(s) not found: access
-# toolbar" (Drupal =<11.3 and 10.x still install Toolbar and are unaffected).
-# Grant whichever
-# admin-bar permission the installed core provides; neither is worth sinking a
-# build over. The patched clone is COPY'd into the demo and final images, so
-# the runtime `civibuild reinstall` takes the same path. Drop this once
-# upstream handles Drupal 11.4 (the sed then quietly no-ops and the grep
-# below says so).
+# Drupal 11.4+ installs Navigation instead of Toolbar, so buildkit's grant of
+# 'access toolbar' fails `civibuild create`; grant whichever exists.
 sed -i 's@^  drush8 -y role-add-perm demoadmin "access toolbar"$@  drush8 -y role-add-perm demoadmin "access toolbar" || drush8 -y role-add-perm demoadmin "access navigation" || true@' \
     /home/buildkit/buildkit/src/civibuild.lib.sh
 grep -q 'access navigation' /home/buildkit/buildkit/src/civibuild.lib.sh \
     || echo "bake.sh: NOTE: upstream 'access toolbar' line changed; Drupal 11.4 toolbar-perm patch no longer applies (probably fixed upstream)" >&2
 
-# robo 5.2.1-5.2.3 call Application::addCommand(), which Symfony Console has
-# only from 7.4 (consolidation/robo#1197). Drupal 10 ships Console 6.4, so every
-# drush command dies and civibuild with it. Skip those releases; a fixed robo
-# past 5.2.3 still resolves. Drop this once drush requires such a release.
+# robo 5.2.1-5.2.3 need Symfony Console 7.4 (consolidation/robo#1197); Drupal 10
+# ships 6.4, so drush dies. Drop once drush requires a fixed robo.
 sed -i 's@^  composer require drush/drush$@&\n  composer require "consolidation/robo:<5.2.1 || >5.2.3"@' \
     "/home/buildkit/buildkit/app/config/drupal10-demo/download.sh"
 grep -q 'consolidation/robo' /home/buildkit/buildkit/app/config/drupal10-demo/download.sh \
     || echo "bake.sh: NOTE: upstream drupal10-demo 'composer require drush/drush' line changed; robo 5.2.1-5.2.3 exclusion no longer applies" >&2
 
-# drupal10-demo clones CiviRules and CiviDiscount into core's tools/extensions
-# under vendor/, which a composer site does not serve: their JS and CSS answer
-# 404 (CiviDiscount's on every contribution page). Move them next to
-# ContactLayout, which upstream already moves into files/civicrm/ext.
+# drupal10-demo clones CiviRules and CiviDiscount below vendor/, where their
+# assets answer 404; move them into files/civicrm/ext.
 sed -i 's@^  cv api extension.refresh local=1 remote=0$@  for ext in org.civicoop.civirules cividiscount; do\n    if [ -d "$CIVI_CORE/tools/extensions/$ext" ]; then mv "$CIVI_CORE/tools/extensions/$ext" files/civicrm/ext/; fi\n  done\n&@' \
     "/home/buildkit/buildkit/app/config/drupal10-demo/install.sh"
 grep -q 'for ext in org.civicoop.civirules cividiscount' /home/buildkit/buildkit/app/config/drupal10-demo/install.sh \
     || echo "bake.sh: NOTE: upstream drupal10-demo 'cv api extension.refresh' line changed; the extension move no longer applies" >&2
 
-# Upstream civibuild has no drupal11-demo site type — only drupal11-dev (a
-# git/path-repo dev build without demo data, components, or a demoadmin) and
-# drupal11-empty (CMS-only). Install CiviKitchen's own drupal11-demo type
-# (docker/buildkit/site-types/drupal11-demo/ — drupal10-demo's recipe with the
-# Drupal 11.4 adaptations documented there) so the drupal11 images get the
-# identical demo data / demoadmin / component set as every other flavor, and
-# CIVICRM_SITE_TYPE=drupal11-demo works at runtime on any buildkit image. The
-# version-agnostic demo assets (logo, config/, install-*.php, uninstall.sh)
-# are reused from the sibling drupal10-demo dir. Guarded: the day upstream
-# ships app/config/drupal11-demo, this block steps aside.
+# civibuild has no drupal11-demo type: install ours over a copy of drupal10-demo,
+# unless upstream ships one.
 BK_CONFIG=/home/buildkit/buildkit/app/config
 if [ ! -d "${BK_CONFIG}/drupal11-demo" ]; then
     cp -r "${BK_CONFIG}/drupal10-demo" "${BK_CONFIG}/drupal11-demo"
@@ -80,17 +48,14 @@ if [ ! -d "${BK_CONFIG}/drupal11-demo" ]; then
     chown -R buildkit:buildkit "${BK_CONFIG}/drupal11-demo"
 fi
 
-# Configuration mistakes are deterministic and must not enter the network
-# retry loop below (which would waste over 45 seconds and misreport the cause
-# as a transient download failure).
+# A wrong site type must fail here, not in the network retry loop below.
 if [ ! -f "${BK_CONFIG}/${DEFAULT_SITE_TYPE}/download.sh" ]; then
     echo "bake.sh: unknown or incomplete civibuild site type '${DEFAULT_SITE_TYPE}' (missing ${BK_CONFIG}/${DEFAULT_SITE_TYPE}/download.sh)" >&2
     exit 1
 fi
 
-# Run civibuild as the buildkit user (it owns the site tree). The heredoc is
-# expanded by THIS shell (so ${DEFAULT_SITE_TYPE}/${CIVICRM_CREATE_VERSION}
-# resolve); \$PATH is escaped so it expands inside the buildkit shell.
+# Run civibuild as buildkit. This shell expands the heredoc; escaped \$ expand
+# inside the buildkit shell.
 su -s /bin/bash buildkit <<BK
 set -eo pipefail
 export PATH=/home/buildkit/buildkit/bin:\$PATH
@@ -169,10 +134,7 @@ fi
 rm -rf /home/buildkit/.composer/cache /home/buildkit/.npm /home/buildkit/.cache
 BK
 
-# Strip the git history civibuild cloned into the site (~550MB, most of it
-# civicrm-core). Neither serving the site nor the runtime `civibuild reinstall`
-# needs it — but `civibuild update` / working on core does, so it is opt-in:
-# build with --build-arg KEEP_GIT=1 to keep the repos (see docs/building.md).
+# Strip the ~550MB of git history civibuild cloned unless KEEP_GIT=1.
 if [ "${KEEP_GIT:-0}" != "1" ]; then
     echo "bake.sh: stripping git history from the baked site (--build-arg KEEP_GIT=1 keeps it)"
     # Backdrop's uninstall, run by every `civibuild reinstall`, restores settings.php and
@@ -191,11 +153,8 @@ if [ "${KEEP_GIT:-0}" != "1" ]; then
     fi
 fi
 
-# VERIFIED clean shutdown. The `demo` target is `FROM builder` and ships this
-# /var/lib/mysql as its embedded DB — an unclean stop here means InnoDB crash
-# recovery on every demo first boot. Wait for the server PROCESS to exit (the
-# socket file can linger after a kill, so it is no clean-shutdown signal) and
-# fail the build if it doesn't.
+# The demo ships this /var/lib/mysql, so wait for the server process to exit;
+# the socket file can linger and proves nothing.
 mysqladmin -uroot -proot shutdown
 for i in $(seq 1 60); do
     pgrep -x mariadbd >/dev/null || pgrep -x mysqld >/dev/null || break

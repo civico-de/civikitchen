@@ -9,19 +9,10 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * Extensions deploy via `git archive`: every tracked file lands in the
- * extension directory on the server, and that directory lives under the
- * CMS files/ tree — web-reachable by path. So "tracked" means "shipped",
- * and an external review found near-shipped secrets and PII exactly this
- * way. Three classes of file must therefore never be tracked:
- *
- *  - .env / .env.* (credentials; ENV_TEMPLATES are templates)
- *  - anything under var/ (local working data)
- *  - documents and binary data files outside docs/, tests/, examples/
- *
- * A repo that genuinely needs to ship such a path declares it in its
- * civikitchen.yaml policy: deploy_hygiene=<path>[,<path>] -- <reason>; a
- * directory covers every file below it
+ * Tracked files ship to a web-reachable directory, so none may be .env / .env.*
+ * (ENV_TEMPLATES excepted), under var/, or documents and binary data outside
+ * docs/, tests/, examples/. Exceptions go in the civikitchen.yaml policy:
+ * deploy_hygiene=<path>[,<path>] -- <reason>; a directory covers every file below it
  */
 final class DeployHygieneCheck implements Check
 {

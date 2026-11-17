@@ -10,18 +10,8 @@ use CiviKitchen\Ckconform\Policy;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * Floating image tags in the compose stacks.
- *
- * FloatingTagCheck covers the workflow files; this covers the stacks CI brings
- * up. A `:latest` that moves (a maildev release whose built-in healthcheck
- * queries a 404 route) stops every stack coming up with no diff to point at.
- *
- * A missing tag is the same defect spelled shorter: `image: mariadb` means
- * `mariadb:latest`. A service with `build:` names its own image and is exempt.
- *
- * This is a FAIL rather than the warning its workflow counterpart emits: a
- * floating tag in CI makes a run unattributable, but a floating tag in the stack
- * that CI boots stops the run happening at all.
+ * Floating or missing image tags in the compose stacks CI boots; a FAIL, since
+ * such a tag can stop the stack. A service with `build:` is exempt.
  */
 final class ComposeFloatingTagCheck implements Check
 {

@@ -7,13 +7,8 @@ namespace CiviKitchen\PHPStan;
 use PhpParser\Node;
 
 /**
- * A call's argument for one parameter, passed by position or by name.
- *
- * The rules name the parameters of the core signatures they read, because
- * they often see a call without a reflected callee: a `->query()` receiver
- * matched by name, or a call graph walked without a scope. An argument list
- * that cannot be mapped — a spread, a first-class callable — yields null, and
- * the rules stay silent.
+ * A call's argument for one parameter, passed by position or by name, without
+ * a reflected callee. A spread or first-class callable yields null.
  */
 final class CallArgs
 {

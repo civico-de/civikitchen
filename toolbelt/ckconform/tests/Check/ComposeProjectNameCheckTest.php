@@ -55,9 +55,7 @@ final class ComposeProjectNameCheckTest extends CheckTestCase
     }
 
     /**
-     * A compose file in the repo root derives the repo's own directory name,
-     * which is already unique — the collision comes from files tucked into a
-     * shared subdirectory like .docker/.
+     * A root-level compose file derives the repo's own, unique directory name.
      */
     public function testARootLevelComposeFileNeedsNoExplicitName(): void
     {

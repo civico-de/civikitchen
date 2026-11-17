@@ -9,19 +9,9 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * Outdated mixin choices where a modern equivalent exists and works.
- *
- * Both mixins keep working — these are WARNs steering new declarations, with
- * `ignore_checks=` as the repo-level escape (info.xml has no comment tokens
- * an inline ignore could live in).
- *
- *  - smarty-v2@1 is, per its own docblock in core, a deprecated alias of the
- *    version-independent smarty@1 (identical behaviour, misleading name).
- *  - mgd-php@1 scans the entire tree for *.mgd.php; @2 scans only the known
- *    homes (root, managed/, api/, CRM/, Civi/ — CRM/Core/ManagedEntities'
- *    mixin), which keeps vendor and fixture trees from being loaded as
- *    managed records. Advised only when every tracked *.mgd.php already lies
- *    in a path @2 scans — otherwise switching would silently drop records.
+ * WARNs on smarty-v2@1 (deprecated alias of smarty@1) and on mgd-php@1 once every
+ * tracked *.mgd.php lies where @2 scans. Escape: `ignore_checks=`, since info.xml
+ * has no comment tokens an inline ignore could live in.
  */
 final class MixinVersionCheck implements Check
 {

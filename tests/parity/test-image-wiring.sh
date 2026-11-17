@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Image-wiring suite: no job of the shared workflows hands inputs.image to a
-# stack past the policy.civicrm resolver — plus the fixture leg, because the
-# check is silent on success.
+# stack past the policy.civicrm resolver.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."

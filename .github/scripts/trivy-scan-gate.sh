@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # The gating trivy run over $IMAGE_REF for $PLATFORM: fixable HIGH/CRITICAL
-# CVEs only, exceptions in trivyignore.yaml. The flag reasoning lives on the
-# workflow step.
+# CVEs only, exceptions in trivyignore.yaml.
 set -euo pipefail
 
 "$RUNNER_TEMP/trivy" image \

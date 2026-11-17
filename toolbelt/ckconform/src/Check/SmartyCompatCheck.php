@@ -10,60 +10,21 @@ use CiviKitchen\Ckconform\Reporter;
 use CiviKitchen\Ckconform\SmartySource;
 
 /**
- * Smarty tags in shipped templates that Smarty 5 refuses to compile.
- *
- * CiviCRM is phasing Smarty 5 in (core ships it as packages/smarty5, a thin
- * wrapper around smarty/smarty ^5). Smarty 5 dropped several tags that Smarty 2
- * shipped, and it does not ignore them: the compiler throws
- * Smarty\CompilerException "unknown tag" and the whole page fatals. A template
- * carrying one is not degraded, it is a white screen for the first user who
- * opens it — on the day the install flips to Smarty 5, with nothing having
- * changed in the extension.
- *
- * Only tags that were verified to fail were included. Each was compiled against
- * the Smarty 5 that core actually ships, both with and without core's
- * BCPluginsAdapter, and each threw. Core's plugin directory
- * (CRM/Core/Smarty/plugins/) was checked for a shim under the same name and has
- * none — unlike `|smarty:nodefaults`, which core DOES shim (modifier.smarty.php)
- * and which is therefore not a finding here. Constructs that merely look
- * obsolete but compile fine — `{foreach from=…}`, `{section}`, `{$smarty.now}`,
- * `{$x|@count}`, `{strip}`, `{textformat}`, `{cycle}`, `{counter}`,
- * `{html_options}`, `{math}`, `{eval}`, `{fetch}`, a raw `<?php ?>` — are not
- * findings either, however dated they read.
- *
- * `{literal}` blocks and `{* … *}` comments are inert: their contents never
- * reach the tag compiler (verified — `{literal}{php}…{/php}{/literal}` renders
- * as text under Smarty 5), so a tag inside one is not a finding.
- *
- * A repo that ships its own Smarty plugin under a flagged name — a tracked
- * `function.insert.php`, `block.php.php`, `compiler.popup.php` — has registered
- * that tag itself and is exempt: registerPlugin() makes the tag compile again.
- *
- * warn, not FAIL: an install still on Smarty 4 renders these today, so this is
- * a deadline, not a present-tense breakage.
+ * Smarty tags in shipped templates that Smarty 5 refuses to compile ("unknown
+ * tag" fatal); warns, since Smarty 4 still renders them. Tags inside `{literal}`
+ * or `{* *}`, and tags the repo registers as its own plugin, are exempt.
  *
  * SUPPRESSION. Inline `ckconform-ignore` comments elsewhere in this tool are
- * PHP-token based and cannot work in a .tpl, which is not PHP. The escape here
- * is a Smarty comment on the finding's line or the line above it:
+ * PHP-token based and cannot work in a .tpl. Use a Smarty comment with a
+ * mandatory reason, on the finding's line or the line above it:
  *
  *     {* ckconform-ignore smarty-compat -- kept for the Smarty 4 branch *}
- *
- * The reason after `--` is mandatory, as everywhere else: a bare marker
- * suppresses nothing and is itself reported, because an unexplained silencer is
- * indistinguishable from a forgotten one.
- *
- * Deliberately out of scope: the Smarty bodies inside `.mgd.php` message
- * templates (PHP string literals, whose escaping this scanner would have to
- * unwind), unregistered-PHP-function modifiers (Smarty 5 rejects those too, but
- * whether a name is registered depends on core's list plus every plugin
- * directory an install has loaded — unknowable from one repo), and anything
- * requiring an actual compile. This is a static scan for tags with a proven
- * verdict, not a Smarty 5 dry run.
  */
 final class SmartyCompatCheck implements Check
 {
     /**
-     * Tag => what to do instead. Every key throws "unknown tag" in Smarty 5.
+     * Tag => what to do instead. Every key throws "unknown tag" in the Smarty 5
+     * core ships, with or without BCPluginsAdapter; shimmed tags are not listed.
      *
      * @var array<string, string>
      */
@@ -114,16 +75,14 @@ final class SmartyCompatCheck implements Check
     }
 
     /**
-     * Offsets of the tag's OPENING occurrences. A closing `{/php}` is not
-     * reported separately: one block is one finding.
+     * Offsets of the tag's opening occurrences; one block is one finding.
      *
      * @return list<int>
      */
     private function offsets(string $source, string $tag): array
     {
-        // (?=[\s}]) so {insert …} matches and {inserted} does not. No leading
-        // whitespace is allowed after the delimiter because Smarty's auto_literal
-        // treats "{ php}" as plain text, not as a tag.
+        // (?=[\s}]) so {insert …} matches and {inserted} does not; auto_literal
+        // treats "{ php}" as text, so no whitespace after the delimiter.
         $pattern = '/\{' . preg_quote($tag, '/') . '(?=[\s}])/';
         if (preg_match_all($pattern, $source, $matches, PREG_OFFSET_CAPTURE) === false) {
             return [];
@@ -189,8 +148,7 @@ final class SmartyCompatCheck implements Check
     }
 
     /**
-     * Shipped templates. Tests and vendored code are not rendered on an
-     * install, so they cannot fatal for a user.
+     * Shipped templates; tests and vendored code are not rendered on an install.
      *
      * @return list<string>
      */

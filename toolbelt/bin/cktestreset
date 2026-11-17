@@ -2,19 +2,9 @@
 #
 # cktestreset — restore a clean headless-test database + boot caches.
 #
-# A phpunit suite can leave the scratch DB inconsistent: Civi\Test's
-# installMe() does NOT resolve <requires>, so a suite that installs only its
-# own extension leaves it enabled while its dependencies are missing. Every
-# subsequent CIVICRM_UF=UnitTests boot then dies during the container class
-# scan ("Interface ... not found") — and nothing heals itself, because the
-# stale class index survives in THREE layers:
-#   1. the test DB's civicrm_extension/civicrm_cache tables,
-#   2. the per-DSN CachedCiviContainer.*.php in the compile dir,
-#   3. the per-DSN CachedExtLoader.*.php next to it.
-# This resets all three: drop + recreate + reseed <db>_test from the main DB
-# (same seed ck_setup_test_db does at provision time), then delete the cached
-# containers/loaders. Run it whenever headless boots fail mysteriously or you
-# want a pristine scratch DB between suites.
+# Reseeds <db>_test from the main DB and deletes the per-DSN CachedCiviContainer
+# and CachedExtLoader files, all three of which keep a stale class index after
+# installMe() enabled an extension without its <requires>.
 #
 # Usage (inside the app container):  cktestreset
 set -euo pipefail

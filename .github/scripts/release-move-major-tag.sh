@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Move the moving major tag $MAJOR to $RELEASE_SHA — unless a newer patch than
-# $TAG exists on that line, so a patch cut on an older line cannot drag the
-# major tag backwards. Pushes with $RELEASE_PUSH_TOKEN, a GitHub App token.
+# Move the major tag $MAJOR to $RELEASE_SHA unless a newer patch than $TAG
+# exists on that line. Pushes with $RELEASE_PUSH_TOKEN, a GitHub App token.
 set -euo pipefail
 
 : "${RELEASE_PUSH_TOKEN:?RELEASE_PUSH_TOKEN is empty: the release App token was not minted}"

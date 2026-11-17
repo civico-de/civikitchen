@@ -128,9 +128,8 @@ PATH="$work/bin:$PATH" CK_FAKE_EXT_DIR="$work/ext" \
 PATH="$work/bin:$PATH" CK_FAKE_EXT_DIR="$work/ext" \
   bash "$root/docker/profiles/apply.sh" "$work/profile" >/dev/null
 
-# A packaged extension is recognizable to CiviCRM but has no Git metadata.
-# Profiles still converge it to their immutable Git commit, while an arbitrary
-# leftover directory must not receive this privilege.
+# A packaged extension (known to CiviCRM, no .git) converges to the pinned
+# commit; an arbitrary leftover directory does not.
 printf '%s\n' '<extension key="org.example.demo" type="module"><file>demo</file></extension>' \
   > "$work/ext/org.example.demo/info.xml"
 rm -rf "$work/ext/org.example.demo/.git"
@@ -142,9 +141,8 @@ PATH="$work/bin:$PATH" CK_FAKE_EXT_DIR="$work/ext" CK_FAKE_LOCAL_KEYS=org.exampl
 [ "$(cat "$work/ext/org.example.demo/demo.php")" = '<?php' ] \
   || { echo "profile clone retained packaged code instead of the pinned commit" >&2; exit 1; }
 
-# A failure after the filesystem swap restores disabled packaged code. Enabled
-# packaged extensions are refused by apply.sh because DB upgrades are not
-# safely reversible by swapping PHP files.
+# A failure after the swap restores disabled packaged code; enabled ones are
+# refused, since a DB upgrade is not reversed by swapping PHP files.
 rm -rf "$work/ext/org.example.demo/.git"
 printf '%s\n' packaged > "$work/ext/org.example.demo/demo.php"
 php -r '
@@ -212,8 +210,7 @@ if PATH="$work/bin:$PATH" CK_FAKE_EXT_DIR="$work/ext" \
   exit 1
 fi
 
-# Registry acquisition is download-only. `enable` is handled exclusively by
-# the ordered enable phase, so absent/false keeps the extension disabled.
+# Registry acquisition only downloads; without `enable` the extension stays disabled.
 printf '%s\n' '{"description":"registry fetch only","dependencies":[{"name":"org.example.registry","registry":true}]}' \
   > "$work/profile/profile.json"
 feed_archive org.example.registry

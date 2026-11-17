@@ -1,16 +1,8 @@
 <?php
 
 /**
- * Taint SINKS: the CRM_Utils_File helpers that take a filesystem path and act
- * on it — request-controlled input reaching one of these is a path traversal
- * (cleanDir is the one that also deletes).
- *
- * Deliberately a short list: the read-only helpers (isAbsolute, relativize,
- * getExtensionFromPath, …) only inspect a string and are not sinks, and
- * tainting them would flag harmless path arithmetic.
- *
- * runSqlQuery() is not a path sink at all — it hands a raw string to the
- * database, so it is an SQL sink like the DAO methods.
+ * Taint SINKS: the CRM_Utils_File helpers that act on a filesystem path; the
+ * ones that only inspect a string are not sinks. runSqlQuery() is an SQL sink.
  *
  * Signatures verified against CiviCRM 6.18.0 (CRM/Utils/File.php).
  */
@@ -75,10 +67,7 @@ class CRM_Utils_File {
   public static function resizeImage($sourceFile, $targetWidth, $targetHeight, $suffix = "", $preserveAspect = TRUE) {}
 
   /**
-   * ESCAPE: the upload-name sanitizer. It runs the basename through
-   * CRM_Utils_String::munge(), appends a random id and forces an unknown
-   * extension to `.unknown`, so no separator and no traversal survives.
-   * The one right answer for a client-supplied filename.
+   * ESCAPE: the upload-name sanitizer; munge() leaves no separator or traversal.
    *
    * @psalm-taint-escape file
    * @psalm-flow ($name) -> return
@@ -92,9 +81,8 @@ class CRM_Utils_File {
   public static function makeFilenameWithUnicode(string $input, string $replacementString = '_', int $cutoffLength = 63) {}
 
   /**
-   * NOT an escape: it only strips the md5 CiviCRM added to a stored file name
-   * and returns the rest unchanged. Stubbed so it stays a pass-through
-   * instead of laundering taint through an empty stub body.
+   * NOT an escape: it only strips the md5 from a stored file name. Stubbed so
+   * an empty body does not launder taint.
    *
    * @psalm-flow ($name) -> return
    */

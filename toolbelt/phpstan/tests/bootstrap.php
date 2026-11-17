@@ -3,10 +3,8 @@
 declare(strict_types=1);
 
 /**
- * The rule tests need phpstan's own testing harness, the catalog drift tests
- * do not. `composer install` in the repository root provides both; without it the
- * package still autoloads from src/ so nothing has to be installed to run
- * the drift gates.
+ * Rule tests need `composer install` for phpstan's harness; without it src/
+ * still autoloads, enough for the drift gates.
  */
 // The composer autoload knows src/, but not the test support classes in
 // this directory; the fixtures reach phpstan through fixtures.neon.

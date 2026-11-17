@@ -9,19 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A route in xml/Menu/*.xml whose page_callback names a class this extension
- * does not ship.
- *
- * The menu XML is read at cache-rebuild time and stored verbatim; nothing
- * validates the callback. The class is only resolved when someone opens the
- * URL, and then CiviCRM fatals ("Could not load class") — a 500 on a page that
- * looked installed, invisible in CI, in the extension list and in every test
- * that does not happen to hit that route. Renaming or moving a Page class
- * without touching the menu XML produces exactly this.
- *
- * Only the extension's own CRM_<Shortname>_… classes are resolvable statically,
- * so those are the only ones judged; core and third-party callbacks would need
- * a booted CiviCRM and are passed over in silence rather than warned about.
+ * A route in xml/Menu/*.xml whose page_callback names an own CRM_<Shortname>_…
+ * class this extension does not ship; foreign callbacks are passed over.
  */
 final class DeclaredCallbackCheck implements Check
 {

@@ -87,9 +87,8 @@ final class ArchitectureTestTest extends TestCase
     }
 
     /**
-     * Runs phpstan on the consumer fixture with CK_EXT_DIR set, and returns
-     * the boundary rule's errors keyed by line. The result cache is cleared
-     * first: the environment is not part of phpstan's cache key.
+     * Runs phpstan on the consumer fixture with CK_EXT_DIR set and returns the
+     * boundary errors by line; the cache is cleared, its key ignores the env.
      *
      * @return array<int, array{message: string, tip: string}>
      */

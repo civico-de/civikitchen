@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Resolve the civicrm-core refs the git-built standalone images track: master
-# (:standalone-master) and the newest X.Y release branch (:standalone-beta). The
-# Dockerfile ADDs civicrm-packages at the same ref, so both must exist there too.
+# Resolve the refs the git-built standalone images track: master and the newest
+# X.Y release branch, present in both civicrm-core and civicrm-packages.
 # Emits git_refs, one {ref, tag} entry per image tag: the caller's matrix.
 set -euo pipefail
 

@@ -9,14 +9,8 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * ':latest', an untagged image and 'releases/latest/download' in CI make a green run
- * unreproducible and a red one unattributable — the workflow can start
- * building against a different image or binary tomorrow with no diff to
- * point at.
- *
- * Images are read where GitHub Actions takes them: `container:` (shorthand or
- * `image:`), a service's `image:` and a `docker://` step. Only the first hit
- * per file is reported.
+ * ':latest', an untagged image or 'releases/latest/download' in a workflow
+ * (`container:`, service `image:`, `docker://` step); first hit per file only.
  */
 final class FloatingTagCheck implements Check
 {

@@ -1,38 +1,10 @@
 #!/bin/bash
-# Functional test for civikitchen dev images.
-#
-# Exercises every bundled dev tool against real input — not just --version
-# checks. Run inside a built dev image, e.g.:
+# Functional test for the dev images: every bundled tool against real input.
+# Run inside a built image (also the smoke-test job in build-dev-images.yml):
 #
 #   docker run --rm -v "$(pwd)/tests/images:/civikitchen-test" \
 #       ghcr.io/civico-de/civikitchen:standalone \
 #       bash /civikitchen-test/test-dev-tools.sh
-#
-# Or via the workflow's smoke-test job (see .github/workflows/build-dev-images.yml).
-#
-# What it checks:
-#   1. Every binary responds to --version; the dev tools' composer is the pin
-#   2. the toolbelt ships no phpcs; mago does its jobs
-#   3. ck scenario parses a canonical civikitchen.yaml
-#   3b. cklint's mago stage runs the CiviKitchen extension rules and its tests
-#   3c. ckmodernize boots rector and previews a CiviCRM footgun rewrite
-#   3d. ckrelease builds a dist zip and rejects a mismatched tag
-#   3g. ckcompat rejects syntax, APIs, constants and enum cases the declared PHP
-#       floor lacks, not core's polyfills
-#   4. phpstan actually analyses a sample file (intentionally with type errors)
-#   4c. ckanalyze runs mago analyze against core as a shadow gate
-#   5. phpunit actually runs a passing assertion
-#   5b. ckphpunit injects the transaction canary listener, after CiviTestListener
-#   5c. cklifecycle's guards (the cycle itself needs a booted site)
-#   5d. ckmutate: red on a surviving mutant with a floor, no-op without one
-#   5e. cktaint: twelve source/sink fixture pairs — the flow is reported, the
-#       escaped twin stays silent
-#   6. composer can install a real package from packagist
-#   7. civix can render help (signals the phar boots)
-#   8. Xdebug toggle: php -m has no xdebug by default; setting XDEBUG_MODE
-#      via the entrypoint enables it
-#   9. The scaffold template, as ckinit stamps it, passes cklint and ckfmt
-#   9b. The Playwright starter's config and tests pass ckeslint and ckfmt
 set -euo pipefail
 
 PASS=0
@@ -104,11 +76,8 @@ else
     fail "deprecated /usr/local/share/civikitchen/profiles resolves to /opt/civikitchen/docker/profiles"
 fi
 
-# The unified commands depend on files copied outside /usr/local/bin. Exercise
-# them in-image so a missing schema/implementation layer cannot pass the host
-# dispatcher tests and then ship broken.
-# Each check keeps what the command printed and shows it on failure — a
-# one-off miss on a CI runner is undiagnosable from "✗" alone.
+# The unified commands depend on files outside /usr/local/bin; each check
+# prints the command's output on failure.
 ck_out=$(ck help 2>&1) || true
 if grep -q 'ck scenario' <<<"${ck_out}"; then ok "ck dispatcher"; else fail "ck dispatcher"; echo "      ${ck_out}"; fi
 ck_out=$(ck profile validate /opt/civikitchen/docker/profiles/common 2>&1) && ck_rc=0 || ck_rc=$?
@@ -127,10 +96,8 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 1b. Standalone base parity. The image stopped building FROM civicrm/civicrm
-#     and mirrors its base itself; these pin the parity points a consumer
-#     would notice — PHP extensions, gd's WebP support, the ini values, and
-#     the boot stub patch-test-db-boot.php anchors on.
+# 1b. Standalone base parity with civicrm/civicrm: PHP extensions, gd WebP,
+#     ini values, and the boot stub patch-test-db-boot.php anchors on.
 if [ "${CIVICRM_UF:-}" = "Standalone" ]; then
     echo "== standalone base parity =="
     PHP_MODULES="$(php -m)"
@@ -389,10 +356,8 @@ else
     ok "cklint mago stage honors @mago-expect"
 fi
 
-# too-many-methods and no-request-variable are path-scoped in the baseline:
-# signals for production code, noise in a PHPUnit case. The per-rule `exclude`
-# is the only path-aware setting in the config, so a mago upgrade dropping it
-# is worth catching here.
+# too-many-methods and no-request-variable exclude tests/ via the baseline's
+# per-rule `exclude`, the config's only path-aware setting.
 mago_methods_class() {
     { echo "<?php"; echo; echo "declare(strict_types = 1);"; echo;
       echo "class $1 {";
@@ -408,9 +373,8 @@ for f in Civi/RequestProd.php tests/phpunit/RequestTest.php; do
 done
 (cd "${MAGODIR}" && git add -A) >/dev/null 2>&1
 MAGO_OUT3="$( (cd "${MAGODIR}" && cklint --all) 2>&1 || true)"
-# mago prints the rule code and the file path on separate lines, and the output
-# names both fixtures — so look only at the lines belonging to the
-# too-many-methods diagnostic itself.
+# mago prints rule code and file path on separate lines; read only the lines
+# after the diagnostic.
 TMM_CTX="$(echo "${MAGO_OUT3}" | grep -A3 'too-many-methods' || true)"
 if grep -q "BigProd.php" <<<"${TMM_CTX}"; then
     ok "cklint mago stage flags too-many-methods in production code"
@@ -498,9 +462,8 @@ cat > "${RELDIR}/CHANGELOG.md" <<'MD'
 [Unreleased]: https://example.org/compare/v1.3.0...HEAD
 [1.3.0]: https://example.org/releases/tag/v1.3.0
 MD
-# Keep enough entries after info.xml to fill a pipe buffer. This reproduces the
-# Composer-sized archive where `printf entries | grep -q info.xml` used to make
-# printf die with SIGPIPE under pipefail, falsely reporting a missing info.xml.
+# Enough entries after info.xml to fill a pipe buffer: an early-exiting
+# `grep -q` in a pipe would SIGPIPE the writer under pipefail.
 mkdir -p "${RELDIR}/vendor/example/package"
 for n in $(seq 1 2500); do
     printf '<?php // %04d\n' "$n" > "${RELDIR}/vendor/example/package/File${n}.php"
@@ -520,7 +483,7 @@ else
     fail "ckrelease did not build the dist zip (output: ${CKREL_OUT:0:300})"
 fi
 
-# The whole point of the archive: dev/CI files stay out of what a site installs.
+# Dev/CI files stay out of what a site installs.
 CKREL_LIST="$(unzip -Z1 "${RELDIR}/.ckrelease/org.example.greeter-1.3.0.zip" 2>/dev/null || true)"
 if grep -q 'org.example.greeter/greeter.php' <<< "${CKREL_LIST}" \
     && ! grep -qE 'tests/|phpunit.xml.dist|/\.env' <<< "${CKREL_LIST}"; then
@@ -546,15 +509,8 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 3d-bis. ckcommon.sh's readers parse XML as XML.
-#
-# Regression fixtures for two inputs that a tag-shaped regex gets wrong, and
-# that three tools plus one CI step used to read that way. Both are legal XML
-# and both were silently wrong rather than loud:
-#   - a single-quoted attribute yielded an EMPTY key, so the tool aborted
-#   - a commented-out root element won over the real one, so the tool ran under
-#     the wrong extension name
-# Tested against the shared helper because it is now the only implementation.
+# 3d-bis. ckcommon.sh's readers parse XML as XML: single-quoted attributes and
+#     a commented-out root element are the inputs a regex gets wrong.
 echo "== ckcommon xml reader =="
 # shellcheck source=/dev/null
 . /opt/civikitchen/toolbelt/lib/ckcommon.sh
@@ -596,8 +552,7 @@ else
     fail "ck_xml_field did not read <file>"
 fi
 
-# Unparseable input must be loud: exit 2, not an empty string a caller treats
-# as "the field is absent".
+# Unparseable input exits 2 rather than returning "field absent".
 if ! printf 'not xml at all\n' > "${XMLDIR}/broken.xml" \
     || ck_xml_field "${XMLDIR}/broken.xml" key >/dev/null 2>&1; then
     fail "ck_xml_field accepted unparseable XML instead of failing"
@@ -606,16 +561,9 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 3e. ckeslint: the pinned oxlint toolchain is installed and every layer of the
-#     baseline fires. One finding per layer on purpose, because each can
-#     go missing on its own without anything else looking wrong:
-#       - oxlint's own `correctness` category (the native rules)
-#       - no-unsanitized on .js AND on .ts — that plugin runs through oxlint's
-#         alpha jsPlugins bridge, and if the bridge stops loading it, oxlint
-#         still exits 0 over the same file
-#       - a type-aware rule, which needs the tsgolint binary to be found
-#       - civikitchen/api4-contract, a local jsPlugin fed the phpstan catalog
-#     A silently empty gate is the failure mode this block exists to catch.
+# 3e. ckeslint: one finding per baseline layer, since each can vanish alone:
+#     oxlint correctness, no-unsanitized on .js and .ts (jsPlugins bridge, which
+#     exits 0 when it fails to load), a type-aware rule (tsgolint), api4-contract.
 echo "== ckeslint =="
 ESDIR="${WORKDIR}/eslintext"
 mkdir -p "${ESDIR}/js"
@@ -653,11 +601,8 @@ export function boot(): void {
   work();
 }
 TS
-# Node code outside the conventional *.config.js names: a build script and a
-# Playwright spec. The baseline lints with the browser env, so without a node
-# env for these paths every `require`/`process`/`__dirname` reads as no-undef —
-# a gate that fires on correct code, which a repo can only silence by replacing
-# the whole baseline.
+# Node code outside *.config.js (a build script, a Playwright spec) needs the
+# node env, or require/process/__dirname read as no-undef.
 mkdir -p "${ESDIR}/scripts" "${ESDIR}/tests/e2e"
 cat > "${ESDIR}/scripts/build-widget.js" <<'NODEJS'
 const path = require('path');
@@ -674,8 +619,7 @@ test('boots', async ({ page }) => {
 NODEJS
 (cd "${ESDIR}" && git init -q . && git add -A) >/dev/null 2>&1
 
-# --format=unix: oxlint's default reporter is the graphical one in some
-# terminals and a one-liner in others, and these assertions name file AND rule.
+# --format=unix: the default reporter varies by terminal; these match file and rule.
 ESLINT_OUT="$( (cd "${ESDIR}" && ckeslint --format=unix) 2>&1 || true)"
 if grep -q "^js/widget.js:.*no-unsanitized(property)" <<<"${ESLINT_OUT}"; then
     ok "ckeslint flags an unsafe innerHTML assignment in .js"
@@ -708,8 +652,7 @@ else
     ok "ckeslint gives Node scripts and e2e specs the node env"
 fi
 
-# The type-aware rules are the half that can vanish quietly: oxlint reports the
-# missing binary and exits non-zero, and the gate must not read that as a pass.
+# A missing tsgolint makes oxlint exit non-zero; the gate must fail too.
 TSGO_OUT="$( (cd "${ESDIR}" && OXLINT_TSGOLINT_PATH=/nonexistent/tsgolint ckeslint --format=unix) 2>&1 || true)"
 if (cd "${ESDIR}" && OXLINT_TSGOLINT_PATH=/nonexistent/tsgolint ckeslint --format=unix) >/dev/null 2>&1; then
     fail "ckeslint passed with an unusable tsgolint (output: ${TSGO_OUT:0:300})"
@@ -717,9 +660,8 @@ else
     ok "ckeslint fails when tsgolint is missing"
 fi
 
-# Without a root tsconfig there is no TypeScript program: every import is
-# `any` and no-unsafe-* would bury the gate in false positives. The wrapper
-# must pick the no-type-aware baseline then — while no-unsanitized stays live.
+# Without a root tsconfig the wrapper picks the no-type-aware baseline (no
+# no-unsafe-* noise); no-unsanitized stays live.
 ESNOTS="${WORKDIR}/eslintnotsext"
 mkdir -p "${ESNOTS}/js"
 cp "${ESDIR}/info.xml" "${ESNOTS}/info.xml"
@@ -743,9 +685,7 @@ else
     fail "ckeslint lost no-unsanitized in the no-tsconfig baseline (output: ${NOTS_OUT:0:300})"
 fi
 
-# A repo that still ships only an eslint.config.* has to stop the gate loudly:
-# ESLint is not in the image any more, and running the baseline over rules that
-# repo never chose is the silent-wrong-answer case.
+# A repo whose only config is an eslint.config.* stops the gate.
 ESCFG="${WORKDIR}/eslintcfgext"
 mkdir -p "${ESCFG}/js"
 cp "${ESDIR}/info.xml" "${ESCFG}/info.xml"
@@ -773,8 +713,7 @@ else
     fail "ckeslint ignored the repo's .oxlintrc.json (output: ${OWN_OUT:0:300})"
 fi
 
-# CRM/cj/ts/_/angular must not read as undefined identifiers, or every real
-# extension's frontend drowns in no-undef and the gate gets switched off.
+# CRM/cj/ts/_/angular are known globals, not no-undef.
 cat > "${ESDIR}/js/globals.js" <<'JS'
 export function boot() {
   return [CRM.url('civicrm/x'), cj('body'), ts('Hi'), _.size([]), angular.module('x')];
@@ -788,9 +727,7 @@ else
     ok "ckeslint knows the CiviCRM globals"
 fi
 
-# A repo with no JS at all must PASS, and say so — the common case in this
-# fleet, and the one where a silent exit 0 is indistinguishable from a broken
-# tool.
+# A repo with no JS passes and says so.
 NOJS="${WORKDIR}/nojsext"
 mkdir -p "${NOJS}"
 cp "${ESDIR}/info.xml" "${NOJS}/info.xml"
@@ -802,10 +739,8 @@ else
     fail "ckeslint on a JS-free repo (output: ${NOJS_OUT:0:200})"
 fi
 
-# Node globals: an e2e suite reading process.env must not drown in
-# no-unsafe-* just because the repo does not carry @types/node. The image's
-# copy is linked in for the run — and must be gone again afterwards, because a
-# stray node_modules/ in a checkout is exactly what the gate must not leave.
+# process.env is typed from the image's @types/node, linked in for the run
+# and removed again afterwards.
 ESNODE="${WORKDIR}/eslintnodeext"
 mkdir -p "${ESNODE}/e2e"
 cp "${ESDIR}/info.xml" "${ESNODE}/info.xml"
@@ -841,8 +776,7 @@ else
     ok "ckeslint removes its @types/node overlay again"
 fi
 
-# A repo that carries its own @types/node keeps it: the overlay must not
-# overwrite it, and two copies in one program is the conflict to avoid.
+# A repo's own @types/node is kept, not overlaid.
 ESOWNNODE="${WORKDIR}/eslintownnodeext"
 mkdir -p "${ESOWNNODE}/e2e/../node_modules/@types"
 cp "${ESNODE}/info.xml" "${ESOWNNODE}/info.xml"
@@ -860,9 +794,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 3e2. ckfmt: both formatter halves fire, converge, and the mago output passes
-#      the lint rules cklint enforces — the property the whole gate rests on,
-#      so it is asserted here, not assumed.
+# 3e2. ckfmt: both formatter halves fire, converge, and the output passes cklint.
 echo "== ckfmt =="
 FMTDIR="${WORKDIR}/fmtext"
 mkdir -p "${FMTDIR}/js"
@@ -903,9 +835,7 @@ else
     fail "cklint rejects ckfmt output (output: ${CKLINT_FMT_OUT:0:300})"
 fi
 
-# The same agreement property on overlong lines, where the formatter makes
-# its largest layout decisions: whatever ckfmt does, cklint must accept.
-# Each fixture is its own file so a regression names the construct.
+# The same agreement on overlong lines, one file per construct.
 AGREEDIR="${WORKDIR}/fmtagreeext"
 mkdir -p "${AGREEDIR}"
 cp "${FMTDIR}/info.xml" "${AGREEDIR}/info.xml"
@@ -1036,10 +966,8 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 3f. ckschemadiff: table discovery from both schema formats, and the
-#     normalisation that makes two dumps of the same schema compare equal.
-#     The database half is exercised by the shared CI's schema-parity job,
-#     which is the only place two CiviCRM databases exist.
+# 3f. ckschemadiff: table discovery from both schema formats and dump
+#     normalisation; the database half runs in CI's schema-parity job.
 echo "== ckschemadiff =="
 SCHDIR="${WORKDIR}/schemaext"
 mkdir -p "${SCHDIR}/schema" "${SCHDIR}/xml/schema/CRM/Widget"
@@ -1082,10 +1010,8 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 3g. ckcompat: mago at the declared PHP floor — its parser for syntax the floor
-#     cannot read, analyze for APIs it lacks. The image runs a single PHP 8.4,
-#     so `php -l` is structurally blind to 8.4-only syntax; this is the only
-#     gate that sees it.
+# 3g. ckcompat: mago at the declared PHP floor, parser for syntax and analyze
+#     for APIs the floor lacks (the image's PHP 8.4 `php -l` cannot see either).
 echo "== ckcompat =="
 CMPDIR="${WORKDIR}/compatext"
 mkdir -p "${CMPDIR}/Civi"
@@ -1118,8 +1044,7 @@ if grep -q "semantics" <<<"${CMP_OUT}"; then
 else
     fail "ckcompat's mago parse stage did not run (output: ${CMP_OUT:0:300})"
 fi
-# The same code with the floor it really needs must be silent, or the gate is
-# just noise.
+# The same code with the floor it needs is silent.
 if (cd "${CMPDIR}" && ckcompat --php 8.4) >/dev/null 2>&1; then
     ok "ckcompat passes when the floor matches the syntax"
 else
@@ -1145,8 +1070,7 @@ if (cd "${CMPDIR}" && ckcompat) >/dev/null 2>&1; then
 else
     ok "ckcompat rejects PHP-8.4 property hooks against the declared floor"
 fi
-# array_find() is PHP 8.4, but core ships symfony/polyfill-php84: calling it on
-# an 8.3 floor is fine, and flagging it would be a false alarm.
+# array_find() is PHP 8.4, but core ships symfony/polyfill-php84.
 APIDIR="${WORKDIR}/compatapi"
 mkdir -p "${APIDIR}/Civi"
 echo '{"require":{"php":">=8.3"}}' > "${APIDIR}/composer.json"
@@ -1425,11 +1349,8 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 5b. ckphpunit injects the transaction canary into the repo's config.
-#     The canary itself needs a booted site (the shared CI's PHPUnit step is
-#     where it earns its keep); what is checkable here is the wiring — that the
-#     listener is added, and added AFTER CiviTestListener, which is what puts
-#     the marker inside the transaction and the check after the rollback.
+# 5b. ckphpunit injects the transaction canary listener after CiviTestListener,
+#     so the marker lands inside the transaction and the check after rollback.
 echo "== ckphpunit =="
 CKPU="${WORKDIR}/ckphpunit"
 mkdir -p "${CKPU}/fake"
@@ -1442,8 +1363,7 @@ cat > "${CKPU}/phpunit.xml.dist" <<'XML'
     </listeners>
 </phpunit>
 XML
-# A stand-in for phpunit that only records the config it was handed: the real
-# one would need a CiviCRM to boot.
+# A stand-in phpunit that records the config it was handed.
 cat > "${CKPU}/fake/phpunit" <<SH
 #!/bin/bash
 while [ "\$#" -gt 0 ]; do
@@ -1466,8 +1386,8 @@ if [ -f "${CKPU}/handed.xml" ] \
 else
     fail "canary listener ordering (it must come after CiviTestListener)"
 fi
-# The generated config lives in a temp dir, never in the (possibly read-only
-# under CI's uid mismatch) repo — and its paths must survive the move.
+# The generated config lives in a temp dir (the repo may be read-only), with
+# its paths absolutized.
 if [ -z "$(find "${CKPU}" -maxdepth 1 -name '.ckphpunit-canary.xml' -o -name 'ckphpunit-canary-*' | head -1)" ]; then
     ok "ckphpunit writes nothing into the repo directory"
 else
@@ -1487,8 +1407,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 5c. cklifecycle: the cycle itself needs a booted site, so only the guards are
-#     checkable here.
+# 5c. cklifecycle's guards; the cycle itself needs a booted site.
 echo "== cklifecycle =="
 if CKLIFECYCLE_HELP="$(cklifecycle --help 2>&1)" && grep -q 'disable' <<<"${CKLIFECYCLE_HELP}"; then
     ok "cklifecycle --help describes the cycle"
@@ -1533,9 +1452,8 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 8. Xdebug toggle
-# pcov should always be loaded but disabled until ckcoverage enables it; xdebug
-# should only load when XDEBUG_MODE is set via the entrypoint.
+# 8. Xdebug toggle: pcov loaded but disabled until ckcoverage enables it;
+#    xdebug loads only when XDEBUG_MODE is set via the entrypoint.
 echo "== xdebug toggle =="
 DEFAULT_MODULES="$(php -m)"
 if grep -qiE "^pcov$" <<<"${DEFAULT_MODULES}"; then ok "pcov loaded by default"; else fail "pcov not loaded"; fi
@@ -1565,10 +1483,8 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 5d. ckmutate: the point of mutation testing in one fixture — a test that
-#     COVERS a line without asserting enough to notice it changing. `$n > 10`
-#     asserted only at n = 50 survives the GreaterThanOrEqual mutant, so a 100%
-#     floor must go red. Without the civikitchen.yaml key the tool must be a no-op.
+# 5d. ckmutate: `$n > 10` asserted only at n = 50 survives the >= mutant, so a
+#     100% floor goes red; without the civikitchen.yaml key it is a no-op.
 echo "== ckmutate =="
 MUT="${WORKDIR}/ckmutate"
 mkdir -p "${MUT}/Civi" "${MUT}/tests"
@@ -1638,13 +1554,8 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 5e. cktaint: the stubs, proven by fixtures.
-#
-# Every case is a pair: a `_bad` file where request input reaches a sink and
-# has to be reported, and a `_good` file with the escape (or the safe API) in
-# between, which has to stay silent. A stub that stops matching core — a
-# renamed method, a changed argument position — turns the pair red on the
-# side that matters: the flow stops being found.
+# 5e. cktaint: each case is a `_bad` file where request input reaches a sink
+#     (reported) and a `_good` twin with the escape in between (silent).
 echo "== cktaint (Psalm taint analysis) =="
 TAINT="$(mktemp -d)/taint"
 mkdir -p "${TAINT}"
@@ -1839,9 +1750,8 @@ function f12g(RequestInterface $r): void {
 }
 PHP
 
-# One run over the whole fixture set — Psalm reports one flow per source/sink
-# pair, and every pair here is distinct, so all twelve findings show up
-# together. --no-cache because the fixtures live in a fresh temp dir.
+# One run over all fixtures: every source/sink pair is distinct, so each
+# reports its own flow.
 TAINT_RC=0
 TAINT_OUT_RAW="$( (cd "${TAINT}" && cktaint --no-cache) 2>&1 )" || TAINT_RC=$?
 TAINT_OUT="$(printf '%s' "${TAINT_OUT_RAW}" | sed -E 's/\x1b\[[0-9;]*m//g')"
@@ -1853,8 +1763,7 @@ else
     fail "cktaint exited 0 despite blocking TaintedSql/Shell/SSRF fixtures"
 fi
 
-# A run restricted to an advisory-only fixture (header taint = INFO) must
-# report the finding but keep exit 0 — that is the blocking/advisory split.
+# An advisory-only fixture (header taint = INFO) reports but exits 0.
 ADV_RC=0
 ADV_OUT="$( (cd "${TAINT}" && cktaint --no-cache 03_uri_header_bad.php) 2>&1 )" || ADV_RC=$?
 if [[ "${ADV_RC}" -eq 0 ]] && grep -q 'TaintedHeader' <<<"${ADV_OUT}"; then
@@ -1894,10 +1803,8 @@ for case in "${TAINT_CASES[@]}"; do
 done
 
 # ---------------------------------------------------------------------------
-# 9. The scaffold template passes civikitchen's own gates
-# Consumers get these files verbatim from `ckinit --update` and then run cklint
-# and ckfmt over them in their CI, so a template that trips either one breaks
-# every conforming repo. Stamp a throwaway extension and hold it to the same bar.
+# 9. The scaffold template, stamped into a throwaway extension, passes the
+#    gates consumers run over it.
 echo "== scaffold template vs. cklint/ckfmt =="
 CK_SRC="${CK_SRC:-/civikitchen-src}"
 if [[ ! -x "${CK_SRC}/scaffold/ckinit.php" ]]; then
@@ -1913,8 +1820,7 @@ else
     mkdir -p "${TPL_EXT}"
     printf '%s\n' '<extension key="org.acme.example_ext" type="module"><file>example_ext</file><license>AGPL-3.0</license></extension>' \
         > "${TPL_EXT}/info.xml"
-    # ckinit's YAML parser lives in a gitignored vendor/, so the checkout CI
-    # mounts here usually has none.
+    # ckinit's YAML parser lives in the gitignored vendor/.
     if [[ ! -f "${TPL_SRC}/vendor/autoload.php" ]]; then
         composer install --no-dev --no-interaction --no-progress --quiet \
             --working-dir "${TPL_SRC}" >/dev/null 2>&1 || true
@@ -1959,9 +1865,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 9b. The Playwright starter passes the same gates
-# The docs tell consumers to copy its config and tests into their repository,
-# where ck ci runs ckeslint and ckfmt over them.
+# 9b. The Playwright starter, which consumers copy, passes ckeslint and ckfmt.
 echo "== Playwright starter vs. ckeslint/ckfmt =="
 PW_SRC="${CK_SRC}/examples/extension-with-playwright"
 if [[ ! -f "${PW_SRC}/playwright.config.ts" ]]; then

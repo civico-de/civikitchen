@@ -9,10 +9,7 @@ use CiviKitchen\Ckconform\Context;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * No .gitignore means build output and vendor/ have no guard rail keeping
- * them out of the next commit — see CommittedArtifactCheck for what lands
- * there once nothing stops it. One in a directory above the extension (a
- * repository of several extensions) guards it too.
+ * No .gitignore for the extension, its own or one in a directory above it.
  */
 final class GitignoreCheck implements Check
 {

@@ -1,6 +1,5 @@
-# Keeps the pinned actions and the sidecar images of the example stacks
-# current. Image contents (CiviCRM, buildkit, dev tools) track upstream through
-# the daily rebuild; the PHP base image is a build arg and bumped by hand.
+# Pinned actions and the example stacks' sidecar images; the PHP base image is
+# a build arg, bumped by hand.
 version: 2
 updates:
   - package-ecosystem: github-actions

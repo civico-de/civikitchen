@@ -14,17 +14,9 @@ use Rector\Set\ValueObject\SetList;
 use Rector\ValueObject\PhpVersion;
 
 /**
- * CiviKitchen's default rector config, used by `ckmodernize` when an extension
- * ships no rector.php of its own. It combines:
- *   - rector's OFF-THE-SHELF PHP-version migration sets ("PHP 7 -> 8" and up),
- *   - off-the-shelf code-quality / dead-code / early-return sets,
- *   - CiviKitchen's own CiviCRM footgun rules (the deprecations cklint bans).
- *
- * Target PHP for the upgrade sets: CK_PHP_VERSION, else the extension's OWN
- * floor (the lowest version composer.json require.php admits), else 8.1 (the
- * CiviCRM floor); a target without a migration set stops the run. Rewriting
- * to a PHP the extension does not promise to install on is a broken release,
- * and that promise is composer's — ckconform keeps it aligned with info.xml.
+ * CiviKitchen's default rector config for `ckmodernize`: rector's PHP-version
+ * and quality sets plus CiviKitchen's CiviCRM rules. Target PHP: CK_PHP_VERSION,
+ * else composer.json's require.php floor, else 8.1; one without a set stops the run.
  */
 
 require_once __DIR__ . '/../lib/php/bootstrap.php';
@@ -46,10 +38,8 @@ $rules = [
   // No off-the-shelf set does named arguments; rector's own is an open request.
   PositionalDefaultsToNamedArgsRector::class,
 ];
-// API style. Safe by DEFAULT: restyle existing api4 array-form calls to the OO
-// builder (same version, same semantics). The risky api3 -> api4 migration is
-// opt-in via `ckmodernize --api`. `--api=array` instead keeps the array style
-// (migrate api3 to the array form, leave api4 arrays as-is).
+// Default: api4 array calls to the OO builder. `--api` adds api3 -> api4 (OOP),
+// `--api=array` migrates api3 to the array form and leaves api4 arrays alone.
 $apiStyle = getenv('CK_API_MIGRATE');
 if ($apiStyle === 'array') {
   $rules[] = Api3ToApi4AssistRector::class;
@@ -61,10 +51,8 @@ else {
   }
 }
 
-// Core on the autoloader, the same way phpstanBootstrap.php does it: without it
-// rector's type inference is blind wherever a core symbol is involved — which
-// costs the off-the-shelf sets, not just our own rules. So a missing core is an
-// error, not a quieter run; ckmodernize derives CIVICRM_CORE_DIR from cv.
+// Without core on the autoloader rector's type inference is blind, so a missing
+// core is an error; ckmodernize derives CIVICRM_CORE_DIR from cv.
 $coreDir = getenv('CIVICRM_CORE_DIR') ?: '/var/www/html/core';
 if (!is_file($coreDir . '/CRM/Core/ClassLoader.php')) {
   throw new RuntimeException("no CiviCRM core at $coreDir (set CIVICRM_CORE_DIR)");

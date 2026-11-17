@@ -65,9 +65,8 @@ final class CommittedArtifactCheckTest extends CheckTestCase
     }
 
     /**
-     * TypeScript names its incremental cache after the tsconfig, so a
-     * '.tsbuildinfo' ignore pattern misses 'tsconfig.tsbuildinfo' — which is
-     * exactly how one repo ended up tracking one.
+     * TypeScript names its cache after the tsconfig, so a '.tsbuildinfo' ignore
+     * pattern misses 'tsconfig.tsbuildinfo'.
      */
     public function testATsbuildinfoCacheIsFlaggedWhateverItIsNamed(): void
     {

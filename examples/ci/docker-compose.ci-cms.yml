@@ -1,11 +1,6 @@
-# CMS-flavor variant of docker-compose.ci.yml — for extensions that need
-# testing against a real Drupal / WordPress / Joomla stack. First boot runs
-# `civibuild reinstall` (~1-2 min); the image's HEALTHCHECK turns healthy once
-# the site is provisioned, so `docker compose up -d --wait` blocks until ready.
-#
-# The workflow's matrix supplies IMAGE and CK_EXT_BASE (the flavor's CiviCRM
-# extensionsDir — it differs per CMS, see the volumes note). civibuild
-# provisions its own DB user and an isolated sitetest_* test database.
+# CMS variant of docker-compose.ci.yml. First boot runs `civibuild reinstall`
+# (~1-2 min); `up -d --wait` blocks until healthy. The workflow's matrix sets
+# IMAGE and CK_EXT_BASE.
 services:
   app:
     image: ${IMAGE:-ghcr.io/civico-de/civikitchen:drupal10}
@@ -23,8 +18,7 @@ services:
       # registry dependencies can go here:
       # CIVIKITCHEN_EXTRA_EXTENSIONS: "de.systopia.xcm"
     volumes:
-      # On the CMS flavors the extension dir is the CMS extensionsDir, NOT
-      # /var/www/html/ext (that path is standalone-only):
+      # The CMS extensionsDir per flavor:
       #   drupal10/11: …/web/sites/default/files/civicrm/ext
       #   wordpress:   …/web/wp-content/uploads/civicrm/ext
       #   joomla:      …/web/media/civicrm/ext

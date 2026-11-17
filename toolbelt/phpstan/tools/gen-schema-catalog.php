@@ -8,16 +8,9 @@ declare(strict_types=1);
  * Usage:
  *   php tools/gen-schema-catalog.php <core-dir> [out-file]
  *
- * Reads the SOURCE tree only — no booted CiviCRM, no database, so the table
- * list can be built in CI from a tarball and pinned to a release. Every core
- * table is declared by a schema/<Component>/<Entity>.entityType.php file
- * (core and core-shipped extensions alike) carrying a `'table' => '...'`
- * key; the .sql templates add nothing but the sample-data custom-value
- * tables, which are dynamic anyway.
- *
- * What is NOT in here, and must therefore never be reported by the rule:
- * custom-value tables, temp tables, logging mirrors, and every table a
- * non-core extension installs. See SqlSchema for how those are excluded.
+ * Reads the `'table' => '...'` key of every schema/*.entityType.php in the
+ * source tree. Custom-value, temp, logging and non-core tables are not here;
+ * SqlSchema excludes them.
  */
 
 require_once __DIR__ . '/catalog-common.php';
@@ -58,8 +51,7 @@ function entityTypeFiles(string $coreDir): array
 
 $tables = [];
 foreach (entityTypeFiles($coreDir) as $file) {
-    // Matched, not included: an entityType file calls ts() and closures at
-    // top level, which would need a booted CiviCRM to evaluate.
+    // Matched, not included: evaluating an entityType file needs a booted CiviCRM.
     if (preg_match("/'table'\s*=>\s*'([A-Za-z0-9_]+)'/", (string) file_get_contents($file), $m) === 1) {
         $tables[] = $m[1];
     }

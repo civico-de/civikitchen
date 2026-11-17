@@ -9,13 +9,8 @@ use PHPStan\Analyser\Scope;
 use PHPStan\Type\ObjectType;
 
 /**
- * Recognising direct database traffic in the AST.
- *
- * Shared by the two rules that care about it: DDL inside a transactional
- * test, and a catch block that swallows a query failure. Both work on plain
- * literals and resolved names — the point is to be certain or silent, so an
- * expression this cannot read is simply not database traffic as far as the
- * rules are concerned.
+ * Recognising direct database traffic in the AST, from literals and resolved
+ * names only; an unreadable expression is not database traffic.
  */
 final class Sql
 {
@@ -76,13 +71,8 @@ final class Sql
     }
 
     /**
-     * A literal string, including one built by concatenating literals.
-     *
-     * Heredocs and simple concatenation are how long SQL is written; a
-     * statement assembled from a variable is not readable here and is left
-     * alone rather than guessed at. An interpolated string yields only its
-     * leading literal part, which is enough to see the statement's verb and
-     * its first table.
+     * A literal string, including one built by concatenating literals; an
+     * interpolated string yields only its leading literal part.
      */
     public static function literalString(?Node\Expr $expr): ?string
     {
@@ -104,10 +94,8 @@ final class Sql
     }
 
     /**
-     * A DDL statement that would commit an open test transaction.
-     *
-     * CREATE/DROP TEMPORARY TABLE is the documented exception: MySQL and
-     * MariaDB run it without an implicit commit.
+     * A DDL statement that would commit an open test transaction; CREATE/DROP
+     * TEMPORARY TABLE does not.
      */
     public static function isDdlLiteral(string $sql): bool
     {
@@ -160,10 +148,8 @@ final class Sql
     }
 
     /**
-     * Whether an expression is plausibly a DAO object.
-     *
-     * Only a `new CRM_..._DAO_...` or a variable named like one; anything
-     * else would make `->find()` on an arbitrary object database traffic.
+     * Whether an expression is plausibly a DAO object: a `new CRM_..._DAO_...`
+     * or a variable named like one.
      */
     private static function looksLikeDaoVariable(Node\Expr $expr): bool
     {

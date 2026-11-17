@@ -1,10 +1,6 @@
 <?php
-// Seed the core Verein world: the association itself, member groups, German
-// member contacts (email + address), membership types (Voll-/Förder-/Ehren-
-// mitgliedschaft), memberships, and last calendar year's membership fees.
-// Runs via `cv scr` with CiviCRM booted. Idempotent: skips entirely when the
-// Verein org already exists (the apply re-runs if an earlier first boot died
-// before the provisioning marker was written).
+// Seed a Verein, member groups and contacts, membership types, memberships and
+// last year's fees; skipped when the Verein org exists.
 
 require_once __DIR__ . '/../../seed-lib.php';
 

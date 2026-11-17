@@ -19,9 +19,7 @@
 #   phpMyAdmin: http://localhost:8081  (opt-in: --profile pma)
 #   Maildev:    http://localhost:1080
 
-# Distinct compose project name (rather than the CWD-derived default, e.g.
-# 'standalone') so parallel civikitchen examples don't collide on container
-# names / networks.
+# Own project name, so parallel examples do not collide on names and networks.
 name: civikitchen-standalone
 
 services:
@@ -29,9 +27,7 @@ services:
     # Override via `IMAGE=... docker compose up` (used by CI to test a
     # locally-built tag). Defaults to the published GHCR tag.
     image: ${IMAGE:-ghcr.io/civico-de/civikitchen:standalone}
-    # The :standalone tag is rebuilt daily and on image changes to main, to pick
-    # up upstream patches. Always pull on `up` so a stale local copy doesn't
-    # mask entrypoint/install fixes.
+    # :standalone is rebuilt daily; pull on every `up`.
     pull_policy: always
     depends_on:
       db:
@@ -50,19 +46,12 @@ services:
       # Auto-create a login user after install. Defaults: pass=admin,
       # email=admin@example.org. Unset CIVIKITCHEN_DEMO_USER to skip.
       CIVIKITCHEN_DEMO_USER: admin
-      # The image enables all standard Civi components by default
-      # (CiviEvent, CiviContribute, CiviMember, CiviMail, CiviPledge, CiviCase,
-      # CiviReport, CiviCampaign). Override with CIVIKITCHEN_COMPONENTS to narrow
-      # the set; pass an empty string to keep only the core component.
-      # Point Civi's mailer at the maildev sidecar (UI on :1080). Outbound
-      # mail from Civi (mailings, notifications, password resets) lands in
-      # maildev instead of being silently dropped.
+      # All standard components are on; CIVIKITCHEN_COMPONENTS narrows the set.
+      # Outbound mail lands in maildev (UI on :1080).
       CIVIKITCHEN_SMTP_HOST: maildev
       CIVIKITCHEN_SMTP_PORT: "1025"
-      # Comma-separated extension keys downloaded + enabled after install
-      # (e.g. de.systopia.xcm,de.systopia.twingle). Supports key@URL for
-      # pinned / forked releases. Empty by default; set the env var in your
-      # shell or a .env file alongside this compose file.
+      # Registry extensions to download and enable, comma-separated keys or
+      # key@URL; set in your shell or a .env file.
       CIVIKITCHEN_EXTRA_EXTENSIONS: "${CIVIKITCHEN_EXTRA_EXTENSIONS:-}"
     # volumes:
     #   - ../path/to/your/extension:/var/www/html/ext/myextension

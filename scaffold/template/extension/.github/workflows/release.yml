@@ -1,14 +1,6 @@
-# Thin caller: the release pipeline lives in civikitchen's reusable
-# extension-release.yml (ckrelease check → ckrelease dist → install smoke test
-# → GitHub release), run on a vX.Y.Z or vX.Y.Z-<pre-release> tag push.
-#
-# The @v1 pin is the versioned contract, the same one ci.yml follows. See
-# civikitchen's docs/extension-releases.md.
-#
-# Everything up to the END marker is template-managed; `with:` inputs and
-# `secrets:` for the call go below the marker and survive `ckinit --update`.
-# A repo that never releases declares `release: none` with a reason in
-# civikitchen.yaml; `ckinit --update` then deletes this file.
+# Thin caller of civikitchen's reusable extension-release.yml at @v1, run on a
+# vX.Y.Z tag. `with:` and `secrets:` go below the END marker; a repo declaring
+# `release: none` in civikitchen.yaml loses this file on `ckinit --update`.
 # BEGIN CIVIKITCHEN MANAGED caller
 name: Release
 

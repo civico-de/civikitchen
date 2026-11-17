@@ -57,8 +57,7 @@ final class DeprecationGateCheckTest extends CheckTestCase
     }
 
     /**
-     * A commented-out attribute is not an attribute — the predecessor grep for
-     * the literal string would have read this file as gated.
+     * A commented-out attribute is not an attribute.
      */
     public function testACommentedAttributeDoesNotCount(): void
     {

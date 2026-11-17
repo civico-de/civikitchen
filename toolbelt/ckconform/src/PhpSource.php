@@ -13,10 +13,8 @@ final class PhpSource
     private const OPENERS = ['(', '[', '{', T_CURLY_OPEN, T_DOLLAR_OPEN_CURLY_BRACES, T_ATTRIBUTE];
 
     /**
-     * PHP source with comment bodies blanked, so an entity or call named only
-     * in prose is not read as code. Through the tokenizer, since a regex cannot
-     * tell a `//` inside a string from one that starts a comment. Newlines
-     * inside comments are kept so line-based tooling still lines up.
+     * PHP source with comment bodies blanked via the tokenizer, so a name in
+     * prose is not read as code. Newlines are kept so line numbers still match.
      */
     public static function withoutComments(string $source): string
     {

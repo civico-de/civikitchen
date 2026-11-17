@@ -21,8 +21,7 @@ Thumbs.db
 *.swp
 *.swo
 
-# TypeScript's incremental build cache (named after the tsconfig it belongs
-# to, so a bare '.tsbuildinfo' pattern misses it)
+# TypeScript's build cache is named after its tsconfig; '.tsbuildinfo' misses it.
 *.tsbuildinfo
 
 # Playwright's session file, report and traces (playwright.config.ts)

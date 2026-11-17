@@ -1,15 +1,9 @@
 <?php
 
 /**
- * Post-uninstall DB invariants for cklifecycle. Run through `cv scr` while the
- * extension is UNINSTALLED; parameters arrive in the environment.
- *
- * `cv ext:uninstall` exiting 0 only means uninstall() ran without throwing. It
- * says nothing about whether the tables went away, whether civicrm_managed
- * still points at entities of a module that no longer exists (those become
- * "unknown module" noise and, on the next enable, duplicate records), or
- * whether option groups and scheduled jobs stayed behind to fire against code
- * that is gone.
+ * Post-uninstall DB invariants for cklifecycle: tables, civicrm_managed rows,
+ * option groups and scheduled jobs left behind. Run through `cv scr` while the
+ * extension is uninstalled; parameters arrive in the environment.
  */
 
 $key = getenv('CK_LC_KEY') ?: '';
@@ -23,12 +17,8 @@ if ($key === '' || $dir === '' || $prefix === '') {
 $findings = [];
 
 /**
- * Table names the extension is known to create.
- *
- * Guessing from the prefix alone is not enough: civix names a table after the
- * ENTITY (civicrm_widget), not after the extension, so the only reliable
- * sources are the artifacts that create them. The prefix scan stays as a
- * second net for hand-written tables.
+ * Table names the extension's artifacts create; civix names tables after the
+ * entity, so the prefix scan is only a second net.
  */
 $declared = [];
 foreach (glob($dir . '/sql/*.sql') ?: [] as $sqlFile) {
@@ -72,9 +62,8 @@ foreach (['civicrm_' . $prefix . '%', $prefix . '%'] as $like) {
   }
 }
 
-// Managed entities of a module that no longer exists. CiviCRM reconciles
-// civicrm_managed by module, so a row left here is an entity nothing owns —
-// unless core kept it by policy: cleanup `never`, or `unused` while referenced.
+// Managed entities nothing owns, unless core kept them by policy (cleanup
+// `never`, or `unused` while referenced).
 $kept = [];
 $dao = CRM_Core_DAO::executeQuery(
   'SELECT id, entity_type, entity_id, name, cleanup FROM civicrm_managed WHERE module = %1',

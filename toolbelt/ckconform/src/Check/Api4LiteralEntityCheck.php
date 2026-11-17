@@ -10,23 +10,9 @@ use CiviKitchen\Ckconform\PhpSource;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A procedural civicrm_api4('Foo', ...) call to one of this extension's own
- * entities that does not exist.
- *
- * Api4EntityCheck catches the object form: \Civi\Api4\WidgetTypo::get() fails
- * because WidgetTypo is in neither core nor this extension. But the procedural
- * form takes the entity as a string — civicrm_api4('WidgetTypo', 'get', ...) —
- * and no static analyser resolves it, so a typo or a half-finished rename
- * fatals only at runtime, on whichever call path happens to hit it.
- *
- * The trap is telling a typo from a legitimate call to ANOTHER extension's
- * entity. widget calls civicrm_api4('CiviRulesRule', ...) constantly; that
- * entity lives in the civirules extension, not core and not widget, and a check
- * that flagged it would be wrong. So this stays inside the family it can be sure
- * about: a literal that shares its leading word with an entity this extension
- * defines (WidgetState alongside a local Widget/WidgetLog) is one of ours, and
- * if we do not define it, it is a mistake. Core entities and other extensions'
- * entities share no leading word with ours and are left alone.
+ * A civicrm_api4('Foo', ...) literal that shares its leading word with an entity
+ * this extension defines (WidgetState beside Widget) but names none of them.
+ * Other extensions' and core's entities share no such word and are left alone.
  */
 final class Api4LiteralEntityCheck implements Check
 {
@@ -53,9 +39,7 @@ final class Api4LiteralEntityCheck implements Check
         $family = [];
         foreach ($local as $entity) {
             $word = $this->leadingWord($entity);
-            // A local CiviRulesRule-style entity would put core's whole
-            // Civi* family (CiviCase, CiviMail, ...) under suspicion —
-            // too broad to tell a typo from a legitimate core call.
+            // A local Civi* entity would put core's whole Civi* family under suspicion.
             if ($word === 'Civi') {
                 continue;
             }

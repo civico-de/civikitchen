@@ -1,26 +1,8 @@
 <?php
 /**
- * Patch the standalone boot stub (civicrm.standalone.php) so that
- * CIVICRM_UF=UnitTests boots hit the isolated test database.
- *
- * Why this is necessary: CiviCRM core's SettingsManager::bootSettings()
- * composes CIVICRM_DSN from the CIVICRM_DB_* environment variables BEFORE
- * civicrm.settings.php is loaded ("env takes precedence over the settings
- * file"). In an env-configured container that means the settings file's own
- * "CIVICRM_UF=UnitTests → use $GLOBALS['_CV']['TEST_DB_DSN']" branch is dead
- * code — CIVICRM_DSN is already defined — and headless phpunit silently runs
- * against the dev database. The only reliable interception point is the boot
- * stub, which runs in-process before bootSettings().
- *
- * The same block pins the cache to the test database. Core keys its
- * version-scoped caches by cache name and CiviCRM version only, so a cache
- * outside the DB (FileCache, Redis, Memcache) is shared with the dev site and
- * outlives Civi\Test's schema rebuild.
- *
- * Usage:  php patch-test-db-boot.php [/path/to/civicrm.standalone.php]
- * Idempotent: a block that differs from the current one (an older image's) is
- * replaced; a current one leaves the file untouched.
- * Never fatal: missing stub or anchor exits 0 (non-standalone layouts).
+ * Patch civicrm.standalone.php so CIVICRM_UF=UnitTests boots use the test DB
+ * and cache: bootSettings() builds CIVICRM_DSN from env before the settings file.
+ * Usage: php patch-test-db-boot.php [stub]; idempotent, no stub exits 0.
  */
 
 $stub = $argv[1] ?? '/var/www/html/civicrm.standalone.php';

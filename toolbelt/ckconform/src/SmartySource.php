@@ -8,10 +8,8 @@ namespace CiviKitchen\Ckconform;
 final class SmartySource
 {
     /**
-     * Smarty comments and `{literal}` blocks, replaced by spaces of the same
-     * length: their contents are never parsed as tags, and blanking rather than
-     * deleting keeps every remaining offset — and so every reported line number
-     * — correct.
+     * Smarty comments and `{literal}` blocks, blanked to spaces of the same
+     * length so every offset and line number stays correct.
      */
     public static function blankOutInertRegions(string $source): string
     {

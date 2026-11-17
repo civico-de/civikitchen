@@ -1,52 +1,16 @@
-# Central exceptions for the image scan in .github/workflows/build-dev-images.yml
-# (`trivy image`, gate policy: --ignore-unfixed --severity HIGH,CRITICAL).
+# Exceptions for the image scan in .github/workflows/build-dev-images.yml,
+# passed with `--ignorefile` (gate: --ignore-unfixed --severity HIGH,CRITICAL).
 #
-# YAML format, passed explicitly with `--ignorefile trivyignore.yaml`: trivy
-# loads .trivyignore by name automatically but the YAML file only when asked
-# (the feature is still marked experimental upstream), which is why this file
-# is not a dotfile — it is a named input to the scan step, not a magic default.
-#
-# Every entry needs both a `statement` (what makes this finding not apply to
-# these images) and an `expired_at` — an entry without them is a review
-# comment, not a merge:
-#
-#   - id: CVE-0000-00000
-#     statement: <why this does not apply here>
-#     expired_at: 2027-01-31
-#
-# expired_at is a MECHANISM, not a convention: trivy prunes an expired entry
-# and the finding comes back, so the gate goes red on that date and the
-# exception has to be renewed with a fresh reason or deleted. "It was here when
-# I got here" is not a reason.
-#
-# `paths` scopes an entry to where the vulnerable copy actually lives (glob,
-# matched against the finding's package path). Use it wherever a CVE could also
-# appear in a tree this repo controls — toolbelt/oxlint, toolbelt/oxfmt —
-# so that excusing upstream's vulnerable copy does not silently excuse ours.
-# The compensating check for everything still suppressed image-wide is
-# `npm audit` on those two lockfiles, which trivy is not the only reader of.
-#
-# Scope: these images are DEVELOPMENT and CI images. That is an argument for
-# some exceptions (a CVE reachable only through a service nothing here runs) and
-# for none at all in the direction people usually reach for — a dev image that
-# eleven repos boot on every push is not an image where an unaudited exception
-# is cheap.
-#
-# What is deliberately NOT in this file: everything under
-# /usr/lib/node_modules/npm. That tree is npm's own bundled dependencies
-# (tar, glob, minimatch, sigstore, cross-spawn), it was the bulk of the
-# findings, and it is fixed by installing a newer npm over the one NodeSource's
-# nodejs 20 package ships — see NPM_VERSION in toolbelt/install-dev-tools.sh.
-# An exception there would have been an exception for a thing we could fix.
+# Every entry needs a `statement` and an `expired_at`; trivy drops an expired
+# entry and the gate goes red until it is renewed or deleted. `paths` scopes an
+# entry so it cannot also excuse a copy in toolbelt/oxlint or toolbelt/oxfmt.
 
 vulnerabilities:
   # -------------------------------------------------------------------------
   # npm's own bundled dependencies
   #
-  # /usr/lib/node_modules/npm/node_modules. A newer npm moves this tree
-  # (NPM_VERSION), but npm 12.2.1, the current npm, still bundles undici
-  # 6.29.0 — confirmed by the image scan on 2026-10-27 — so no release
-  # carries this fix yet.
+  # npm 12.2.1, the current npm, still bundles undici 6.29.0 (image scan,
+  # 2026-10-27); NPM_VERSION in toolbelt/install-dev-tools.sh moves this tree.
   # -------------------------------------------------------------------------
   - id: CVE-2026-109869
     paths:
@@ -84,14 +48,9 @@ vulnerabilities:
   # -------------------------------------------------------------------------
   # Go stdlib inside the oxlint-tsgolint binary
   #
-  # opt/civikitchen/toolbelt/oxlint/node_modules/@oxlint-tsgolint/*/tsgolint is a
-  # prebuilt Go binary from npm; its stdlib version is whatever oxlint built
-  # with (1.26.9 in 7.0.2005, the newest on 2026-10-27), and nothing here can
-  # relink it. The CVE sits in certificate handling. tsgolint is the type-aware linter behind ckeslint: it reads
-  # TypeScript sources the developer points it at, opens no listener and speaks
-  # no TLS/HTTP, so it is not reachable. On expiry: `npm view oxlint-tsgolint
-  # version` — bump toolbelt/oxlint/package.json as soon as a release built
-  # with >= 1.26.10 is out and delete this entry.
+  # Prebuilt Go binary built with Go 1.26.9 (7.0.2005, newest on 2026-10-27);
+  # it opens no listener and speaks no TLS. On expiry: `npm view
+  # oxlint-tsgolint version`, bump once a release built with >= 1.26.10 ships.
   # -------------------------------------------------------------------------
   - id: CVE-2026-111943
     paths:
@@ -104,12 +63,8 @@ vulnerabilities:
   # -------------------------------------------------------------------------
   # CiviCRM core's bundled frontend libraries
   #
-  # core/bower_components/* in every flavor. These are CiviCRM's own vendored
-  # assets, byte-identical to what every CiviCRM release and every production
-  # site ships; the images install the official CiviCRM build and do not
-  # rewrite it. Replacing them here would mean shipping a CiviCRM that behaves
-  # differently from the one the extension under test runs against in
-  # production — which is the one thing these images exist to avoid.
+  # core/bower_components/* as every CiviCRM release ships them; the images
+  # must not diverge from the CiviCRM extensions run against in production.
   # -------------------------------------------------------------------------
   - id: NSWG-ECO-328
     statement: >-
@@ -155,15 +110,9 @@ vulnerabilities:
   # -------------------------------------------------------------------------
   # PhpSpreadsheet in CiviCRM core's vendor tree
   #
-  # Core's vendor tree, reported against its composer/installed.json: in
-  # standalone at var/www/html/core, in the buildkit flavors (standalone-demo
-  # included) below the civibuild site (Drupal's site-level composer already
-  # resolves 5.10.0).
-  # Same argument as the bundled frontend libraries: core's composer.lock pins
-  # phpoffice/phpspreadsheet 5.8.1 on every line these images build. The fixed
-  # 5.x releases require PHP 8.2, which core's stable lines do not; master
-  # takes 5.10.0 with civicrm-core#37744. On expiry recheck core's
-  # composer.lock for each built line and delete what no longer reports.
+  # Core's composer.lock pins 5.8.1 on every built line; the fixed releases need
+  # PHP 8.2, master takes 5.10.0 with civicrm-core#37744. On expiry recheck
+  # core's composer.lock for each built line and delete what no longer reports.
   # -------------------------------------------------------------------------
   - id: CVE-2026-108357
     paths:
@@ -203,23 +152,9 @@ vulnerabilities:
   # -------------------------------------------------------------------------
   # civicrm-buildkit's own node_modules (buildkit-based flavors only)
   #
-  # /home/buildkit/buildkit/node_modules is created by upstream's
-  # bin/civi-download-tools from civicrm-buildkit's committed
-  # package-lock.json: jshint, jasmine-core, watch, civicrm-cv, and the
-  # optional karma stack. The parent chains below are `npm ls` output from the
-  # built image, not a guess.
-  #
-  # Nothing the images run loads any of it — the entrypoint serves the baked
-  # site through Apache/PHP, and no /usr/local/bin/ck* tool references the
-  # tree. It is reached only when a developer invokes buildkit's JS test
-  # tooling by hand, on a source tree they mounted themselves.
-  #
-  # Not fixable here either: pinning our own versions over the clone would mean
-  # the buildkit flavor no longer reproduces a real civicrm-buildkit install,
-  # which is the only reason that flavor exists. `npm audit fix` in the clone
-  # at build time was considered and rejected for the same reason, plus it
-  # would resolve to whatever is current on each monthly rebuild — the drift
-  # this repo pins everything else against.
+  # Installed from civicrm-buildkit's package-lock.json; the parent chains are
+  # `npm ls` output from the built image. Nothing the images run loads the tree,
+  # and overriding versions would stop the flavor reproducing real buildkit.
   # -------------------------------------------------------------------------
   - id: CVE-2024-4068
     statement: >-
@@ -333,14 +268,8 @@ vulnerabilities:
   # -------------------------------------------------------------------------
   # Drupal's package_manager test FIXTURE (drupal11 flavors)
   #
-  # core/modules/package_manager/tests/fixtures/fake_site/vendor/composer/
-  # installed.json declares drupal/core, drupal/core-dev and
-  # drupal/core-recommended at 9.8.0. There is no Drupal 9.8.0 in the image:
-  # that vendor/ directory contains no PHP file other than composer's own
-  # installed.php, and the Drupal the site actually runs is 11.4.4
-  # (Drupal::VERSION). Trivy is reading a hand-written fixture manifest that
-  # describes an imaginary site, which is exactly what package_manager's tests
-  # need it for. Deleting the fixture would break Drupal core's own test suite.
+  # .../package_manager/tests/fixtures/fake_site/vendor/composer/installed.json
+  # declares drupal/core 9.8.0, but that vendor/ holds no code; the site runs 11.4.4.
   # -------------------------------------------------------------------------
   - id: CVE-2024-55637
     statement: >-
@@ -369,15 +298,8 @@ vulnerabilities:
   # -------------------------------------------------------------------------
   # Joomla's own vendor tree (joomla flavors)
   #
-  # build/site/web/libraries/vendor is the CMS's composer tree, shipped by the
-  # Joomla 4.4.14 release civibuild downloads — not CiviCRM's and not ours. The
-  # versions are pinned in Joomla's composer.lock; raising them means shipping
-  # a Joomla nobody else runs, and the point of this flavor is to test CiviCRM
-  # against the Joomla people actually have.
-  #
-  # Separately worth knowing: Joomla 4.4 is past upstream's support window.
-  # That is a question about which Joomla civibuild's site type installs, not a
-  # question this file can answer.
+  # build/site/web/libraries/vendor as the Joomla 4.4.14 release civibuild
+  # downloads ships it, pinned by Joomla's composer.lock.
   # -------------------------------------------------------------------------
   - id: CVE-2023-29530
     statement: >-
@@ -441,10 +363,8 @@ vulnerabilities:
   # -------------------------------------------------------------------------
   # Docker CLI plugins from the docker:*-cli base image
   #
-  # The cli and Playwright images copy docker-compose (and the cli image
-  # docker-buildx) as the official image ships them. Trivy reads the module
-  # list from the Go build info; the vulnerable package of these modules is
-  # not compiled into the binary.
+  # Copied as the official image ships them. Trivy reads the module list from
+  # the Go build info; the vulnerable packages are not compiled in.
   # -------------------------------------------------------------------------
   - id: CVE-2026-17106
     paths:

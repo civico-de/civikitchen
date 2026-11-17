@@ -17,17 +17,13 @@
 #   phpMyAdmin: http://localhost:8081  (opt-in: --profile pma)
 #   Maildev:    http://localhost:1080
 
-# Distinct compose project name (rather than the CWD-derived default, e.g.
-# 'standalone') so parallel civikitchen examples don't collide on container
-# names / networks.
+# Own project name, so parallel examples do not collide on names and networks.
 name: civikitchen-extension-with-playwright
 
 services:
   app:
     image: ${IMAGE:-ghcr.io/civico-de/civikitchen:standalone}
-    # The :standalone tag is rebuilt daily and on image changes to main, to pick
-    # up upstream patches. Always pull on `up` so a stale local copy doesn't
-    # mask entrypoint/install fixes.
+    # :standalone is rebuilt daily; pull on every `up`.
     pull_policy: always
     depends_on:
       db:
@@ -49,9 +45,8 @@ services:
       CIVIKITCHEN_SMTP_HOST: maildev
       CIVIKITCHEN_SMTP_PORT: "1025"
     volumes:
-      # Edit the left-hand side to point at your own extension repo.
-      # The right-hand side is the path inside the container; the last
-      # segment ("myextension") is the extension key used by `cv ext:enable`.
+      # Left: your extension repo. The last segment on the right is the key
+      # `cv ext:enable` takes.
       - ../../extensions/de.systopia.contract:/var/www/html/ext/myextension
 
   db:

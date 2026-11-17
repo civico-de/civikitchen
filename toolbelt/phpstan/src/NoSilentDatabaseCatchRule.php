@@ -11,21 +11,9 @@ use PHPStan\Rules\Rule;
 use PHPStan\Rules\RuleErrorBuilder;
 
 /**
- * A failed query that nobody ever hears about.
- *
- * When a `try` reaches the database directly and its `catch` neither
- * rethrows nor logs at error level, the failure becomes a substituted value:
- * an empty list where rows were expected, a zero where a sum was. The caller
- * cannot tell that apart from a legitimately empty result, so the bug
- * surfaces as wrong data days later instead of as an exception now. An
- * honest error beats a silent fallback.
- *
- * `\Civi::log()->debug()`/`info()` does not count: those levels are off on
- * every production site, so the branch is still silent where it matters.
- *
- * APIv4 calls are deliberately out of scope — they raise typed exceptions
- * that callers legitimately catch for control flow (an absent record, a
- * permission denial), and the catch-all here would drown that in noise.
+ * A `try` reaching the database directly whose `catch` neither rethrows nor
+ * logs at error level or above. APIv4 calls are out of scope: their typed
+ * exceptions are legitimately caught for control flow.
  *
  * @implements Rule<Node\Stmt\TryCatch>
  */

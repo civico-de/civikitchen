@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Attach $TAG, and $MAJOR if $TAG is the newest on its line, to the digest behind
-# $IMAGE_PREFIX:latest (package $PKG, owner $OWNER). Every path the cli target
-# copies must match $RELEASE_SHA in its build commit unless $ALLOW_DRIFT=1. A
-# published $TAG is the release's image and stays where it is. Needs $GH_TOKEN.
+# Attach $TAG (and $MAJOR if newest on its line) to $IMAGE_PREFIX:latest's
+# digest; the cli's copied paths must match $RELEASE_SHA unless $ALLOW_DRIFT=1.
+# An already published $TAG stays. Needs $GH_TOKEN.
 set -euo pipefail
 
 dockerfile=docker/cli/Dockerfile

@@ -1,26 +1,12 @@
-# Shared GitLab pipeline for a CiviCRM extension: the counterpart of the
-# reusable GitHub workflow .github/workflows/extension-ci.yml, for repositories
-# hosted on GitLab. The repository's .gitlab-ci.yml includes it (ckinit writes
-# that caller when civikitchen.yaml declares `ci: gitlab`):
+# GitLab counterpart of extension-ci.yml, included by ckinit's .gitlab-ci.yml:
 #
 #   include:
 #     - remote: https://raw.githubusercontent.com/civico-de/civikitchen/v1/ci/gitlab/extension-ci.yml
 #
-# The jobs run inside the civikitchen image with the database as a service, so
-# a docker executor is enough; nothing needs a privileged runner. The e2e job
-# starts as root through `image:docker:user`, which the runner must support. ckboot
-# provisions the site in the job container, then the gates run as the web user,
-# the same `ck ci` a developer runs in the dev stack. The @v1 ref and CK_IMAGE
-# move together, like the GitHub caller and its image (docs/releases.md).
-#
-# A repository may override CK_IMAGE, CK_DB_IMAGE (keep it equal to the db of
-# .docker/docker-compose.ci.yml), CK_LIFECYCLE ("0" skips cklifecycle), and opt
-# in like the GitHub inputs: CK_NPM_CI="1" installs node_modules before the
-# gates, CK_JS_TESTS="1" also runs `npm test`. npm only; the image has no Bun.
-# The web user writes into the checkout, which relies on the docker executor's
-# default umask 0000 (FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR must stay off).
-# Jobs set CK_IN_IMAGE=1: e2e helpers call cv directly instead of through
-# compose (the managed tests/e2e/lib.sh does).
+# Needs a docker executor; the e2e job needs `image:docker:user` support. Overridable:
+# CK_IMAGE, CK_DB_IMAGE, CK_LIFECYCLE ("0" skips), CK_NPM_CI, CK_JS_TESTS.
+# The web user writes the checkout through the default umask 0000, so
+# FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR must stay off.
 
 variables:
   CK_IMAGE: ghcr.io/civico-de/civikitchen:v1
