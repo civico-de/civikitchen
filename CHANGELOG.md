@@ -21,7 +21,6 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - `ck run`, `ck ab` and `ck bisect` take `:ro` at the end of a `--mount`.
 - `ck ab --mount-a` and `--mount-b` mount into one side only; with them both
   sides may be the same image, to compare two work trees of a branch.
-- `:standalone-6.16` rebuilds again: 6.16 is the extended security release.
 
 ### Fixed
 
