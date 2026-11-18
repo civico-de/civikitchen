@@ -14,6 +14,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.68.0] - 2026-11-18
+
 ### Changed
 
 - **Breaking:** an extension's manual lives in `docs/handbook/`
@@ -2992,7 +2994,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.67.1...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.68.0...HEAD
+[1.68.0]: https://github.com/civico-de/civikitchen/compare/v1.67.1...v1.68.0
 [1.67.1]: https://github.com/civico-de/civikitchen/compare/v1.67.0...v1.67.1
 [1.67.0]: https://github.com/civico-de/civikitchen/compare/v1.66.1...v1.67.0
 [1.66.1]: https://github.com/civico-de/civikitchen/compare/v1.66.0...v1.66.1
