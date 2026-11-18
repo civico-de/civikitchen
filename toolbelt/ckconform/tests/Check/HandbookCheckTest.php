@@ -19,14 +19,57 @@ final class HandbookCheckTest extends CheckTestCase
     public function testAnOpenSourceExtensionWithoutAHandbookFails(): void
     {
         $context = $this->repo(['info.xml' => $this->infoXml(license: 'AGPL-3.0-or-later')]);
-        $this->assertFails($this->run_(new HandbookCheck(), $context), 'no handbook/index.md');
+        $this->assertFails($this->run_(new HandbookCheck(), $context), 'no docs/handbook/index.md');
+    }
+
+    public function testAManualLeftInTheOldDirectoryNamesTheMove(): void
+    {
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(license: 'AGPL-3.0-or-later'),
+            'handbook/index.md' => "# Fixture\n",
+        ]);
+        $this->assertFails($this->run_(new HandbookCheck(), $context), 'git mv handbook docs/handbook');
+    }
+
+    public function testTheTaggedDirectoryIsTheManual(): void
+    {
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(
+                license: 'AGPL-3.0-or-later',
+                extra: '<tags><tag>handbook:dir=manual</tag></tags>'
+                    . '<urls><url desc="Documentation">https://example.github.io/fixture/</url></urls>',
+            ),
+            'manual/index.md' => "# Fixture\n",
+            '.github/workflows/docs.yml' => self::DOCS_CALLER,
+        ], git: true);
+        $this->assertSilent($this->run_(new HandbookCheck(), $context));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function badTags(): iterable
+    {
+        yield 'two tags' => ['<tag>handbook:dir=manual</tag><tag>handbook:dir=docs</tag>'];
+        yield 'outside' => ['<tag>handbook:dir=../manual</tag>'];
+        yield 'root' => ['<tag>handbook:dir=/</tag>'];
+        yield 'dot' => ['<tag>handbook:dir=.</tag>'];
+    }
+
+    /** @dataProvider badTags */
+    public function testABadTagFails(string $tags): void
+    {
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(license: 'AGPL-3.0-or-later', extra: "<tags>{$tags}</tags>"),
+            'manual/index.md' => "# Fixture\n",
+            'index.md' => "# Fixture\n",
+        ]);
+        $this->assertFails($this->run_(new HandbookCheck(), $context), 'exactly one handbook directory');
     }
 
     public function testAnUnpublishedHandbookFails(): void
     {
         $context = $this->repo([
             'info.xml' => $this->infoXml(license: 'AGPL-3.0-or-later'),
-            'handbook/index.md' => "# Fixture\n",
+            'docs/handbook/index.md' => "# Fixture\n",
         ], git: true);
         $this->assertFails($this->run_(new HandbookCheck(), $context), 'no workflow calls extension-docs.yml');
     }
@@ -38,7 +81,7 @@ final class HandbookCheckTest extends CheckTestCase
                 license: 'AGPL-3.0-or-later',
                 extra: '<urls><url desc="Documentation">https://example.github.io/fixture/</url></urls>',
             ),
-            'handbook/index.md' => "# Fixture\n",
+            'docs/handbook/index.md' => "# Fixture\n",
             '.github/workflows/docs.yml' => self::DOCS_CALLER,
         ], git: true);
         $this->assertSilent($this->run_(new HandbookCheck(), $context));
@@ -58,7 +101,7 @@ final class HandbookCheckTest extends CheckTestCase
     {
         $context = $this->monorepoExtension(
             [],
-            ['info.xml' => $this->infoXml(license: 'AGPL-3.0-or-later'), 'handbook/index.md' => "# Fixture\n"],
+            ['info.xml' => $this->infoXml(license: 'AGPL-3.0-or-later'), 'docs/handbook/index.md' => "# Fixture\n"],
             ['info.xml' => $this->infoXml(key: 'base')],
         );
         $this->assertSilent($this->run_(new HandbookCheck(), $context));
@@ -68,7 +111,7 @@ final class HandbookCheckTest extends CheckTestCase
     {
         $context = $this->repo([
             'info.xml' => $this->infoXml(license: 'MIT'),
-            'handbook/index.md' => "# Fixture\n",
+            'docs/handbook/index.md' => "# Fixture\n",
             '__policy_fixture' => "ci=gitlab\n",
         ], git: true);
         $this->assertSilent($this->run_(new HandbookCheck(), $context));
@@ -81,7 +124,7 @@ final class HandbookCheckTest extends CheckTestCase
                 license: 'AGPL-3.0-or-later',
                 extra: '<urls><url desc="Main Extension Page">https://github.com/example/fixture</url></urls>',
             ),
-            'handbook/index.md' => "# Fixture\n",
+            'docs/handbook/index.md' => "# Fixture\n",
             '.github/workflows/docs.yml' => self::DOCS_CALLER,
         ], git: true);
         $this->assertFails($this->run_(new HandbookCheck(), $context), 'does not link the published handbook');
@@ -94,7 +137,7 @@ final class HandbookCheckTest extends CheckTestCase
                 license: 'AGPL-3.0-or-later',
                 extra: '<urls><url desc="Documentation">https://github.com/example/fixture</url></urls>',
             ),
-            'handbook/index.md' => "# Fixture\n",
+            'docs/handbook/index.md' => "# Fixture\n",
             '.github/workflows/docs.yml' => self::DOCS_CALLER,
         ], git: true);
         $this->assertFails($this->run_(new HandbookCheck(), $context), 'does not link the published handbook');

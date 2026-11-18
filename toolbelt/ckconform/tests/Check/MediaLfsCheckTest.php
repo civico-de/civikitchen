@@ -16,7 +16,7 @@ final class MediaLfsCheckTest extends CheckTestCase
     /** @return iterable<string, array{string}> */
     public static function media(): iterable
     {
-        yield 'screenshot' => ['handbook/images/shot.png'];
+        yield 'screenshot' => ['docs/handbook/images/shot.png'];
         yield 'upper-case extension' => ['images/PHOTO.JPG'];
         yield 'video at the root' => ['tour.mp4'];
         yield 'document' => ['docs/flyer.pdf'];
@@ -33,8 +33,8 @@ final class MediaLfsCheckTest extends CheckTestCase
     public function testPassesOnMediaWhoseIndexEntryIsAnLfsPointer(): void
     {
         $reporter = $this->run_(new MediaLfsCheck(), $this->repo([
-            'handbook/images/shot.png' => self::POINTER,
-            'handbook/images/de/shot.png' => self::POINTER,
+            'docs/handbook/images/shot.png' => self::POINTER,
+            'docs/handbook/images/de/shot.png' => self::POINTER,
         ], git: true));
         $this->assertPasses($reporter);
         self::assertContains('all 2 media file(s) are committed through Git LFS', $reporter->messages('ok'));
@@ -42,9 +42,9 @@ final class MediaLfsCheckTest extends CheckTestCase
 
     public function testJudgesTheIndexNotTheWorkTree(): void
     {
-        $context = $this->repo(['handbook/images/shot.png' => self::POINTER], git: true);
+        $context = $this->repo(['docs/handbook/images/shot.png' => self::POINTER], git: true);
         // What a checkout with git-lfs installed leaves on disk for the same commit.
-        $this->write('handbook/images/shot.png', self::PNG);
+        $this->write('docs/handbook/images/shot.png', self::PNG);
         $this->assertPasses($this->run_(new MediaLfsCheck(), $context));
     }
 
@@ -110,7 +110,7 @@ final class MediaLfsCheckTest extends CheckTestCase
 
     public function testSaysNothingOutsideAGitRepository(): void
     {
-        $reporter = $this->run_(new MediaLfsCheck(), $this->repo(['handbook/images/shot.png' => self::PNG]));
+        $reporter = $this->run_(new MediaLfsCheck(), $this->repo(['docs/handbook/images/shot.png' => self::PNG]));
         $this->assertPasses($reporter);
         self::assertSame([], $reporter->messages('ok'));
     }

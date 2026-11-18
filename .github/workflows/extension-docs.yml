@@ -1,4 +1,4 @@
-# Builds an extension's handbook/ pages into a documentation site, one per
+# Builds an extension's docs/handbook/ pages into a documentation site, one per
 # language, checks every page against WCAG 2.1 AA and deploys it to GitHub Pages.
 name: Extension Docs
 

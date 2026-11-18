@@ -482,12 +482,14 @@ info.xml version has no section
 
 A repository whose licence is neither empty nor Proprietary and that cuts
 releases is published, and the handbook check then asks for
-`handbook/index.md` plus a job calling
+`docs/handbook/index.md` (or `index.md` in the directory the `handbook:dir=`
+tag names) plus a job calling
 `extension-docs.yml`
 ([Documentation site](reusable-workflows.md#documentation-site)). A repository of several
 extensions and one on GitLab need only the index. Once the site is published,
 info.xml links it as `<url desc="Documentation">` on its `github.io` address,
-which the CiviCRM extension list shows.
+which the CiviCRM extension list shows. The rest of `docs/` is for developers
+and stays out of both the handbook and the site.
 
 ### Versions and tags
 

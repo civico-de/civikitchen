@@ -1056,8 +1056,8 @@ final class SharedPhpTest extends TestCase
     public function testReleaseRefusesAnArchiveHoldingGitLfsPointers(): void
     {
         $repository = $this->stagedRepository(['ang/app.bundle.js']);
-        $this->write($repository, 'handbook/images/shot.png', "version https://git-lfs.github.com/spec/v1\noid sha256:4d7a\nsize 12345\n");
-        $this->git($repository, 'add', 'handbook');
+        $this->write($repository, 'docs/handbook/images/shot.png', "version https://git-lfs.github.com/spec/v1\noid sha256:4d7a\nsize 12345\n");
+        $this->git($repository, 'add', 'docs');
         $this->git($repository, '-c', 'user.name=ck', '-c', 'user.email=ck@example.org', 'commit', '-q', '-m', 'pointer');
         $this->write($repository, 'ang/app.bundle.js', 'built();');
 
@@ -1067,7 +1067,7 @@ final class SharedPhpTest extends TestCase
             $repository,
         );
         self::assertSame(1, $cli['status']);
-        self::assertStringContainsString("Git LFS pointers instead of files:\n  org.example.staged/handbook/images/shot.png\n", $cli['stderr']);
+        self::assertStringContainsString("Git LFS pointers instead of files:\n  org.example.staged/docs/handbook/images/shot.png\n", $cli['stderr']);
     }
 
     public function testReleaseReadsTheChangelogOfTheArchivedRef(): void

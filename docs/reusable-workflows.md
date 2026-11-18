@@ -12,7 +12,7 @@ checkout, toolchain, artifacts, cleanup and runner selection.
 | `frontend-ci.yml` | Install, typecheck, lint, test and build an npm project | [Frontend CI](#frontend-ci) |
 | `playwright-e2e.yml` | A browser suite that owns its stack | [Standalone Playwright E2E](#standalone-playwright-e2e) |
 | `command-check.yml` | One cheap command the repository owns | [Repository command checks](#repository-command-checks) |
-| `extension-docs.yml` | The `handbook/` directory as a site on GitHub Pages | [Documentation site](#documentation-site) |
+| `extension-docs.yml` | The `docs/handbook/` directory as a site on GitHub Pages | [Documentation site](#documentation-site) |
 
 [Working directory](#working-directory) and [Runner selection](#runner-selection)
 apply to all of them except `extension-docs.yml`.
@@ -222,9 +222,12 @@ jobs:
 
 ## Documentation site
 
-`extension-docs.yml` turns the extension's `handbook/` directory into a
-documentation site on GitHub Pages. These are the same pages the handbook
-extension shows inside CiviCRM, so one set of Markdown files serves both. Its
+`extension-docs.yml` turns the extension's `docs/handbook/` directory, or the
+one its info.xml tag `handbook:dir=<name>` names, into a documentation site on
+GitHub Pages. These are the same pages the handbook extension shows inside
+CiviCRM, so one set of Markdown files serves both. The rest of `docs/` is
+developer documentation and is not published
+([ADR-0020](adr/0020-extension-docs-live-in-docs.md)). Its
 inputs are `languages` (space-separated, default `en`) and `deploy` (default
 `false`; the caller decides when).
 
@@ -233,9 +236,9 @@ name: Docs
 on:
   push:
     branches: [main]
-    paths: ['handbook/**', 'info.xml']
+    paths: ['docs/handbook/**', 'info.xml']
   pull_request:
-    paths: ['handbook/**', 'info.xml']
+    paths: ['docs/handbook/**', 'info.xml']
 jobs:
   docs:
     uses: civico-de/civikitchen/.github/workflows/extension-docs.yml@v1
@@ -248,15 +251,20 @@ jobs:
       deploy: ${{ github.event_name == 'push' }}
 ```
 
+An extension whose tag names another directory sets both `paths:` filters to
+that directory.
+
 Set the repository's Pages source to GitHub Actions once. GitHub serves Pages
 from a private repository only on paid plans. The workflow always runs on
 GitHub-hosted runners and takes neither `runs_on` nor `working_directory`.
 
 **Pages.** The site takes its name and description from `info.xml`. A
-`handbook/images/logo.svg` (or `logo.png`) stands in the header next to the
+`docs/handbook/images/logo.svg` (or `logo.png`) stands in the header next to the
 name and serves as favicon; without one the header shows the theme's icon.
 Each page's frontmatter sets its title, its position (`order`) and its group
-in the navigation (`section`), just as it does in the handbook. Links between
+in the navigation (`section`), just as it does in the handbook. A
+subdirectory with pages is a section, named after its `index.md`'s title or
+after the directory; that page comes first and places the section. Links between
 pages are relative, such as `setup.md#first-steps`, and the build fails on a
 link to a missing page or heading. Heading ids are made the way the handbook
 makes them: lower case, dashes for spaces, umlauts kept, dots and underscores

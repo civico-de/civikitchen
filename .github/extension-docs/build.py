@@ -1,12 +1,16 @@
-"""Build an extension's handbook/ directory into a Zensical site, one per language.
+"""Build an extension's manual into a Zensical site, one per language.
 
 usage: build.py <extension-dir> <site-dir> <lang> [<lang> ...]
 
-The first language is the default: page.md, served at the site root. Every
+The manual is docs/handbook/, or the directory the info.xml tag
+handbook:dir=<name> names, with its subdirectories; a subdirectory with pages
+is a section. The first language is the default: page.md, served at the site root. Every
 further language is built into <site-dir>/<lang>/ from page.<lang>.md where it
 exists and page.md where not, the fallback the handbook extension applies in
 CiviCRM. Title, order and section come from each page's frontmatter, and a
-variant inherits the keys it leaves out from page.md, as there. Heading ids
+variant inherits the keys it leaves out from page.md, as there. Sections follow
+the extension: a subdirectory's section is its index.md's section or title,
+else its name; that page comes first and places the section. Heading ids
 follow the extension's renderer, so a page.md#anchor link works in both.
 Runs under the Python that has zensical installed.
 """
@@ -77,30 +81,57 @@ def split_name(name, languages):
     return stem, None
 
 
+def sort_key(meta):
+    order = meta.get("order")
+    return (0 if isinstance(order, int) else 1, order if isinstance(order, int) else 0, str(meta["title"]).casefold())
+
+
 def nav(pages, lang, source):
-    """Landing page first, then by order and title; a section sits where its first page sorts."""
-    entries = []
-    for stem, variants in pages.items():
-        meta = page_meta(source, variants, lang)
+    """Landing page first, then by order and title. A section starts with its subdirectory's
+    index.md and sorts where it does, else where its first page sorts."""
+    metas = {stem: page_meta(source, variants, lang) for stem, variants in pages.items()}
+    dir_sections = {}
+    for stem, meta in metas.items():
+        folder, _, leaf = stem.rpartition("/")
+        if folder and folder not in dir_sections:
+            dir_sections[folder] = folder.rpartition("/")[2]
+        if folder and leaf == "index":
+            dir_sections[folder] = str(meta.get("section") or meta["title"]).strip()
+    singles, groups = [], {}
+    for stem, meta in metas.items():
         if stem == "index":
             continue
-        order = meta.get("order")
-        key = (0 if isinstance(order, int) else 1, order if isinstance(order, int) else 0, str(meta["title"]).casefold())
-        section = str(meta.get("section") or "").strip()
-        entries.append((key, section, {str(meta["title"]): f"{stem}.md"}))
-    entries.sort(key=lambda e: e[0])
-    out, groups = [], {}
-    if "index" in pages:
-        out.append({page_meta(source, pages["index"], lang)["title"]: "index.md"})
-    for _, section, item in entries:
-        if not section:
-            out.append(item)
-        elif section in groups:
-            groups[section].append(item)
+        folder = stem.rpartition("/")[0]
+        section = str(meta.get("section") or "").strip() or dir_sections.get(folder, "")
+        entry = ((0 if folder and stem.endswith("/index") else 1, sort_key(meta)), {str(meta["title"]): f"{stem}.md"})
+        if section:
+            groups.setdefault(section, []).append(entry)
         else:
-            groups[section] = [item]
-            out.append({section: groups[section]})
-    return out
+            singles.append((sort_key(meta), entry[1]))
+    placed = list(singles)
+    for section, entries in groups.items():
+        entries.sort(key=lambda e: e[0])
+        placed.append((entries[0][0][1], {section: [item for _, item in entries]}))
+    placed.sort(key=lambda e: e[0])
+    out = [{metas["index"]["title"]: "index.md"}] if "index" in metas else []
+    return out + [item for _, item in placed]
+
+
+def manual_dir(ext, info):
+    """docs/handbook, or the one directory the handbook:dir= tag names, as the extension reads it."""
+    declared = [t.text[len("handbook:dir="):] for t in info.iter("tag") if (t.text or "").startswith("handbook:dir=")]
+    if len(declared) > 1:
+        die(f"info.xml declares more than one handbook directory: {', '.join(declared)}")
+    source = (ext / (declared[0] if declared else "docs/handbook")).resolve()
+    if source == ext or ext not in source.parents or not source.is_dir():
+        die(f"{source} is not a directory inside the extension")
+    return source
+
+
+def markdown(source):
+    """Markdown files below source, without hidden files and directories."""
+    return [p for p in sorted(source.rglob("*.md"))
+            if not any(part.startswith(".") for part in p.relative_to(source).parts)]
 
 
 def main():
@@ -110,17 +141,21 @@ def main():
     for lang in languages:
         if not LANG.match(lang):
             die(f"{lang}: not a language code like de or de_DE")
-    source = ext / "handbook"
-    if not source.is_dir():
-        die(f"{source} does not exist")
     info = ET.parse(ext / "info.xml").getroot()
+    source = manual_dir(ext, info)
     name = (info.findtext("name") or info.get("key") or ext.name).strip()
     description = " ".join((info.findtext("description") or "").split())
 
     pages = {}
-    for path in sorted(source.glob("*.md")):
-        stem, lang = split_name(path.name, languages[1:])
-        pages.setdefault(stem, {})[lang] = path.name
+    for path in markdown(source):
+        relative = path.relative_to(source)
+        stem, lang = split_name(relative.name, languages[1:])
+        folder = relative.parent.as_posix()
+        pages.setdefault(stem if folder == "." else f"{folder}/{stem}", {})[lang] = relative.as_posix()
+    # The site serves page.md and page/index.md both at page/.
+    clashes = [f"{stem}.md" for stem in pages if f"{stem}/index" in pages]
+    if clashes:
+        die(f"pages that the site would serve at one address as their directory's index.md: {', '.join(clashes)}")
     orphans = [v for p in pages.values() if None not in p for v in p.values()]
     if orphans:
         die(f"translations without a default page: {', '.join(orphans)}")
@@ -144,7 +179,7 @@ def main():
         for index, lang in enumerate(languages):
             docs = Path(tmp) / lang / "docs"
             # Images and other assets are shared; pages are the language's variant.
-            shutil.copytree(source, docs, ignore=shutil.ignore_patterns("*.md"))
+            shutil.copytree(source, docs, ignore=shutil.ignore_patterns("*.md", ".*"))
             for stem, variants in pages.items():
                 shutil.copyfile(source / variants.get(lang, variants[None]), docs / f"{stem}.md")
             (docs / "stylesheets").mkdir(exist_ok=True)

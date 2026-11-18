@@ -14,6 +14,21 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** an extension's manual lives in `docs/handbook/`
+  ([ADR-0020](docs/adr/0020-extension-docs-live-in-docs.md)). `extension-docs.yml`
+  builds the site from there, and the ckconform check `handbook` asks for
+  `docs/handbook/index.md`; it names the move when it finds `handbook/index.md`.
+  Move the directory with `git mv handbook docs/handbook` and set the docs
+  caller's `paths:` to `docs/handbook/**`. Both read the `handbook:dir=` tag as
+  the handbook extension does.
+
+### Added
+
+- `extension-docs.yml` builds subdirectories of the manual as sections, named
+  after their `index.md` or the directory, as the handbook extension shows them.
+
 ## [1.67.1] - 2026-11-18
 
 ### Fixed
