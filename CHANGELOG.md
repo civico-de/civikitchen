@@ -14,6 +14,12 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Fixed
+
+- `ckcoretest --e2e` in a `ck run`, `ck ab` or `ck bisect` stack no longer fails
+  with `Undefined array key "ADMIN_USER"`: these stacks create the `admin`
+  login the end-to-end tests sign in as.
+
 ## [1.67.0] - 2026-11-17
 
 ### Added

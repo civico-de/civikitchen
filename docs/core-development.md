@@ -58,7 +58,8 @@ are left to that matrix.
 not the test database. They install the extensions they need into the site,
 so disable those afterwards with `cv ext:disable`. They log in as
 `ADMIN_USER`, which provisioning writes to `~/.cv.json` from
-`CIVIKITCHEN_DEMO_USER`. They run as the web user `www-data`, also when
+`CIVIKITCHEN_DEMO_USER`; stacks from `ck run`, `ck ab` and `ck bisect` set it
+to `admin`. They run as the web user `www-data`, also when
 started as root (`exec -u root` or `user: root`), so files the site writes
 during a test stay writable for it.
 

@@ -79,6 +79,8 @@ final class StandaloneStack
                         'CIVICRM_DB_PASSWORD' => 'civicrm',
                         // The headless test database is created as database root.
                         'CIVICRM_DB_ROOT_PASSWORD' => 'root',
+                        // The admin login that `ckcoretest --e2e` signs in as (ADMIN_USER in ~/.cv.json).
+                        'CIVIKITCHEN_DEMO_USER' => 'admin',
                     ],
                     'volumes' => $mounts,
                 ],
