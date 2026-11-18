@@ -14,6 +14,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.67.1] - 2026-11-18
+
 ### Fixed
 
 - `ckcoretest --e2e` in a `ck run`, `ck ab` or `ck bisect` stack no longer fails
@@ -2975,7 +2977,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.67.0...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.67.1...HEAD
+[1.67.1]: https://github.com/civico-de/civikitchen/compare/v1.67.0...v1.67.1
 [1.67.0]: https://github.com/civico-de/civikitchen/compare/v1.66.1...v1.67.0
 [1.66.1]: https://github.com/civico-de/civikitchen/compare/v1.66.0...v1.66.1
 [1.66.0]: https://github.com/civico-de/civikitchen/compare/v1.65.0...v1.66.0
