@@ -48,9 +48,10 @@ vulnerabilities:
   # -------------------------------------------------------------------------
   # Go stdlib inside the oxlint-tsgolint binary
   #
-  # Prebuilt Go binary built with Go 1.26.9 (7.0.2005, newest on 2026-10-27);
-  # it opens no listener and speaks no TLS. On expiry: `npm view
-  # oxlint-tsgolint version`, bump once a release built with >= 1.26.10 ships.
+  # Prebuilt Go binary built with Go 1.26.9 (7.0.2005); 7.0.2007, newest on
+  # 2026-11-19, is built with 1.26.10. It opens no listener and speaks no TLS.
+  # On expiry: `npm view oxlint-tsgolint version`, bump once a release built
+  # with >= 1.26.11 ships (`strings tsgolint | grep -m1 '^go1\.'`).
   # -------------------------------------------------------------------------
   - id: CVE-2026-111943
     paths:
@@ -58,6 +59,15 @@ vulnerabilities:
     statement: >-
       Go stdlib crypto/x509 certificate handling in the prebuilt tsgolint binary — only reached when
       verifying certificates, which a local linter without TLS never does; see the group note above.
+    expired_at: 2027-01-31
+
+  - id: CVE-2026-97054
+    paths:
+      - "opt/civikitchen/toolbelt/oxlint/node_modules/@oxlint-tsgolint/**"
+    statement: >-
+      Go stdlib net/http: an HTTP/1 server whose MaxBytesReader limit is hit
+      mishandles the connection. tsgolint runs no HTTP server; see the group
+      note above.
     expired_at: 2027-01-31
 
   # -------------------------------------------------------------------------

@@ -25,6 +25,11 @@ except that a break the consumers are adjusted for ships as a minor, marked
   the new token adds the notes
   ([extension releases](docs/extension-releases.md#a-mirror-an-extension-directory-reads)).
 
+### Changed
+
+- The CLI and Playwright toolbelt images carry Docker CLI 29.10.0, built with
+  Go 1.27.4, which clears CVE-2026-97054 in the 29.9.3 binary.
+
 ## [1.68.0] - 2026-11-18
 
 ### Changed
