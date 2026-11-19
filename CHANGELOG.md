@@ -14,6 +14,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.69.0] - 2026-11-19
+
 ### Added
 
 - **Breaking:** a release to `mirror_url` also creates the GitLab release of the
@@ -3003,7 +3005,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.68.0...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.69.0...HEAD
+[1.69.0]: https://github.com/civico-de/civikitchen/compare/v1.68.0...v1.69.0
 [1.68.0]: https://github.com/civico-de/civikitchen/compare/v1.67.1...v1.68.0
 [1.67.1]: https://github.com/civico-de/civikitchen/compare/v1.67.0...v1.67.1
 [1.67.0]: https://github.com/civico-de/civikitchen/compare/v1.66.1...v1.67.0
