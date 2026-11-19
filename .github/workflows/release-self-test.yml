@@ -12,6 +12,7 @@ on:
       - '.github/workflows/release-self-test.yml'
       - '.github/scripts/release-publish-flags.sh'
       - '.github/scripts/release-mirror.sh'
+      - '.github/scripts/release-mirror-notes.sh'
 
 permissions:
   contents: read

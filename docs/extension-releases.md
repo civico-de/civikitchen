@@ -126,7 +126,7 @@ extensions releases them together from one caller at its root; see
 | Secret | What it is for |
 |--------|----------------|
 | `composer_app_id`, `composer_app_private_key` | A GitHub App with contents read, installed on the private dependency repos, for private Composer packages and staged dependency releases. Pass both; one without the other fails the run. |
-| `mirror_token` | A token that may push to `mirror_url`. |
+| `mirror_token` | A token that may push to `mirror_url` and write its releases. |
 
 ## The changelog
 
@@ -387,7 +387,10 @@ The mirror receives:
 - a tag named after the bare version, 1.3.0 for v1.3.0. It points at one
   commit on top of the released one whose files are the archive's files, so an
   archive of that tag is the release archive: vendor/ and build output
-  included, the development layer left out, LFS media as plain files.
+  included, the development layer left out, LFS media as plain files;
+- a GitLab release of that tag whose notes are the version's changelog
+  section, the same notes as the GitHub release. A directory that links a
+  version's release page finds them there; a re-run updates them.
 
 The v-prefixed tags stay in the source repository. A release from an older
 line publishes its tag and leaves the mirror's branch alone. A tag the mirror
@@ -398,7 +401,7 @@ branch from following and is reported in the run.
 
 `mirror_token` reaches git through a credential helper and never appears in a
 URL or a command line. On GitLab, create a project access token with the
-write_repository scope and the Maintainer role, allow that role to create
+write_repository and api scopes and the Maintainer role, allow that role to create
 tags and to push to the default branch, and store the token as a repository
 secret. The mirror takes one extension per repository; a release with several
 archives fails at this step.

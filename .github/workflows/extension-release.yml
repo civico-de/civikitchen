@@ -86,8 +86,9 @@ on:
         description: >-
           HTTPS address of a second git repository that receives each release:
           the default branch as released, and the archive's contents as a
-          commit tagged with the bare version (1.2.3). Needs the mirror_token
-          secret; one extension per repository.
+          commit tagged with the bare version (1.2.3), plus a GitLab release
+          of that tag with the changelog section as notes. Needs the
+          mirror_token secret; one extension per repository.
         type: string
         default: ''
       node_version:
@@ -112,8 +113,8 @@ on:
 
       mirror_token:
         description: >-
-          Token that may push to mirror_url. On GitLab a project access token
-          with the write_repository scope.
+          Token that may push to mirror_url and write its releases. On GitLab
+          a project access token with the write_repository and api scopes.
         required: false
 
 permissions:
@@ -712,3 +713,13 @@ jobs:
           [ "${#zips[@]}" -eq 1 ] \
             || { echo "mirror_url takes one extension per repository, this release carries ${#zips[@]} archives" >&2; exit 1; }
           "$GITHUB_WORKSPACE/.civikitchen-ci/.github/scripts/release-mirror.sh" "${zips[0]}" "${GITHUB_REF_NAME#v}" "$CK_BRANCH"
+
+      # A directory that links a tag's release page finds the notes there.
+      - name: Publish the release notes to the mirror
+        if: ${{ inputs.mirror_url != '' && !inputs.dry_run }}
+        env:
+          CK_MIRROR_URL: ${{ inputs.mirror_url }}
+          CK_MIRROR_TOKEN: ${{ secrets.mirror_token }}
+        run: |
+          set -euo pipefail
+          .civikitchen-ci/.github/scripts/release-mirror-notes.sh "${GITHUB_REF_NAME#v}" "$RUNNER_TEMP/release-notes.md"

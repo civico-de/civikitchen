@@ -14,6 +14,15 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- **Breaking:** a release to `mirror_url` also creates the GitLab release of the
+  bare-version tag, with the version's changelog section as notes, and a re-run
+  updates them. `mirror_token` now needs the api scope beside write_repository;
+  without it the run fails after the tag reached the mirror, and a re-run with
+  the new token adds the notes
+  ([extension releases](docs/extension-releases.md#a-mirror-an-extension-directory-reads)).
+
 ## [1.68.0] - 2026-11-18
 
 ### Changed
