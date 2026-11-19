@@ -14,6 +14,12 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- `extension-docs.yml` fails on an image or linked file the manual does not
+  hold, such as `![Form](images/form.png)` after the picture was renamed; the
+  build already failed on a link to a missing page or heading.
+
 ## [1.69.0] - 2026-11-19
 
 ### Added

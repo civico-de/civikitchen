@@ -266,7 +266,8 @@ in the navigation (`section`), just as it does in the handbook. A
 subdirectory with pages is a section, named after its `index.md`'s title or
 after the directory; that page comes first and places the section. Links between
 pages are relative, such as `setup.md#first-steps`, and the build fails on a
-link to a missing page or heading. Heading ids are made the way the handbook
+link to a missing page or heading, and on an image or linked file that is
+not in the manual's directory. Heading ids are made the way the handbook
 makes them: lower case, dashes for spaces, umlauts kept, dots and underscores
 dropped. A heading `widget.max_items` is linked as `#widgetmaxitems`.
 

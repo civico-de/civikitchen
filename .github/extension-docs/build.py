@@ -22,7 +22,9 @@ import subprocess
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
+from html.parser import HTMLParser
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 import yaml
 
@@ -34,6 +36,36 @@ CONTRAST_CSS = """[data-md-color-scheme="default"] { --md-accent-fg-color: #3949
 [data-md-color-scheme="slate"] { --md-accent-fg-color: #8c9eff; --md-accent-fg-color--transparent: #8c9eff1a; }
 .md-typeset video { max-width: 100%; height: auto; }
 """
+
+
+class References(HTMLParser):
+    """The href, src, srcset and poster URLs of a built page."""
+
+    def __init__(self):
+        super().__init__()
+        self.urls = []
+
+    def handle_starttag(self, tag, attrs):
+        self.urls += [value for name, value in attrs if name in ("href", "src", "poster") and value]
+        # A srcset candidate's URL runs to the next whitespace, so a data: URL keeps its comma.
+        self.urls += [url.rstrip(",") for name, value in attrs if name == "srcset" and value
+                      for url in re.findall(r"(?:^|(?<=,))\s*([^\s,]\S*)", value)]
+
+
+def dangling(site):
+    """Relative references in the built site whose file is missing; --strict checks only page links."""
+    missing = []
+    for page in sorted(site.rglob("*.html")):
+        parser = References()
+        parser.feed(page.read_text(encoding="utf-8"))
+        for url in parser.urls:
+            parts = urlsplit(url)
+            if parts.scheme or parts.netloc or url.startswith(("/", "#")) or not parts.path:
+                continue
+            target = (page.parent / unquote(parts.path)).resolve()
+            if not (target.is_file() or (target / "index.html").is_file()):
+                missing.append(f"{page.relative_to(site).as_posix()} → {url}")
+    return missing
 
 
 def die(message):
@@ -225,6 +257,9 @@ def main():
             env = {**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parent), "PYTHONDONTWRITEBYTECODE": "1"}
             subprocess.run([sys.executable, "-m", "zensical", "build", "--strict", "-f", str(config_file)], check=True, env=env)
             shutil.copytree(Path(tmp) / lang / "site", site / prefix, dirs_exist_ok=True)
+    missing = dangling(site)
+    if missing:
+        die("missing files behind relative references (built page → reference):\n  " + "\n  ".join(missing))
 
 
 if __name__ == "__main__":
