@@ -12,7 +12,7 @@ declare(strict_types = 1);
  */
 function ck_headless(string ...$optional): \Civi\Test\CiviEnvBuilder {
   ck_restore_core_foreign_keys();
-  $info = ck_extension_info(dirname(__DIR__, 2));
+  $info = ck_extension_info(ck_extension_dir());
   $keys = [];
   foreach ($info->requires->ext ?? [] as $required) {
     $keys[] = trim((string) $required);
@@ -24,7 +24,7 @@ function ck_headless(string ...$optional): \Civi\Test\CiviEnvBuilder {
     [static fn () => ck_install_in_order($keys), 'ck-install:' . implode(',', $keys)],
     // Last, so it drains what every earlier step queued. Its signature carries
     // the install files, so editing them rebuilds the test database.
-    ['ck_discard_bootstrap_status', 'ck-discard-bootstrap-status;' . ck_install_signature(dirname(__DIR__, 2), $info)],
+    ['ck_discard_bootstrap_status', 'ck-discard-bootstrap-status;' . ck_install_signature(ck_extension_dir(), $info)],
   ];
   $builder = \Civi\Test::headless();
   foreach ($steps as [$callback, $signature]) {
@@ -168,6 +168,25 @@ function ck_install_signature(string $dir, SimpleXMLElement $info): string {
  */
 function ck_discard_bootstrap_status(): void {
   \CRM_Core_Session::singleton()->getStatus(reset: TRUE);
+}
+
+/**
+ * The extension under test: the working directory, where ckphpunit and ck ci
+ * run phpunit. Resolved once, before anything can change the directory.
+ */
+function ck_extension_dir(): string {
+  static $dir = NULL;
+  if (is_string($dir)) {
+    return $dir;
+  }
+  $cwd = getcwd();
+  if ($cwd === FALSE || !is_file($cwd . '/info.xml')) {
+    throw new RuntimeException(
+      'ck_headless: no info.xml in ' . ($cwd === FALSE ? 'the working directory' : $cwd)
+      . ' - run phpunit from the extension root',
+    );
+  }
+  return $dir = $cwd;
 }
 
 /**

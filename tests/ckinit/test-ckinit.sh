@@ -228,14 +228,14 @@ fi
 # tracks); content-identical but chmod +x must read as drift.
 /bin/rm "$work/drift/civikitchen.yaml"
 "$root/scaffold/ckinit.php" --update "$work/drift" >/dev/null
-chmod +x "$work/drift/phpstanBootstrap.php"
+chmod +x "$work/drift/.gitattributes"
 if out=$("$root/scaffold/ckinit.php" --check "$work/drift" 2>&1); then
   echo "executable-bit drift was not detected" >&2
   exit 1
 fi
-grep -q 'drifted   phpstanBootstrap.php' <<<"$out"
+grep -q 'drifted   .gitattributes' <<<"$out"
 "$root/scaffold/ckinit.php" --update "$work/drift" >/dev/null
-if [ -x "$work/drift/phpstanBootstrap.php" ]; then
+if [ -x "$work/drift/.gitattributes" ]; then
   echo "--update did not restore the file mode" >&2
   exit 1
 fi
@@ -1113,6 +1113,53 @@ fi
 wait "$proxy_pid"
 grep -q '^CONNECT github.com:443 ' "$work/proxy-request" \
   || { echo "the Strauss runner bypassed HTTPS_PROXY: $(cat "$work/proxy-request") $out" >&2; exit 1; }
+
+# The bootstraps ship in the image. A repository still carrying the template's
+# copies: --check names each, --update deletes a copy once nothing names it.
+fixtures="$root/toolbelt/ckconform/tests/fixtures/retired-template"
+make_extension "$work/retired"
+"$root/scaffold/ckinit.php" "$work/retired" >/dev/null
+mkdir -p "$work/retired/tests/phpunit"
+cp "$fixtures/phpstanBootstrap.php" "$work/retired/"
+cp "$fixtures/bootstrap.php" "$fixtures/ckHeadless.php" "$work/retired/tests/phpunit/"
+rewrite_with_sed 's#bootstrap="/opt/civikitchen/toolbelt/phpunit/bootstrap.php"#bootstrap="tests/phpunit/bootstrap.php"#' "$work/retired/phpunit.xml.dist"
+grep -q 'bootstrap="tests/phpunit/bootstrap.php"' "$work/retired/phpunit.xml.dist"
+if out=$("$root/scaffold/ckinit.php" --check "$work/retired" 2>&1); then
+  echo "--check accepted the retired bootstrap copies" >&2
+  exit 1
+fi
+grep -q 'retired   phpstanBootstrap.php (a copy of the bootstrap the image ships as /opt/civikitchen/toolbelt/phpstan-config/bootstrap.php; --update deletes it)' <<<"$out"
+grep -q 'retired   tests/phpunit/bootstrap.php (still named by phpunit.xml.dist:2 — point that at /opt/civikitchen/toolbelt/phpunit/bootstrap.php' <<<"$out"
+grep -q 'retired   tests/phpunit/ckHeadless.php (loaded by the copy tests/phpunit/bootstrap.php, and goes with it)' <<<"$out"
+# --update deletes only the unnamed copy; the named ones keep the suite working.
+out=$("$root/scaffold/ckinit.php" --update "$work/retired")
+grep -q 'removed   phpstanBootstrap.php' <<<"$out"
+[ ! -e "$work/retired/phpstanBootstrap.php" ] || { echo "--update kept an unnamed copy" >&2; exit 1; }
+[ -f "$work/retired/tests/phpunit/bootstrap.php" ] && [ -f "$work/retired/tests/phpunit/ckHeadless.php" ] \
+  || { echo "--update deleted a copy phpunit.xml.dist still loads" >&2; exit 1; }
+# Once the config points at the image, both copies go in one run.
+rewrite_with_sed 's#bootstrap="tests/phpunit/bootstrap.php"#bootstrap="/opt/civikitchen/toolbelt/phpunit/bootstrap.php"#' "$work/retired/phpunit.xml.dist"
+out=$("$root/scaffold/ckinit.php" --update "$work/retired")
+grep -q 'removed   tests/phpunit/bootstrap.php' <<<"$out"
+grep -q 'removed   tests/phpunit/ckHeadless.php' <<<"$out"
+[ ! -e "$work/retired/tests/phpunit/bootstrap.php" ] && [ ! -e "$work/retired/tests/phpunit/ckHeadless.php" ]
+"$root/scaffold/ckinit.php" --check "$work/retired" | grep -q 'up to date'
+# A bootstrap the repository changed is its own: never deleted, never reported.
+{ cat "$fixtures/bootstrap.php"; echo '// repository-specific'; } > "$work/retired/tests/phpunit/bootstrap.php"
+"$root/scaffold/ckinit.php" --update "$work/retired" >/dev/null
+[ -f "$work/retired/tests/phpunit/bootstrap.php" ] || { echo "--update deleted a repository-modified bootstrap" >&2; exit 1; }
+"$root/scaffold/ckinit.php" --check "$work/retired" | grep -q 'up to date'
+# template_custom naming a retired path is drift with the fix, not a crash.
+php -r '
+  require $argv[1]; $f=$argv[2]; $d=ck_scenario_parse_yaml($f);
+  $d["policy"]["template_custom"]=["paths"=>["tests/phpunit/bootstrap.php"],"reason"=>"own Drupal bootstrap"];
+  file_put_contents($f, ck_scenario_dump_yaml($d));
+' "$root/packages/civikitchen-scenario-schema/scenario.php" "$work/retired/civikitchen.yaml"
+if out=$("$root/scaffold/ckinit.php" --check "$work/retired" 2>&1); then
+  echo "--check accepted template_custom naming a retired file" >&2
+  exit 1
+fi
+grep -q 'drifted   tests/phpunit/bootstrap.php (listed in policy.template_custom, but the image ships it and no template file carries it — drop it from the list)' <<<"$out"
 
 "$root/scaffold/ckinit.php" --help >/dev/null
 echo "ckinit integration checks passed"

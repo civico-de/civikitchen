@@ -6,11 +6,12 @@ namespace CiviKitchen\Ckconform\Check;
 
 use CiviKitchen\Ckconform\Check;
 use CiviKitchen\Ckconform\Context;
+use CiviKitchen\Ckconform\ImageBootstraps;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A Civi\Test headless suite whose tests/ tree has no TEST_DB_DSN guard, which
- * can wipe the developer's own CiviCRM; pure unit suites are exempt.
+ * A Civi\Test headless suite whose phpunit bootstrap has no TEST_DB_DSN guard,
+ * which can wipe the developer's own CiviCRM; pure unit suites are exempt.
  */
 final class TestBootstrapGuardCheck implements Check
 {
@@ -31,8 +32,9 @@ final class TestBootstrapGuardCheck implements Check
             return;
         }
 
-        if (!$context->isTracked('tests/phpunit/bootstrap.php')) {
-            $reporter->fail('no tests/phpunit/bootstrap.php');
+        [$bootstrap, $code] = ImageBootstraps::suiteBootstrap($context);
+        if ($code === null) {
+            $reporter->fail("no {$bootstrap}");
 
             return;
         }
@@ -43,10 +45,10 @@ final class TestBootstrapGuardCheck implements Check
             return;
         }
 
-        if ($this->guardsInCode($context->read('tests/phpunit/bootstrap.php') ?? '')) {
+        if ($this->guardsInCode($code)) {
             $reporter->ok('test bootstrap has the TEST_DB_DSN guard');
         } else {
-            $reporter->fail('tests/phpunit/bootstrap.php lacks the TEST_DB_DSN guard — headless runs can wipe the dev DB');
+            $reporter->fail("{$bootstrap} lacks the TEST_DB_DSN guard — headless runs can wipe the dev DB");
         }
     }
 

@@ -806,7 +806,7 @@ E_USER_DEPRECATED, which PHPUnit ignores unless it is in the error mask. The
 template has both settings that make it a red build:
 
 - `convertDeprecationsToExceptions="true"` in phpunit.xml.dist
-- `error_reporting(E_ALL)` in `tests/phpunit/bootstrap.php`
+- `error_reporting(E_ALL)` in the image's PHPUnit bootstrap, or in a repository's own
 
 The ckconform check deprecation-gate warns when a repo drops either.
 

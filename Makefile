@@ -226,15 +226,15 @@ test-ckcoretest: ## ckcoretest --e2e runs only e2e tests against the dev site, a
 test-core-patches: ## Standalone core patches: applied once, contained ones skipped, stale or unlinked ones fail
 	bash tests/toolbelt/test-core-patches.sh
 
-# Two managed template files derive the <requires> chain from info.xml — the
-# test bootstrap for Civi\Test, the phpstan bootstrap for class resolution.
+# Two image bootstraps derive the <requires> chain from info.xml — the test
+# bootstrap for Civi\Test, the phpstan bootstrap for class resolution.
 test-ck-headless: ## ck_headless() installs the <requires> closure and rebuilds on install-file changes (stubbed Civi)
 	bash tests/toolbelt/test-ck-headless.sh
 
-test-ck-headless-phpstan: $(CORE) $(VENDOR_STAMP) ## The managed ckHeadless.php passes phpstan level 10 against the pinned core
+test-ck-headless-phpstan: $(CORE) $(VENDOR_STAMP) ## The image's ckHeadless.php passes phpstan level 10 against the pinned core
 	CIVICRM_CORE_DIR=$(abspath $(CORE)) bash tests/toolbelt/test-ck-headless-phpstan.sh
 
-test-phpstan-bootstrap: ## phpstanBootstrap.php autoloads mounted <requires> extensions (stubbed core)
+test-phpstan-bootstrap: ## The image's phpstan bootstrap autoloads mounted <requires> extensions (stubbed core)
 	bash tests/toolbelt/test-phpstan-bootstrap.sh
 
 # `vendored_paths` decides what the linters never see; a regression is silent.

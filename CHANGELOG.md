@@ -93,6 +93,26 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Changed
 
+- **Breaking:** the PHPUnit and phpstan bootstraps ship in the image instead of
+  being copied into each repository. The template's `phpunit.xml.dist` loads
+  `/opt/civikitchen/toolbelt/phpunit/bootstrap.php`, its `phpstan.neon.dist`
+  loads `/opt/civikitchen/toolbelt/phpstan-config/bootstrap.php`, and both take
+  the extension from the working directory. `phpstanBootstrap.php`,
+  `tests/phpunit/bootstrap.php` and `tests/phpunit/ckHeadless.php` are no
+  longer managed, and the new ckconform check `retired-template-copy` fails on
+  an unchanged copy of them and on a config that still loads one. To migrate:
+  - in `phpunit.xml.dist`, set
+    `bootstrap="/opt/civikitchen/toolbelt/phpunit/bootstrap.php"`;
+  - in `phpstan.neon.dist`, replace `- phpstanBootstrap.php` under
+    `bootstrapFiles` with `- /opt/civikitchen/toolbelt/phpstan-config/bootstrap.php`
+    and drop `- phpstanBootstrap.php` from `excludePaths`;
+  - drop the three paths from `policy.template_custom`, where listed;
+  - run `ckinit --update`, which deletes the copies once nothing names them.
+  A bootstrap the repository changed stays its own and is left alone; one that
+  requires the `ckHeadless.php` copy requires
+  `/opt/civikitchen/toolbelt/phpunit/ckHeadless.php` instead. Setup of its own
+  goes into `tests/phpunit/bootstrap.local.php`, which the image's bootstrap
+  loads.
 - `policy.vendor` in `civikitchen.yaml` takes only
   `{mode: committed, reason: …}`. A plain string no longer validates:
   `vendor: committed` carried no reason, and any other string had no effect.

@@ -21,10 +21,11 @@ parameters:
 	scanFiles:
 		- ckmonobase.civix.php
 	# scanDirectories:
-	#	# Only what phpstanBootstrap.php does not autoload, e.g.:
+	#	# Only what the image's phpstan bootstrap does not autoload, e.g.:
 	#	# - /var/www/html/core/ext/flexmailer/src
 	bootstrapFiles:
-		- phpstanBootstrap.php
+		# Core, its ext packages and the info.xml <requires>, shipped in the image.
+		- /opt/civikitchen/toolbelt/phpstan-config/bootstrap.php
 	civikitchen:
 		# `civicrm_` tables of other extensions this repo queries in raw SQL:
 		#	- civicrm_someext_thing

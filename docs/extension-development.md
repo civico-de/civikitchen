@@ -144,7 +144,7 @@ This drops the test database, reseeds it from the main one and clears the
 cached containers.
 
 The lasting fix for the first case belongs in the extension. Build the
-environment with ck_headless() from the managed bootstrap instead of
+environment with ck_headless() from the image's bootstrap instead of
 \Civi\Test::headless(). It installs every extension the info.xml requires, one
 level deep, then the extension itself:
 
@@ -244,9 +244,30 @@ only after reviewing the conflicts.
 
 The template stays an interface after day one
 ([ADR-0013](adr/0013-managed-and-seeded-template-files.md)). Managed files stay
-byte-identical in every repository: the CI caller, the test bootstraps and the
-CI compose stack. Seeded files become the repository's own after the first
-copy: composer.json, the phpstan config, the dev compose file and .gitignore.
+byte-identical in every repository: the CI caller, the CI compose stack and the
+e2e helpers. Seeded files become the repository's own after the first copy:
+composer.json, the phpstan and PHPUnit configs, the dev compose file and
+.gitignore.
+
+Code that runs only inside the image is not copied at all. The seeded configs
+load the bootstraps from the image's toolbelt:
+
+| Config | Loads |
+|---|---|
+| phpunit.xml.dist `bootstrap=` | `/opt/civikitchen/toolbelt/phpunit/bootstrap.php`, which requires `ckHeadless.php` beside it |
+| phpstan.neon.dist `bootstrapFiles` | `/opt/civikitchen/toolbelt/phpstan-config/bootstrap.php` |
+
+Both take the extension under test from the working directory, where ckphpunit,
+phpstan and `ck ci` run, and stop with an error when it holds no info.xml.
+
+A repository from before this split still carries `phpstanBootstrap.php`,
+`tests/phpunit/bootstrap.php` and `tests/phpunit/ckHeadless.php`. The ckconform
+check retired-template-copy names each copy and each config line that still
+loads one. Point the configs at the paths above and drop
+`phpstanBootstrap.php` from excludePaths; `ckinit --update` then deletes the
+copies. It deletes a file only when it is byte-identical to a released template
+version and nothing names it any more. A file the repository changed is its
+own: ckinit and ckconform leave it alone.
 
 ```bash
 /path/to/civikitchen/scaffold/ckinit --check  /path/to/org.example.myext   # report drift, exit 1 on any
@@ -270,12 +291,12 @@ with a mandatory reason, in its civikitchen.yaml:
 policy:
   template_custom:
     paths:
-      - tests/phpunit/bootstrap.php
-    reason: Drupal settings discovery and its own test DSN
+      - .docker/docker-compose.ci.yml
+    reason: an extra service the CI stack needs inside the managed block
 ```
 
 Repository-specific test setup goes into `tests/phpunit/bootstrap.local.php`,
-which the managed bootstrap loads when it exists. The shell suites work the
+which the image's bootstrap loads when it exists. The shell suites work the
 same way. The managed tests/e2e/lib.sh carries the shared plumbing:
 
 - `check`, `note` and `finish` for the verdict
@@ -332,8 +353,9 @@ same.
 
 ## Static analysis and linting
 
-PHPStan resolves CiviCRM classes through the managed
-[`phpstanBootstrap.php`](https://github.com/civico-de/civikitchen/blob/main/scaffold/template/extension/phpstanBootstrap.php).
+PHPStan resolves CiviCRM classes through the image's
+[phpstan bootstrap](https://github.com/civico-de/civikitchen/blob/main/toolbelt/phpstan-config/bootstrap.php)
+at `/opt/civikitchen/toolbelt/phpstan-config/bootstrap.php`.
 It loads core, core's own ext packages, and every extension listed under
 requires in info.xml that exists in the ext directory, so no repository needs
 its own bootstrap or scanDirectories entry. A missing required extension is

@@ -3,10 +3,17 @@
 declare(strict_types = 1);
 
 /**
- * phpstan bootstrap: core's class loader, the core component extensions and
- * every <requires> extension under the ext dir. CIVICRM_CORE_DIR and
- * CK_EXT_DIR override the standalone layout.
+ * phpstan bootstrap, loaded from the image: core's class loader, the core
+ * component extensions and every <requires> extension of the extension in the
+ * working directory. CIVICRM_CORE_DIR and CK_EXT_DIR override the standalone layout.
  */
+$ckExtension = getcwd();
+if ($ckExtension === FALSE || !is_file($ckExtension . '/info.xml')) {
+  throw new RuntimeException(
+    'phpstan bootstrap: no info.xml in ' . ($ckExtension === FALSE ? 'the working directory' : $ckExtension)
+    . ' - run phpstan from the extension root',
+  );
+}
 $coreDir = getenv('CIVICRM_CORE_DIR') ?: '/var/www/html/core';
 
 require_once $coreDir . '/vendor/autoload.php';
@@ -44,7 +51,7 @@ $ckDaoBase = static function (string $class, string $ckDir): bool {
   class_alias('CRM_Core_DAO_Base', $class);
   return TRUE;
 };
-spl_autoload_register(static fn (string $class): bool => $ckDaoBase($class, __DIR__));
+spl_autoload_register(static fn (string $class): bool => $ckDaoBase($class, $ckExtension));
 
 /**
  * Autoload one extension directory in the civix layout plus its vendor/; its
@@ -94,7 +101,7 @@ foreach (array_merge(
 // Required extensions under the ext dir, named by key; a missing one is only
 // noted, and code using it gets phpstan's "unknown class".
 $ckExtDir = getenv('CK_EXT_DIR') ?: '/var/www/html/ext';
-$ckInfo = simplexml_load_file(__DIR__ . '/info.xml');
+$ckInfo = simplexml_load_file($ckExtension . '/info.xml');
 foreach ($ckInfo === FALSE ? [] : $ckInfo->requires->ext ?? [] as $ckRequired) {
   $ckKey = trim((string) $ckRequired);
   if (in_array($ckKey, $ckCoreKeys, TRUE)) {
@@ -104,7 +111,7 @@ foreach ($ckInfo === FALSE ? [] : $ckInfo->requires->ext ?? [] as $ckRequired) {
   if ($ckKey === '' || !is_dir($ckDir)) {
     fwrite(
       STDERR,
-      "phpstanBootstrap: required extension {$ckKey} is not under {$ckExtDir}; its classes stay unresolved\n",
+      "phpstan bootstrap: required extension {$ckKey} is not under {$ckExtDir}; its classes stay unresolved\n",
     );
     continue;
   }

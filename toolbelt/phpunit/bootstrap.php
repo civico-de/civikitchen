@@ -1,6 +1,12 @@
 <?php
 
+// The PHPUnit bootstrap an extension's phpunit.xml.dist loads from the image;
+// the extension under test is the working directory (ck_extension_dir()).
 ini_set('memory_limit', '2G');
+
+// ck_headless(): the headless builder with info.xml <requires> resolved.
+require __DIR__ . '/ckHeadless.php';
+$ckExtensionDir = ck_extension_dir();
 
 eval(cv('php:boot --level=classloader', 'phpcode'));
 
@@ -47,17 +53,15 @@ if ($ckTestDsns === [] || $ckBadDsn !== NULL) {
 putenv('CIVICRM_DB_NAME=civicrm_test');
 $_ENV['CIVICRM_DB_NAME'] = 'civicrm_test';
 
-// Allow autoloading of PHPUnit helper classes in this extension.
+// Autoloading of the extension's classes and its PHPUnit helper classes.
+$ckTests = $ckExtensionDir . '/tests/phpunit';
 $loader = new \Composer\Autoload\ClassLoader();
-$loader->add('CRM_', [__DIR__ . '/../..', __DIR__]);
-$loader->addPsr4('Civi\\', [__DIR__ . '/../../Civi', __DIR__ . '/Civi']);
-$loader->add('api_', [__DIR__ . '/../..', __DIR__]);
-$loader->addPsr4('api\\', [__DIR__ . '/../../api', __DIR__ . '/api']);
+$loader->add('CRM_', [$ckExtensionDir, $ckTests]);
+$loader->addPsr4('Civi\\', [$ckExtensionDir . '/Civi', $ckTests . '/Civi']);
+$loader->add('api_', [$ckExtensionDir, $ckTests]);
+$loader->addPsr4('api\\', [$ckExtensionDir . '/api', $ckTests . '/api']);
 
 $loader->register();
-
-// ck_headless(): the headless builder with info.xml <requires> resolved.
-require __DIR__ . '/ckHeadless.php';
 
 /**
  * Call the "cv" command.
@@ -81,10 +85,9 @@ function cv(string $cmd, string $decode = 'json') {
   // Execute `cv` in the original folder. This is a work-around for
   // phpunit/codeception, which seem to manipulate PWD.
   $pwd = getenv('PWD');
-  $cwd = getcwd();
-  $cmd = sprintf('cd %s; %s', escapeshellarg(is_string($pwd) ? $pwd : (is_string($cwd) ? $cwd : __DIR__)), $cmd);
+  $cmd = sprintf('cd %s; %s', escapeshellarg(is_string($pwd) ? $pwd : ck_extension_dir()), $cmd);
 
-  $process = proc_open($cmd, $descriptorSpec, $pipes, __DIR__);
+  $process = proc_open($cmd, $descriptorSpec, $pipes, ck_extension_dir());
   if (!is_resource($process)) {
     throw new RuntimeException("Could not start command: $cmd");
   }
@@ -114,7 +117,7 @@ function cv(string $cmd, string $decode = 'json') {
   }
 }
 
-// Repo-specific setup goes in bootstrap.local.php; ckinit --update rewrites this file.
-if (file_exists(__DIR__ . '/bootstrap.local.php')) {
-  require __DIR__ . '/bootstrap.local.php';
+// Repository-specific setup goes in the extension's tests/phpunit/bootstrap.local.php.
+if (file_exists($ckTests . '/bootstrap.local.php')) {
+  require $ckTests . '/bootstrap.local.php';
 }

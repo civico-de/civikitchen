@@ -1847,8 +1847,8 @@ else
             fail "stamped template fails ckfmt --check"
             echo "${TPL_FMT}"
         fi
-        # phpstanBootstrap.php is written for the standalone layout, the one
-        # extension CI runs on; the tests config is what reads tests/phpunit/.
+        # The image's phpstan bootstrap is written for the standalone layout, the
+        # one extension CI runs on; the tests config is what reads tests/phpunit/.
         if [ "${CIVICRM_UF:-}" = "Standalone" ]; then
             mkdir -p "${TPL_EXT}/Civi" "${TPL_EXT}/CRM"
             printf '<?php\n' > "${TPL_EXT}/example_ext.civix.php"

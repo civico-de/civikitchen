@@ -7,22 +7,20 @@
 #   bash tests/images/boot-test-standalone.sh <image>
 #   CK_PROVISION_OVERRIDE=docker/runtime/provision.sh bash tests/images/boot-test-standalone.sh ghcr.io/civico-de/civikitchen:standalone
 #   CK_DATABASE_IMAGE=mysql:8.0 bash tests/images/boot-test-standalone.sh ghcr.io/civico-de/civikitchen:standalone
-# CK_PROVISION_OVERRIDE mounts this checkout's provision.sh, PHP library and
-# profile driver over a published image's.
+# CK_PROVISION_OVERRIDE mounts this checkout's provision.sh, PHP library, PHPUnit
+# bootstrap and profile driver over a published image's.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
 IMAGE="${1:?usage: boot-test-standalone.sh <image>}"
 DATABASE_IMAGE="${CK_DATABASE_IMAGE:-mariadb:11.4}"
 SRC="$(cd "$(dirname "$0")/../.." && pwd)"
-# Staged copy: the headless suite needs the template bootstrap beside it.
+# Staged copy with the template's phpunit.xml.dist, which loads the image's bootstrap.
 # Inside the checkout, never $TMPDIR: on macOS the Docker VM sees only $HOME.
 FIXTURE="${SRC}/.cache/boot-fixture-$$"
 mkdir -p "${FIXTURE}"
 cp -R "$(dirname "$0")/fixtures/ckbootfixture/." "${FIXTURE}/"
 mkdir -p "${FIXTURE}/tests/phpunit"
-cp "${SRC}/scaffold/template/extension/tests/phpunit/bootstrap.php" \
-   "${SRC}/scaffold/template/extension/tests/phpunit/ckHeadless.php" "${FIXTURE}/tests/phpunit/"
 mv "${FIXTURE}/headless/CkHeadlessContractTest.php" "${FIXTURE}/tests/phpunit/"
 rmdir "${FIXTURE}/headless"
 sed "s/__EXTKEY__/ckbootfixture/g" "${SRC}/scaffold/template/extension/phpunit.xml.dist" \
@@ -49,6 +47,7 @@ extra=()
 if [ -n "${CK_PROVISION_OVERRIDE:-}" ]; then
     extra+=(-v "$(cd "$(dirname "${CK_PROVISION_OVERRIDE}")" && pwd)/$(basename "${CK_PROVISION_OVERRIDE}"):/usr/local/share/civikitchen/provision.sh:ro"
         -v "${SRC}/toolbelt/lib/php:/opt/civikitchen/toolbelt/lib/php:ro"
+        -v "${SRC}/toolbelt/phpunit:/opt/civikitchen/toolbelt/phpunit:ro"
         -v "${SRC}/docker/profiles/apply.sh:/opt/civikitchen/docker/profiles/apply.sh:ro")
     echo "==> provision.sh overridden from ${CK_PROVISION_OVERRIDE}"
 fi

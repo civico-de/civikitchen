@@ -56,3 +56,22 @@ a release and, where a repo has to react, a consumer pass.
 Some files are deliberately seeded although they control CI.
 `phpstan-tests.neon.dist` turns a second gate on by existing, so pushing it
 into existing repos would fail them.
+
+## Amended 2026-11-17: code that runs only in the image is not copied
+
+Managed copies are only for files a tool reads from the repository or the host:
+the CI callers, the compose stacks, `.gitattributes`, `renovate.json`, the e2e
+helpers. Code that runs only inside the image is loaded from the image.
+
+The PHPUnit bootstrap, `ckHeadless.php` and the phpstan bootstrap are of that
+kind. They ship under `/opt/civikitchen/toolbelt/phpunit/` and
+`/opt/civikitchen/toolbelt/phpstan-config/bootstrap.php`, and the seeded
+`phpunit.xml.dist` and `phpstan.neon.dist` name those paths. They take the
+extension from the working directory and fail when it holds no info.xml. A fix
+to them then reaches every repository with the image, without a consumer pass.
+
+`ckinit --update` deletes a former copy only when it is byte-identical to a
+released template version and no config or remaining file names it. A file
+the repository changed is its own, and neither ckinit nor ckconform touches or
+reports it. The ckconform check retired-template-copy fails on a copy and on a
+config line that still loads one.

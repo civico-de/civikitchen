@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# The managed ckHeadless.php passes phpstan level 10 against the pinned core,
-# as a consumer's phpstan-tests gate analyses it. Usage: CIVICRM_CORE_DIR=<core>
+# The image's ckHeadless.php passes phpstan level 10 against the pinned core, the
+# level consumers' test code is held to. Usage: CIVICRM_CORE_DIR=<core>
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -17,7 +17,7 @@ parameters:
 	checkUninitializedProperties: true
 	tmpDir: $work/cache
 	paths:
-		- $root/scaffold/template/extension/tests/phpunit/ckHeadless.php
+		- $root/toolbelt/phpunit/ckHeadless.php
 	scanDirectories:
 		- $core/Civi/Test
 		- $core/CRM/Extension

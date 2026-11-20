@@ -6,6 +6,7 @@ namespace CiviKitchen\Ckconform\Check;
 
 use CiviKitchen\Ckconform\Check;
 use CiviKitchen\Ckconform\Context;
+use CiviKitchen\Ckconform\ImageBootstraps;
 use CiviKitchen\Ckconform\PhpSource;
 use CiviKitchen\Ckconform\Reporter;
 
@@ -59,9 +60,10 @@ final class DeprecationGateCheck implements Check
             );
         }
 
-        if (!$this->widensErrorReporting($xml, $context->readShipped('tests/phpunit/bootstrap.php'))) {
+        [$bootstrap, $code] = ImageBootstraps::suiteBootstrap($context);
+        if (!$this->widensErrorReporting($xml, $code)) {
             $reporter->warn(
-                'no error_reporting(E_ALL) in tests/phpunit/bootstrap.php'
+                "no error_reporting(E_ALL) in {$bootstrap}"
                 . ' — the CLI default masks E_DEPRECATED outside Civi\\Test tests'
             );
         }

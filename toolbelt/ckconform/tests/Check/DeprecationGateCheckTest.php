@@ -230,4 +230,14 @@ final class DeprecationGateCheckTest extends CheckTestCase
         $reporter = $this->run_(new DeprecationGateCheck(), $context);
         $widens ? $this->assertSilent($reporter) : $this->assertWarns($reporter, 'no error_reporting(E_ALL)');
     }
+
+    /** The image's bootstrap widens error_reporting; it is read from this toolbelt. */
+    public function testTheTemplatesImageBootstrapPasses(): void
+    {
+        $context = $this->repo([
+            'phpunit.xml.dist' => (string) file_get_contents(dirname(__DIR__, 4) . '/scaffold/template/extension/phpunit.xml.dist'),
+            'tests/phpunit/SomeTest.php' => '<?php',
+        ]);
+        $this->assertSilent($this->run_(new DeprecationGateCheck(), $context));
+    }
 }

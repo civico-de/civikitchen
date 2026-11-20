@@ -74,7 +74,7 @@ final class AnalyzeCommand implements Command
                 $includes[] = $symbolsOnly;
             }
         }
-        // Required extensions resolve as phpstanBootstrap.php resolves them; core's own sit inside $core.
+        // Required extensions resolve as the image's phpstan bootstrap resolves them; core's own sit inside $core.
         $extDir = getenv('CK_EXT_DIR') ?: $this->imageExtDir;
         $inspector = new ExtensionInspector('');
         $coreKeys = array_map($inspector->key(...), [...glob("{$core}/ext/*/info.xml") ?: [], ...glob("{$core}/ext/*/*/info.xml") ?: []]);

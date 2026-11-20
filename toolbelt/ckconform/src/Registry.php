@@ -16,6 +16,7 @@ final class Registry
         Check\PhpstanConfigCheck::class,
         Check\PhpunitConfigCheck::class,
         Check\TestBootstrapGuardCheck::class,
+        Check\RetiredTemplateCopyCheck::class,
         Check\DeprecationGateCheck::class,
         Check\CoverageSectionCheck::class,
         Check\CiCoverageCheck::class,

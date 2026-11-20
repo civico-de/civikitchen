@@ -10,7 +10,9 @@ trap '/bin/rm -rf "$work"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
 mkdir -p "$work/ext/tests/phpunit"
-cp "$root/scaffold/template/extension/tests/phpunit/ckHeadless.php" "$work/ext/tests/phpunit/"
+headless="$root/toolbelt/phpunit/ckHeadless.php"
+# phpunit runs from the extension root, where ck_headless() reads info.xml.
+cd "$work/ext"
 cat > "$work/ext/info.xml" <<'XML'
 <?xml version="1.0"?>
 <extension key="org.example.fixture" type="module">
@@ -128,14 +130,14 @@ probe='
     ($last[1] ?? "none"), "|";
   echo (CRM_Core_Session::$status === [] ? "drained" : "kept"), "\n";
 '
-out="$(php -r "$probe" "$work/stubs.php" "$work/ext/tests/phpunit/ckHeadless.php")"
+out="$(php -r "$probe" "$work/stubs.php" "$headless")"
 IFS='|' read -r installed restored order executed sig drained <<<"$out"
 [[ "$installed" == "org.example.base,org.example.deep,org.example.dep,org.example.fixture" ]] \
   || fail "expected the requires closure, trimmed, each after its own requires, own key last; got '$installed'"
 
 # An optional integration installs after <requires>, before the extension.
 out="$(php -r 'require $argv[1]; require $argv[2]; ck_headless("org.example.optional")->run(); echo implode(",", CkProbe::$installed);' \
-  "$work/stubs.php" "$work/ext/tests/phpunit/ckHeadless.php")"
+  "$work/stubs.php" "$headless")"
 [[ "$out" == "org.example.base,org.example.deep,org.example.dep,org.example.optional,org.example.fixture" ]] \
   || fail "expected optional extensions between <requires> and the own key; got '$out'"
 
@@ -148,20 +150,20 @@ out="$(php -r 'require $argv[1]; require $argv[2]; ck_headless("org.example.opti
 [[ "$executed" == *"CORE SCHEMA SQL"* ]] || fail "the restore must replay the CoreSchemaStep SQL; got '$executed'"
 
 # 6.20 keeps the keys while signing, and replaying the SQL would add them twice.
-out="$(CK_CORE=6.20.beta1 php -r "$probe" "$work/stubs.php" "$work/ext/tests/phpunit/ckHeadless.php")"
+out="$(CK_CORE=6.20.beta1 php -r "$probe" "$work/stubs.php" "$headless")"
 IFS='|' read -r _ restored _ executed _ _ <<<"$out"
 [[ "$restored" == "no-restore" && "$executed" != *"CORE SCHEMA SQL"* ]] \
   || fail "on 6.20 the core schema SQL must not be replayed; got '$restored' '$executed'"
 
 # A scratch database another core version built rejects the current schema
 # SQL (errno 150): it must be rebuilt, with both versions named.
-out="$(CK_DB=6.17.3 php -r "$probe" "$work/stubs.php" "$work/ext/tests/phpunit/ckHeadless.php" 2>"$work/err")"
+out="$(CK_DB=6.17.3 php -r "$probe" "$work/stubs.php" "$headless" 2>"$work/err")"
 IFS='|' read -r _ _ _ executed _ _ <<<"$out"
 [[ "$executed" == "DROP TABLE IF EXISTS \`civicrm_test\`.civitest_revs;"* && "$executed" != *"CORE SCHEMA SQL"* ]] \
   || fail "a version mismatch must forget the signature, not replay the SQL; got '$executed'"
 grep -q "built by CiviCRM 6.17.3, running 6.19.0" "$work/err" || fail "the mismatch must name both versions; got '$(cat "$work/err")'"
 # An empty scratch database has no keys to restore.
-out="$(CK_DB=none php -r "$probe" "$work/stubs.php" "$work/ext/tests/phpunit/ckHeadless.php")"
+out="$(CK_DB=none php -r "$probe" "$work/stubs.php" "$headless")"
 IFS='|' read -r _ _ _ executed _ _ <<<"$out"
 [[ "$executed" != *"CORE SCHEMA SQL"* && "$executed" != *"DROP TABLE"* ]] || fail "an empty scratch database needs no restore; got '$executed'"
 
@@ -171,7 +173,7 @@ out="$(php -r 'require $argv[1]; require $argv[2];
   CRM_Utils_System::$version = "6.20.0";
   $b = ck_headless(); ($b->steps[0][0])($b);
   echo $b->steps[0][1], "|", implode(";", CkProbe::$executed);' \
-  "$work/stubs.php" "$work/ext/tests/phpunit/ckHeadless.php")"
+  "$work/stubs.php" "$headless")"
 [[ "$out" == "ck-forget-signature|DELETE FROM \`civicrm_test\`.civitest_revs" ]] \
   || fail "the first step must forget the saved signature; got '$out'"
 
@@ -200,7 +202,7 @@ install_sig() {
     foreach ($b->steps as [$cb, $sig]) {
       if (str_contains((string) $sig, "ck-install-files:")) { $n++; echo is_callable($cb) ? $sig : "not-callable"; }
     }
-    if ($n !== 1) { echo "steps:$n"; }' "$work/stubs.php" "$work/ext/tests/phpunit/ckHeadless.php"
+    if ($n !== 1) { echo "steps:$n"; }' "$work/stubs.php" "$headless"
 }
 base="$(install_sig)"
 [[ "$base" == *ck-install-files:* ]] || fail "expected one callable step signed with the install files; got '$base'"
@@ -237,13 +239,21 @@ out="$(php -r 'require $argv[1]; require $argv[2];
   $first = end(ck_headless()->steps)[1];
   file_put_contents($argv[3], "<?php // edited mid-run");
   echo $first === end(ck_headless()->steps)[1] ? "once" : "rehashed";' \
-  "$work/stubs.php" "$work/ext/tests/phpunit/ckHeadless.php" "$work/ext/fixture.php")"
+  "$work/stubs.php" "$headless" "$work/ext/fixture.php")"
 [[ "$out" == "once" ]] || fail "the install files must be hashed once per process; got '$out'"
 
 # No key in info.xml: a loud error, never a guessed key.
 printf '%s\n' '<extension type="module"><file>fixture</file></extension>' > "$work/ext/info.xml"
-if php -r 'require $argv[1]; require $argv[2]; ck_headless();' "$work/stubs.php" "$work/ext/tests/phpunit/ckHeadless.php" >/dev/null 2>&1; then
+if php -r 'require $argv[1]; require $argv[2]; ck_headless();' "$work/stubs.php" "$headless" >/dev/null 2>&1; then
   fail "a missing extension key must throw"
 fi
+
+# Outside an extension root: a loud error naming the directory.
+mkdir -p "$work/elsewhere"
+if out="$(cd "$work/elsewhere" && php -r 'require $argv[1]; require $argv[2]; ck_headless();' "$work/stubs.php" "$headless" 2>&1)"; then
+  fail "a working directory without info.xml must throw"
+fi
+[[ "$out" == *"ck_headless: no info.xml in "*"/elsewhere - run phpunit from the extension root"* ]] \
+  || fail "the error must name the working directory; got '$out'"
 
 echo "ck_headless: ok"

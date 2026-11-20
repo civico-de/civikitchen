@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# phpstanBootstrap.php autoloads core's ext packages and every info.xml <requires>
-# under CK_EXT_DIR. Core is stubbed to the three files the bootstrap requires.
+# The image's phpstan bootstrap autoloads core's ext packages and every info.xml
+# <requires> of the extension in the working directory under CK_EXT_DIR. Core is
+# stubbed to the three files the bootstrap requires.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -52,7 +53,9 @@ echo '<?php define("CK_DEP_VENDOR_LOADED", 1);' > "$ext/org.example.dep/vendor/a
 mkdir -p "$ext/org.example.dep/packages/lib"
 echo '<?php function ck_dep_bundled() {}' > "$ext/org.example.dep/packages/lib/bundled.php"
 echo '<?php require_once "packages/lib/bundled.php"; class CRM_Dep_Bundled {}' > "$ext/org.example.dep/CRM/Dep/Bundled.php"
-cp "$root/scaffold/template/extension/phpstanBootstrap.php" "$ext/repo/"
+bootstrap="$root/toolbelt/phpstan-config/bootstrap.php"
+# phpstan runs from the extension root; the bootstrap reads info.xml there.
+stan() { (cd "$ext/repo" && CIVICRM_CORE_DIR="$core" CK_EXT_DIR="$ext" php -r "$1" "$bootstrap"); }
 cat > "$ext/repo/info.xml" <<'XML'
 <?xml version="1.0"?>
 <extension key="org.example.repo" type="module">
@@ -75,7 +78,7 @@ coreprobe='require $argv[1];
   echo class_exists("Civi\\Api4\\Membership") ? "member" : "-", " ",
     class_exists("Civi\\Flexmailer\\Sender") ? "flexmailer" : "-", " ",
     class_exists("Civi\\Afform\\Event\\AfformSubmitEvent") ? "afform" : "-", "\n";'
-out="$(CIVICRM_CORE_DIR="$core" CK_EXT_DIR="$ext" php -r "$probe" "$ext/repo/phpstanBootstrap.php" 2>"$work/stderr")"
+out="$(stan "$probe" 2>"$work/stderr")"
 [[ "$out" == "crm civi vendor dao bundled" ]] || fail "required extension classes did not resolve: '$out'"
 grep -q 'org.example.absent is not under' "$work/stderr" \
   || fail "a required extension with no directory must be noted on stderr: $(cat "$work/stderr")"
@@ -85,25 +88,33 @@ fi
 
 # No <requires>: nothing registered, nothing said.
 printf '%s\n' '<extension key="org.example.repo" type="module"><file>repo</file></extension>' > "$ext/repo/info.xml"
-out="$(CIVICRM_CORE_DIR="$core" CK_EXT_DIR="$ext" php -r "$probe" "$ext/repo/phpstanBootstrap.php" 2>"$work/stderr")"
+out="$(stan "$probe" 2>"$work/stderr")"
 [[ "$out" == "- - - - -" ]] || fail "without <requires> nothing may be autoloaded: '$out'"
 [[ ! -s "$work/stderr" ]] || fail "without <requires> stderr must stay empty: $(cat "$work/stderr")"
 
 # Core component extensions need no <requires> entry; a package off the civix
 # layout is not covered and stays a scanDirectories entry.
-out="$(CIVICRM_CORE_DIR="$core" CK_EXT_DIR="$ext" php -r "$coreprobe" "$ext/repo/phpstanBootstrap.php" 2>"$work/stderr")"
+out="$(stan "$coreprobe" 2>"$work/stderr")"
 [[ "$out" == "member - afform" ]] || fail "core ext autoloading is wrong: '$out'"
 
 # The repo's own civix DAOs, core's APIv3 helpers and the newest CiviMix\Schema
 # resolve without <requires>; another prefix's DAO_Base stays unknown.
 mkdir -p "$ext/repo/CRM/Repo/DAO"
 echo '<?php class CRM_Repo_DAO_Item extends CRM_Repo_DAO_Base {}' > "$ext/repo/CRM/Repo/DAO/Item.php"
-ownprobe='require $argv[1]; require dirname($argv[1]) . "/CRM/Repo/DAO/Item.php";
+ownprobe='require $argv[1]; require getcwd() . "/CRM/Repo/DAO/Item.php";
   echo is_subclass_of("CRM_Repo_DAO_Item", "CRM_Core_DAO_Base") ? "dao" : "-", " ",
     class_exists("CRM_Other_DAO_Base") ? "other" : "-", " ",
     function_exists("civicrm_api3_create_success") ? "api3" : "-", " ",
     interface_exists("CiviMix\\Schema\\SchemaHelperInterface") ? "schema" . CiviMix\Schema\SchemaHelperInterface::V : "-", "\n";'
-out="$(CIVICRM_CORE_DIR="$core" CK_EXT_DIR="$ext" php -r "$ownprobe" "$ext/repo/phpstanBootstrap.php" 2>"$work/stderr")"
+out="$(stan "$ownprobe" 2>"$work/stderr")"
 [[ "$out" == "dao - api3 schema10" ]] || fail "own DAO, APIv3 helpers or CiviMix\\Schema did not resolve: '$out'"
+
+# Outside an extension root the bootstrap stops, naming the directory.
+mkdir -p "$work/elsewhere"
+if out="$(cd "$work/elsewhere" && CIVICRM_CORE_DIR="$core" php -r 'require $argv[1];' "$bootstrap" 2>&1)"; then
+  fail "a working directory without info.xml must stop the bootstrap"
+fi
+[[ "$out" == *"no info.xml in $work/elsewhere"* || "$out" == *"no info.xml in $(cd "$work/elsewhere" && pwd -P)"* ]] \
+  || fail "the error must name the working directory: '$out'"
 
 echo "phpstan bootstrap: ok"

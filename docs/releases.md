@@ -179,6 +179,17 @@ rest, and catch the skipped family up once its host is back.
 Every v1 caller is a repo this project maintains, which is what lets a
 breaking change ship as a minor.
 
+### Consumer pass for code moved into the image
+
+When template code moves into the image, a consumer cannot point at the new
+path before an image carries it: `:v1` gains the file only with the tag. Prepare
+each consumer on a branch instead. Its caller sets `image:` to the promoted
+image of main and `check_template: false`, since the pinned ckinit still
+expects the old copies. Apply the changelog's migration steps, let that branch
+go green, then merge it right after the tag and drop both caller overrides.
+A `:standalone-<minor>` image that is no longer rebuilt never gains the file;
+a consumer pinned to such a minor moves to a rebuilt one first.
+
 ## The canary
 
 One repo stays on the moving edge:

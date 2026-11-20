@@ -21,9 +21,6 @@ const MANAGED_FILES = [
   '.docker/docker-compose.ci.yml',
   '.docker/init.d/README.md',
   'renovate.json',
-  'phpstanBootstrap.php',
-  'tests/phpunit/bootstrap.php',
-  'tests/phpunit/ckHeadless.php',
   'tests/e2e/lib.sh',
   '.civikitchen/strauss.php',
 ];
@@ -123,11 +120,15 @@ repository gets a managed .gitlab-ci.yml instead of the GitHub callers and
 renovate.json.
 
 Seeding preserves existing files unless --force is given. --update rewrites
-only the MANAGED files (CI caller, test bootstraps, CI compose stack — the
-ones meant to be identical everywhere) and creates whatever is missing;
-seeded files the repo has edited (composer.json, phpstan.neon.dist, dev
-compose, .gitignore) are never touched. --check is
-the dry twin for CI.
+only the MANAGED files (CI caller, CI compose stack, e2e helpers — the ones
+meant to be identical everywhere) and creates whatever is missing; seeded
+files the repo has edited (composer.json, phpstan.neon.dist, dev compose,
+.gitignore) are never touched. --check is the dry twin for CI.
+
+The PHPUnit and phpstan bootstraps ship in the image under
+/opt/civikitchen/toolbelt. --update deletes an unchanged copy of them
+(phpstanBootstrap.php, tests/phpunit/bootstrap.php, tests/phpunit/ckHeadless.php)
+once no config names it; --check reports every copy.
 
 Some managed files carry marked blocks:
   # BEGIN CIVIKITCHEN MANAGED <name> … # END CIVIKITCHEN MANAGED <name>
@@ -241,8 +242,10 @@ if (preg_match('/^[a-z0-9]([a-z0-9_.-]*[a-z0-9])?$/', $vendor) !== 1) {
 // it loads ckconform's Policy class from the checkout.
 require_once $yamlAutoload;
 require_once dirname(__DIR__) . '/toolbelt/ckconform/src/Policy.php';
+require_once dirname(__DIR__) . '/toolbelt/ckconform/src/ImageBootstraps.php';
 
 $custom = [];
+$retiredCustom = [];
 $legacyPolicy = $target . '/' . \CiviKitchen\Ckconform\Policy::LEGACY_FILE;
 if (is_file($legacyPolicy)) {
   fwrite(STDERR, "ckinit: legacy policy file is no longer supported; migrate it to civikitchen.yaml\n");
@@ -268,6 +271,10 @@ if (is_string($policyRaw)) {
     foreach (explode(',', $value) as $item) {
       $item = trim($item);
       if ($item === '') {
+        continue;
+      }
+      if (isset(\CiviKitchen\Ckconform\ImageBootstraps::RETIRED[$item])) {
+        $retiredCustom[] = $item;
         continue;
       }
       if (!in_array($item, MANAGED_FILES, TRUE) && !in_array($item, SEEDED_FILES, TRUE)) {
@@ -1180,6 +1187,56 @@ function reconcileRootJobs(string $existing, array $templateBlocks, string $rela
   return $out;
 }
 
+/**
+ * The retired template copies in $target: path => NULL when --update deleted
+ * it, else why it stays. A copy goes once no config or remaining file names it.
+ *
+ * @return array<string, ?string>
+ */
+function retiredCopies(string $target, string $mode): array {
+  $read = static function (string $relative) use ($target): ?string {
+    $path = $target . '/' . $relative;
+    return is_file($path) && !is_link($path) ? (string) file_get_contents($path) : NULL;
+  };
+  $rootFiles = array_values(array_filter(scandir($target) ?: [], static fn (string $f): bool => is_file($target . '/' . $f)));
+  [$copies, $references] = \CiviKitchen\Ckconform\ImageBootstraps::scan($rootFiles, $read);
+  // A copy named only by copies that go goes too; repeat until nothing changes.
+  $kept = [];
+  do {
+    $before = $kept;
+    foreach ($copies as $relative) {
+      $names = array_filter($references, static fn (array $r): bool => $r[2] === $relative
+        && !(in_array($r[0], $copies, TRUE) && !isset($kept[$r[0]])));
+      $own = array_filter($names, static fn (array $r): bool => !in_array($r[0], $copies, TRUE));
+      if ($own !== []) {
+        $kept[$relative] = 'still named by ' . implode(', ', array_map(static fn (array $r): string => "{$r[0]}:{$r[1]}", $own))
+          . ' — point that at ' . \CiviKitchen\Ckconform\ImageBootstraps::RETIRED[$relative][0] . ', then --update deletes the copy';
+      }
+      elseif ($names !== []) {
+        $kept[$relative] = 'loaded by the copy ' . implode(', ', array_unique(array_column($names, 0))) . ', and goes with it';
+      }
+    }
+  } while ($kept !== $before);
+  $result = [];
+  foreach ($copies as $relative) {
+    if (isset($kept[$relative])) {
+      $result[$relative] = $kept[$relative];
+    }
+    elseif ($mode === 'update') {
+      if (!unlink($target . '/' . $relative)) {
+        fwrite(STDERR, "ckinit: cannot delete {$relative}\n");
+        exit(1);
+      }
+      $result[$relative] = NULL;
+    }
+    else {
+      $result[$relative] = 'a copy of the bootstrap the image ships as '
+        . \CiviKitchen\Ckconform\ImageBootstraps::RETIRED[$relative][0] . '; --update deletes it';
+    }
+  }
+  return $result;
+}
+
 function writeRendered(string $destination, string $relative, int $perms, string $content): void {
   $parent = dirname($destination);
   if (!is_dir($parent) && !mkdir($parent, 0775, TRUE) && !is_dir($parent)) {
@@ -1348,6 +1405,19 @@ foreach ($files as [$destination, $relative, $perms, $content]) {
   else {
     fwrite(STDOUT, "drifted   {$relative}\n");
   }
+}
+
+// Bootstraps the image ships: a template copy goes once nothing names it; a
+// file the repository changed is its own and stays.
+foreach ($retiredCustom as $relative) {
+  fwrite(STDOUT, "drifted   {$relative} (listed in policy.template_custom, but the image ships it and no template "
+    . "file carries it — drop it from the list)\n");
+  $drifted[] = $relative;
+}
+foreach (retiredCopies($target, $mode) as $relative => $why) {
+  fwrite(STDOUT, ($why === NULL ? 'removed   ' : 'retired   ') . $relative . ' (' . ($why
+    ?? 'a copy of the bootstrap the image ships as ' . \CiviKitchen\Ckconform\ImageBootstraps::RETIRED[$relative][0]) . ")\n");
+  $drifted[] = $relative;
 }
 
 // Not among the rendered files when nothing releases, so reported here.

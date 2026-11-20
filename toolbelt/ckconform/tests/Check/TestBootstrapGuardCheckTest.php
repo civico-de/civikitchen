@@ -134,4 +134,26 @@ final class TestBootstrapGuardCheckTest extends CheckTestCase
         ], git: true);
         $this->assertPasses($this->run_(new TestBootstrapGuardCheck(), $context));
     }
+
+    /** The template's config loads the image's bootstrap, whose guard is read from this toolbelt. */
+    public function testTheImageBootstrapCarriesTheGuard(): void
+    {
+        $context = $this->repo([
+            'phpunit.xml.dist' => (string) file_get_contents(dirname(__DIR__, 4) . '/scaffold/template/extension/phpunit.xml.dist'),
+            'tests/phpunit/SomeHeadlessTest.php' => '<?php class T implements \\Civi\\Test\\HeadlessInterface {}',
+        ], git: true);
+        $reporter = $this->run_(new TestBootstrapGuardCheck(), $context);
+        $this->assertPasses($reporter);
+        self::assertSame(['test bootstrap has the TEST_DB_DSN guard'], $reporter->messages('ok'));
+    }
+
+    public function testTheConfiguredBootstrapIsTheOneRequired(): void
+    {
+        $context = $this->repo([
+            'phpunit.xml.dist' => '<phpunit bootstrap="./tests/bootstrap.php"/>',
+            'tests/phpunit/bootstrap.php' => '<?php if (!getenv("TEST_DB_DSN")) { exit(1); }',
+            'tests/phpunit/SomeHeadlessTest.php' => '<?php class T implements \\Civi\\Test\\HeadlessInterface {}',
+        ], git: true);
+        $this->assertFails($this->run_(new TestBootstrapGuardCheck(), $context), 'no tests/bootstrap.php');
+    }
 }

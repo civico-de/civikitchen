@@ -3,7 +3,6 @@
 declare(strict_types = 1);
 
 use ShipMonk\ComposerDependencyAnalyser\Config\Configuration;
-use ShipMonk\ComposerDependencyAnalyser\Config\ErrorType;
 
 /**
  * Default config for `ckdeps` (shipmonk/composer-dependency-analyser). Core's
@@ -43,11 +42,6 @@ if (is_dir('tests')) {
 // The phpstan bootstrap only runs under phpstan, so its uses are dev dependencies.
 if (is_file('phpstanBootstrap.php')) {
   $configuration->addPathToScan('phpstanBootstrap.php', true);
-}
-// The template-managed files' simplexml use is the template's dependency, not the repo's.
-$ckTemplateFiles = array_filter(['phpstanBootstrap.php', 'tests/phpunit/ckHeadless.php'], 'is_file');
-if ($ckTemplateFiles !== []) {
-  $configuration->ignoreErrorsOnPaths(array_values($ckTemplateFiles), [ErrorType::SHADOW_DEPENDENCY]);
 }
 
 return $configuration;
