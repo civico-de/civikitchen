@@ -258,6 +258,17 @@ if [ -e "$work/drift/phpstan-tests.neon.dist" ]; then
   exit 1
 fi
 
+# Seeding gives tests/phpunit/ a file; a repository without it is not drift.
+test -f "$work/drift/tests/phpunit/bootstrap.local.php"
+/bin/rm "$work/drift/tests/phpunit/bootstrap.local.php"
+out=$("$root/scaffold/ckinit.php" --check "$work/drift")
+grep -q 'up to date' <<<"$out"
+"$root/scaffold/ckinit.php" --update "$work/drift" >/dev/null
+if [ -e "$work/drift/tests/phpunit/bootstrap.local.php" ]; then
+  echo "--update recreated the optional tests/phpunit/bootstrap.local.php" >&2
+  exit 1
+fi
+
 # --force is a seeding flag; refuse the ambiguous combinations.
 if "$root/scaffold/ckinit.php" --force --update "$work/drift" >/dev/null 2>&1; then
   echo "--force --update was accepted" >&2

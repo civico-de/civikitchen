@@ -37,7 +37,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
   requires the `ckHeadless.php` copy requires
   `/opt/civikitchen/toolbelt/phpunit/ckHeadless.php` instead. Setup of its own
   goes into `tests/phpunit/bootstrap.local.php`, which the image's bootstrap
-  loads.
+  loads; a new extension gets an empty one, so the tests config has a file to
+  analyse.
 
 ### Added
 

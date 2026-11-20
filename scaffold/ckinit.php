@@ -41,14 +41,17 @@ const SEEDED_FILES = [
   // second CI gate on, so pushing it into existing repos would fail them.
   'phpstan-tests.neon.dist',
   'phpunit.xml.dist',
+  'tests/phpunit/bootstrap.local.php',
 ];
 
 /**
- * Seeded files whose absence is never drift, and which --update does not create:
- * their existence is the opt-in switch CI reads.
+ * Seeded files whose absence is never drift, and which --update does not create.
  */
 const OPTIONAL_FILES = [
+  // Its existence is the opt-in switch CI reads.
   'phpstan-tests.neon.dist',
+  // Gives a fresh repository a file under the tests config's tests/phpunit path.
+  'tests/phpunit/bootstrap.local.php',
 ];
 
 /**
