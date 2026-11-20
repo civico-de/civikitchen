@@ -14,6 +14,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.71.0] - 2026-11-20
+
 ### Changed
 
 - **Breaking:** the PHPUnit and phpstan bootstraps ship in the image instead of
@@ -3064,7 +3066,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.70.0...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.71.0...HEAD
+[1.71.0]: https://github.com/civico-de/civikitchen/compare/v1.70.0...v1.71.0
 [1.70.0]: https://github.com/civico-de/civikitchen/compare/v1.69.0...v1.70.0
 [1.69.0]: https://github.com/civico-de/civikitchen/compare/v1.68.0...v1.69.0
 [1.68.0]: https://github.com/civico-de/civikitchen/compare/v1.67.1...v1.68.0
