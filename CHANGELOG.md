@@ -14,19 +14,51 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** the PHPUnit and phpstan bootstraps ship in the image instead of
+  being copied into each repository. The template's `phpunit.xml.dist` loads
+  `/opt/civikitchen/toolbelt/phpunit/bootstrap.php`, its `phpstan.neon.dist`
+  loads `/opt/civikitchen/toolbelt/phpstan-config/bootstrap.php`, and both take
+  the extension from the working directory. `phpstanBootstrap.php`,
+  `tests/phpunit/bootstrap.php` and `tests/phpunit/ckHeadless.php` are no
+  longer managed, and the new ckconform check `retired-template-copy` fails on
+  an unchanged copy of them and on a config that still loads one. To migrate:
+  - in `phpunit.xml.dist`, set
+    `bootstrap="/opt/civikitchen/toolbelt/phpunit/bootstrap.php"`;
+  - in `phpstan.neon.dist`, replace `- phpstanBootstrap.php` under
+    `bootstrapFiles` with `- /opt/civikitchen/toolbelt/phpstan-config/bootstrap.php`
+    and drop `- phpstanBootstrap.php` from `excludePaths`;
+  - drop the three paths from `policy.template_custom`, where listed;
+  - run `ckinit --update`, which deletes the copies once nothing names them.
+  A bootstrap the repository changed stays its own and is left alone; one that
+  requires the `ckHeadless.php` copy requires
+  `/opt/civikitchen/toolbelt/phpunit/ckHeadless.php` instead. Setup of its own
+  goes into `tests/phpunit/bootstrap.local.php`, which the image's bootstrap
+  loads.
+
 ### Added
 
 - ckconform's translation-catalog check fails when a `.mo` carries an older
   translation than its `.po`. `policy.translations.complete: true` turns a
   `ts()` string missing from a catalog into a failure and fails on an empty or
   fuzzy `.po` entry ([Translations](docs/extension-standards.md#translations)).
-
 - `ghcr.io/civico-de/civikitchen:civiproxy` (release tags `:civiproxy-v1`):
   an unmodified CiviProxy release on php:apache for extension dev and e2e
   stacks, with the bundled `target.pem` removed, `HTTPS=on` for plain-http
   stacks and mod_rewrite enabled. Mount or COPY your `config.php` into
   `/var/www/html`; the container refuses to start without one
   ([CiviProxy image](docs/images.md#civiproxy-image)).
+
+### Fixed
+
+- A Standalone first boot on a database whose earlier install was interrupted
+  (for example a container replaced while it was still installing) now stops
+  with an error that tells you to remove the database volume. Before, it
+  reused the half-installed tables and came up without the `admin` and
+  `everyone` roles, so the demo user held no role and its API-key calls failed
+  with "Login not permitted". The demo-user script also fails if the user
+  does not end up holding the `admin` role.
 
 ## [1.70.0] - 2026-11-20
 
@@ -93,39 +125,9 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ### Changed
 
-- **Breaking:** the PHPUnit and phpstan bootstraps ship in the image instead of
-  being copied into each repository. The template's `phpunit.xml.dist` loads
-  `/opt/civikitchen/toolbelt/phpunit/bootstrap.php`, its `phpstan.neon.dist`
-  loads `/opt/civikitchen/toolbelt/phpstan-config/bootstrap.php`, and both take
-  the extension from the working directory. `phpstanBootstrap.php`,
-  `tests/phpunit/bootstrap.php` and `tests/phpunit/ckHeadless.php` are no
-  longer managed, and the new ckconform check `retired-template-copy` fails on
-  an unchanged copy of them and on a config that still loads one. To migrate:
-  - in `phpunit.xml.dist`, set
-    `bootstrap="/opt/civikitchen/toolbelt/phpunit/bootstrap.php"`;
-  - in `phpstan.neon.dist`, replace `- phpstanBootstrap.php` under
-    `bootstrapFiles` with `- /opt/civikitchen/toolbelt/phpstan-config/bootstrap.php`
-    and drop `- phpstanBootstrap.php` from `excludePaths`;
-  - drop the three paths from `policy.template_custom`, where listed;
-  - run `ckinit --update`, which deletes the copies once nothing names them.
-  A bootstrap the repository changed stays its own and is left alone; one that
-  requires the `ckHeadless.php` copy requires
-  `/opt/civikitchen/toolbelt/phpunit/ckHeadless.php` instead. Setup of its own
-  goes into `tests/phpunit/bootstrap.local.php`, which the image's bootstrap
-  loads.
 - `policy.vendor` in `civikitchen.yaml` takes only
   `{mode: committed, reason: …}`. A plain string no longer validates:
   `vendor: committed` carried no reason, and any other string had no effect.
-
-### Fixed
-
-- A Standalone first boot on a database whose earlier install was interrupted
-  (for example a container replaced while it was still installing) now stops
-  with an error that tells you to remove the database volume. Before, it
-  reused the half-installed tables and came up without the `admin` and
-  `everyone` roles, so the demo user held no role and its API-key calls failed
-  with "Login not permitted". The demo-user script also fails if the user
-  does not end up holding the `admin` role.
 
 ## [1.66.1] - 2026-11-16
 
