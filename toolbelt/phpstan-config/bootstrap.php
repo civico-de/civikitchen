@@ -117,3 +117,6 @@ foreach ($ckInfo === FALSE ? [] : $ckInfo->requires->ext ?? [] as $ckRequired) {
   }
   $ckRegister($ckDir);
 }
+
+// Tests call the headless helpers from the image, outside the analysed paths.
+require_once dirname(__DIR__) . '/phpunit/ckHeadless.php';
