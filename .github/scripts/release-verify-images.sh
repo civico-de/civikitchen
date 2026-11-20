@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Write the digest behind each flavor tag of $PKG to digests.txt if its build
-# commit's image trees match $RELEASE_SHA. standalone(-demo) are mandatory;
-# other flavors warn. $ALLOW_DRIFT=1 attaches anyway. Needs $GH_TOKEN.
+# commit's image trees match $RELEASE_SHA. standalone(-demo) and civiproxy are
+# mandatory; other flavors warn. $ALLOW_DRIFT=1 attaches anyway. Needs $GH_TOKEN.
 set -euo pipefail
 
 gh api "/orgs/${OWNER}/packages/container/${PKG}/versions?per_page=100" \
@@ -36,9 +36,9 @@ fatal=()
 # standalone leads: the unprefixed :v1 / :v1.2.3 tags alias it.
 for flavor in standalone drupal10 drupal11 wordpress joomla backdrop \
               standalone-demo drupal10-demo drupal11-demo \
-              wordpress-demo joomla-demo backdrop-demo; do
+              wordpress-demo joomla-demo backdrop-demo civiproxy; do
   case "${flavor}" in
-    standalone | standalone-demo) mandatory=1 ;;
+    standalone | standalone-demo | civiproxy) mandatory=1 ;;
     *) mandatory=0 ;;
   esac
   # The release tags this flavor gets; released ones exist on one digest.

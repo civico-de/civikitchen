@@ -1,6 +1,6 @@
 # Images
 
-CiviKitchen publishes five kinds of image. The first four are tags of
+CiviKitchen publishes six kinds of image. All but the CLI are tags of
 `ghcr.io/civico-de/civikitchen`; the CLI is a package of its own.
 
 | Image | Tags | Contents | Use it for |
@@ -10,6 +10,7 @@ CiviKitchen publishes five kinds of image. The first four are tags of
 | [Buildkit flavors (dev)](#buildkit-flavors-dev) | `:drupal10`, `:drupal11`, `:wordpress`, `:joomla`, `:backdrop` | CiviCRM on a CMS, built by civibuild, with the same toolchain; needs a MariaDB beside it | CMS-specific behaviour |
 | [Demo](#demo-images) | `:standalone-demo`, `:<cms>-demo` | One container with an embedded MariaDB and baked demo data | Demos, evaluation, screenshots |
 | [CLI](#cli-image) | `civikitchen-cli` | ck's host commands and the docker CLI, no CiviCRM | Running ck without a checkout |
+| [CiviProxy](#civiproxy-image) | `:civiproxy` | Upstream CiviProxy on php:apache, no config, no CiviCRM | Extension stacks that talk to CiviCRM through CiviProxy |
 
 What applies to several of them:
 
@@ -193,6 +194,67 @@ commands (`run`, `ab`, `bisect`, `demo`, `playwright`) and the docker CLI, and s
 the stacks from the images above through the host's Docker socket.
 [ck without a checkout](building.md#ck-without-a-checkout) has the command.
 
+## CiviProxy image
+
+`:civiproxy` holds an unmodified release of
+[CiviProxy](https://github.com/systopia/CiviProxy) on php:apache, for dev and
+e2e stacks of extensions that sit behind one. The release and its checksum are
+pinned in
+[docker/civiproxy/Dockerfile](https://github.com/civico-de/civikitchen/tree/main/docker/civiproxy/Dockerfile);
+the image label `org.opencontainers.image.version` names it. Compared with a
+plain copy of upstream's `proxy/` directory, the image:
+
+- removes the bundled `target.pem`, whose CA bundle is stale, so curl uses the
+  system CAs and plain http targets work;
+- sets `HTTPS=on` for every request, because CiviProxy refuses requests
+  without it and a local stack serves plain http. Production sets it in its
+  TLS front end;
+- enables mod_rewrite, which the bundled `.htaccess` needs for the APIv4 route
+  `/civicrm/ajax/api4/<entity>/<action>`.
+
+The interface is the web root `/var/www/html`: mount or COPY your
+`config.php` there, plus any further files such as a `secrets.php` or
+endpoint scripts. Without a `config.php` the container exits at start with a
+message. The container turns healthy once `/` answers.
+
+```yaml
+services:
+  proxy:
+    image: ghcr.io/civico-de/civikitchen:civiproxy
+    ports: ["8081:80"]
+    volumes:
+      # sets $target_civicrm = 'http://app' (the compose service name)
+      - ./civiproxy/config.php:/var/www/html/config.php:ro
+    depends_on:
+      app: { condition: service_healthy }
+  app:
+    image: ghcr.io/civico-de/civikitchen:standalone
+    environment:
+      CIVICRM_AUTO_INSTALL: "1"
+    depends_on:
+      db: { condition: service_healthy }
+  db:
+    image: mariadb:11.4
+    # ... see examples/standalone/docker-compose.yml
+```
+
+A stack that needs more than files, such as Basic Auth in front of the proxy,
+layers it on top, with `auth.conf` naming the password file:
+
+```dockerfile
+FROM ghcr.io/civico-de/civikitchen:civiproxy
+COPY config.php /var/www/html/config.php
+COPY auth.conf /etc/apache2/conf-enabled/auth.conf
+COPY .htpasswd /etc/apache2/.htpasswd
+RUN chown root:www-data /etc/apache2/.htpasswd && chmod 640 /etc/apache2/.htpasswd
+```
+
+The health check requests `/` without credentials, so a layer that protects
+`/` also replaces `HEALTHCHECK`, for example with `curl -u`.
+
+Pin `:civiproxy-v1` like the other release tags
+([Releases](releases.md#what-a-version-names)).
+
 ## Profiles (`CIVIKITCHEN_PROFILE`)
 
 A profile adds a curated extension stack, configuration, seed data and API
@@ -346,7 +408,7 @@ them and the replacement.
 
 All images rebuild daily against the current CiviCRM stable from
 [latest.civicrm.org](https://latest.civicrm.org/stable.php). A push touching
-the image inputs rebuilds standalone and standalone-demo (*Build Dev Images*);
+the image inputs rebuilds standalone, standalone-demo and civiproxy (*Build Dev Images*);
 the CMS flavors and their demos rebuild daily or on a manual dispatch of
 *Build CMS Images*.
 
@@ -376,6 +438,7 @@ repo:
 | `:standalone-<minor>` | The latest patch of that minor, for example `:standalone-6.16`. The current stable minor always has one; older minors keep rebuilding while listed in `CK_STANDALONE_EXTRA_MINORS` in toolbelt/versions.env, and freeze once dropped. To rebuild another minor once, dispatch *Build Dev Images* with extra_standalone_minors. |
 | `:drupal10`, `:drupal11`, `:wordpress`, `:joomla`, `:backdrop`, `:*-demo` | The current stable at build time; see the version label below. |
 | `:<flavor>-php<version>` | The buildkit dev flavors with an explicit PHP version, for example `:drupal10-php8.3`. |
+| `:civiproxy` | The pinned CiviProxy release on the current php:apache base. |
 | `:standalone-master` | The head of civicrm-core master, built daily from git by *Build Git Images*. |
 | `:standalone-beta` | The head of core's newest X.Y branch, built daily from git. Shortly after a release this may still be the branch that just shipped. |
 

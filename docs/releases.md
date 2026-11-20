@@ -35,6 +35,7 @@ A release is a git tag on this repo plus the image tags that go with it.
 | `:standalone-v1.4.2`, `:standalone-v1` | image | the same digest, spelled with its flavor |
 | `:drupal10-v1`, `:wordpress-v1`, `:joomla-demo-v1`, … | image | every other published flavor, with and without the patch level, once it has [caught up](#catching-up-a-cms-flavor) |
 | `civikitchen-cli:v1.4.2`, `civikitchen-cli:v1` | image | the [CLI image](building.md#ck-without-a-checkout) of the release |
+| `:civiproxy-v1.4.2`, `:civiproxy-v1` | image | the [CiviProxy image](images.md#civiproxy-image) of the release |
 | `:standalone`, `:drupal10`, `:*-demo`, `civikitchen-cli:latest`, … | image | the **moving edge**: whatever last passed test-then-promote |
 
 A release leaves the moving tags alone; they follow the daily rebuild. The
@@ -70,7 +71,7 @@ only ship image content that is already live.
 
 | Images | Built by | In a release |
 |---|---|---|
-| standalone, standalone-demo, civikitchen-cli | *Build Dev Images*: on every push to the image paths, daily and on dispatch | Gate it: a mismatch fails the release |
+| standalone, standalone-demo, civiproxy, civikitchen-cli | *Build Dev Images*: on every push to the image paths, daily and on dispatch | Gate it: a mismatch fails the release |
 | drupal10, drupal11, wordpress, joomla, backdrop and their demos | *Build CMS Images*: daily and on dispatch, in their own concurrency group | Never block it: a mismatch or a missing live image gives a warning and no release tags; they [catch up](#catching-up-a-cms-flavor) later |
 
 To build the gating images now:
@@ -130,7 +131,7 @@ The tag push then
 
 1. verifies the live image digests as described above,
 2. attaches the release tags (v1.0.1 and the per-flavor spellings, and v1 if
-   v1.0.1 is the newest v1.x.y) to standalone, standalone-demo,
+   v1.0.1 is the newest v1.x.y) to standalone, standalone-demo, civiproxy,
    civikitchen-cli and every CMS flavor whose live image matches,
 3. moves the git v1 tag, but only if v1.0.1 is the newest v1.x.y,
 4. creates the GitHub release from the changelog section.

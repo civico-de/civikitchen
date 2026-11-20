@@ -21,6 +21,13 @@ except that a break the consumers are adjusted for ships as a minor, marked
   `ts()` string missing from a catalog into a failure and fails on an empty or
   fuzzy `.po` entry ([Translations](docs/extension-standards.md#translations)).
 
+- `ghcr.io/civico-de/civikitchen:civiproxy` (release tags `:civiproxy-v1`):
+  an unmodified CiviProxy release on php:apache for extension dev and e2e
+  stacks, with the bundled `target.pem` removed, `HTTPS=on` for plain-http
+  stacks and mod_rewrite enabled. Mount or COPY your `config.php` into
+  `/var/www/html`; the container refuses to start without one
+  ([CiviProxy image](docs/images.md#civiproxy-image)).
+
 ## [1.70.0] - 2026-11-20
 
 ### Added

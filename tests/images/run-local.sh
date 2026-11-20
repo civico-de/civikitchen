@@ -18,6 +18,7 @@
 #   demo flavors   boot-test-demo.sh (embedded DB boots clean, demo data,
 #                  CIVIKITCHEN_SITE_URL rewrite on a non-80 port; plus one
 #                  profile leg when CK_PROFILE is set)
+#   civiproxy      smoke-test-civiproxy.sh (config guard, APIv4 relay to a stub)
 #
 # Heads-up on time: a buildkit dev boot test is ~2-5 min, a profile leg up to
 # ~15 min. The full default run is roughly an hour.
@@ -29,7 +30,7 @@ PREFIX="ghcr.io/civico-de/civikitchen"
 while getopts "p:h" opt; do
     case "${opt}" in
         p) PREFIX="${OPTARG}" ;;
-        h) sed -n '2,20p' "$0"; exit 0 ;;
+        h) sed -n '2,21p' "$0"; exit 0 ;;
         *) exit 2 ;;
     esac
 done
@@ -38,7 +39,7 @@ shift $((OPTIND - 1))
 DEV_FLAVORS=(standalone drupal10 drupal11 wordpress joomla backdrop)
 DEMO_FLAVORS=(standalone-demo drupal10-demo drupal11-demo wordpress-demo joomla-demo backdrop-demo)
 FLAVORS=("$@")
-[ "${#FLAVORS[@]}" -gt 0 ] || FLAVORS=("${DEV_FLAVORS[@]}" "${DEMO_FLAVORS[@]}")
+[ "${#FLAVORS[@]}" -gt 0 ] || FLAVORS=("${DEV_FLAVORS[@]}" "${DEMO_FLAVORS[@]}" civiproxy)
 
 site_type_for() {
     case "$1" in
@@ -63,6 +64,9 @@ FAILED=0
 for flavor in "${FLAVORS[@]}"; do
     image="${PREFIX}:${flavor}"
     case "${flavor}" in
+        civiproxy)
+            run "smoke-test-civiproxy ${image}" bash smoke-test-civiproxy.sh "${image}"
+            ;;
         *-demo)
             run "boot-test-demo ${image}" bash boot-test-demo.sh "${image}"
             if [ -n "${CK_PROFILE:-}" ]; then

@@ -40,7 +40,7 @@ rel=$(git rev-parse HEAD)
 
 export OWNER=owner PKG=civikitchen TAG=v1.2.3 RELEASE_SHA="${rel}" ALLOW_DRIFT=0
 flavors=(standalone drupal10 drupal11 wordpress joomla backdrop
-         standalone-demo drupal10-demo drupal11-demo wordpress-demo joomla-demo backdrop-demo)
+         standalone-demo drupal10-demo drupal11-demo wordpress-demo joomla-demo backdrop-demo civiproxy)
 
 # One package version per argument, `<digest>=<tag>,<tag>…`.
 versions() {
@@ -118,7 +118,7 @@ for why in pruned "${unknown}"; do
   run || { cat "${work}/out" >&2; fail "unknown provenance of wordpress (${why}) blocked the release"; }
   grep -q '::warning::.*:wordpress.*its release tags follow' "${work}/out" || { cat "${work}/out" >&2; fail "unknown wordpress provenance (${why}) not warned"; }
   [[ " $(attached)" != *" wordpress "* ]] || fail "wordpress of unknown provenance (${why}) attached"
-  for f in standalone standalone-demo; do
+  for f in standalone standalone-demo civiproxy; do
     mapfile -t v < <(live "${rel}" "${f}=${why}")
     versions "${v[@]}"
     expect_fail "image drift: .*:${f}"
@@ -131,8 +131,8 @@ for why in pruned "${unknown}"; do
     || fail "allow_image_drift left out a flavor of unknown provenance (${why}): $(attached)"
 done
 
-# standalone and standalone-demo are mandatory.
-for f in standalone standalone-demo; do
+# standalone, standalone-demo and civiproxy are mandatory.
+for f in standalone standalone-demo civiproxy; do
   mapfile -t v < <(live "${rel}" "${f}=${old}")
   versions "${v[@]}"
   expect_fail ":${f} was built from"
@@ -156,7 +156,7 @@ run || { cat "${work}/out" >&2; fail "catch-up re-run failed"; }
 [ "$(attached)" = "drupal11 " ] || fail "catch-up attached: $(attached)"
 grep -q ':standalone-v1.2.3 is already released' "${work}/out" || { cat "${work}/out" >&2; fail "released standalone not reported"; }
 # Released flavors are not checked again: main may have moved their trees on.
-mapfile -t v2 < <(live "${rel}" "standalone=${old}" "standalone-demo=${old}")
+mapfile -t v2 < <(live "${rel}" "standalone=${old}" "standalone-demo=${old}" "civiproxy=${old}")
 versions "${v2[@]}" "${released[@]}"
 run || { cat "${work}/out" >&2; fail "catch-up re-run failed on a released, since rebuilt standalone"; }
 [ "$(attached)" = "drupal11 " ] || fail "catch-up after a rebuild attached: $(attached)"
