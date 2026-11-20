@@ -14,6 +14,13 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- ckconform's translation-catalog check fails when a `.mo` carries an older
+  translation than its `.po`. `policy.translations.complete: true` turns a
+  `ts()` string missing from a catalog into a failure and fails on an empty or
+  fuzzy `.po` entry ([Translations](docs/extension-standards.md#translations)).
+
 ## [1.70.0] - 2026-11-20
 
 ### Added

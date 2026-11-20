@@ -553,6 +553,29 @@ The same paths need a .gitattributes of their own that takes them out of the
 filter (`*.png -filter -diff -merge`), or git reports them as modified in
 every checkout; the check fails until it is there.
 
+### Translations
+
+An extension that ships translations keeps one catalog per locale at
+`l10n/<locale>/LC_MESSAGES/<file>.po`, beside the `.mo` that CiviCRM reads at
+runtime. Compile after every edit:
+
+```bash
+msgfmt -o l10n/de_DE/LC_MESSAGES/myext.mo l10n/de_DE/LC_MESSAGES/myext.po
+```
+
+ckconform's translation-catalog check fails when a `.mo` is missing, lacks a
+translated string of its `.po` or carries an older translation of it. It warns
+on an `E::ts()` or `{ts}` string that is in no catalog and on a `ts()` call
+whose text no extractor can read. A repo whose catalogs cover every string
+declares it, and the check then fails on a missing string and on a `.po` entry
+that is empty or fuzzy:
+
+```yaml
+policy:
+  translations:
+    complete: true
+```
+
 ### Dev stack and workflow permissions
 
 The dev stack is `.docker/docker-compose.yml` on a civikitchen image, and
@@ -871,6 +894,7 @@ Every key under `policy:`:
 | `max_unreleased_days` | Days shipped changes may wait behind the newest tag before the unreleased-shipped-changes check warns (default 30) | — |
 | `dist` | `exclude`, `include` and `build` for the release archive | [What the archive contains](extension-releases.md#what-the-archive-contains) |
 | `javascript.type_check` | TypeScript compiler diagnostics in ckeslint | [Linting JavaScript](#linting-javascript) |
+| `translations.complete` | Every `ts()` string in every catalog, every entry translated | [Translations](#translations) |
 | `lifecycle.log_ignore` | Expected log lines in the lifecycle gate | [The lifecycle gate](#the-lifecycle-gate-what-cklifecycle-adds-to-the-cycle) |
 | `template_custom` | Template-managed files the repo owns instead | [Managed and seeded template files](extension-development.md#managed-and-seeded-template-files) |
 | `renovate_preset` | The preset the managed renovate.json extends | below |

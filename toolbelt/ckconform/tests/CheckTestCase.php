@@ -163,6 +163,7 @@ abstract class CheckTestCase extends TestCase
                 case 'dist_exclude': $policy['dist']['exclude'] = $list; break;
                 case 'dist_include': $policy['dist']['include'] = array_map(static fn ($path) => ['path' => $path, 'reason' => $reason], $list); break;
                 case 'lifecycle_log_ignore': $policy['lifecycle']['log_ignore'][] = ['pattern' => $plain, 'reason' => $reason]; break;
+                case 'translations_complete': $policy['translations']['complete'] = match ($plain) { 'true' => true, 'false' => false, default => $plain }; break;
                 case 'template_custom': $policy['template_custom'] = ['paths' => $list, 'reason' => $reason]; break;
                 case 'extension_source':
                     [$sourceKey, $url] = array_pad(explode('@', $plain, 2), 2, '');

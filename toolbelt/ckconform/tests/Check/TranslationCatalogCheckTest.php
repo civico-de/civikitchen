@@ -87,6 +87,199 @@ final class TranslationCatalogCheckTest extends CheckTestCase
         );
     }
 
+    /** A .po edited after the last msgfmt run: same msgid, older text in the .mo. */
+    public function testAMoWithAnOutdatedTranslationFails(): void
+    {
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(key: 'de.example.greeter'),
+            'Civi/Greeter/Thing.php' => $this->php("E::ts('Hello'); E::ts('Goodbye')"),
+            'l10n/de_DE/LC_MESSAGES/greeter.po' => $this->po([['Hello', 'Hallo'], ['Goodbye', 'Tschüss']]),
+            'l10n/de_DE/LC_MESSAGES/greeter.mo' => $this->mo(['Hello' => 'Servus', 'Goodbye' => 'Tschüss']),
+        ], git: true);
+        $this->assertFails(
+            $this->run_(new TranslationCatalogCheck(), $context),
+            "1 string(s) carry another translation than in greeter.po ('Hello')"
+        );
+    }
+
+    /** Only plain entries are compared by text; a context entry has its own translation. */
+    public function testAContextEntryIsNotComparedWithThePlainOne(): void
+    {
+        $po = $this->po([['Hello', 'Hallo']]) . "\nmsgctxt \"phone\"\nmsgid \"Hello\"\nmsgstr \"Hallo?\"\n";
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(key: 'de.example.greeter'),
+            'Civi/Greeter/Thing.php' => $this->php("E::ts('Hello')"),
+            'l10n/de_DE/LC_MESSAGES/greeter.po' => $po,
+            'l10n/de_DE/LC_MESSAGES/greeter.mo' => $this->mo(['Hello' => 'Hallo', "phone\x04Hello" => 'Hallo?']),
+        ], git: true);
+        $this->assertSilent($this->run_(new TranslationCatalogCheck(), $context));
+    }
+
+    public function testACompleteCatalogUnderTheCompletePolicyIsSilent(): void
+    {
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(key: 'de.example.greeter'),
+            'civikitchen.yaml' => $this->policyFixture('translations_complete=true'),
+            'Civi/Greeter/Thing.php' => $this->php("E::ts('Hello')"),
+            'l10n/greeter.pot' => $this->po([['Hello', '']]),
+            'l10n/de_DE/LC_MESSAGES/greeter.po' => $this->po([['Hello', 'Hallo']]),
+            'l10n/de_DE/LC_MESSAGES/greeter.mo' => $this->mo(['Hello' => 'Hallo']),
+        ], git: true);
+        $this->assertSilent($this->run_(new TranslationCatalogCheck(), $context));
+    }
+
+    public function testTheCompletePolicyFailsOnAStringMissingFromTheCatalog(): void
+    {
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(key: 'de.example.greeter'),
+            'civikitchen.yaml' => $this->policyFixture('translations_complete=true'),
+            'Civi/Greeter/Thing.php' => $this->php("E::ts('Hello'); E::ts('Goodbye')"),
+            'l10n/de_DE/LC_MESSAGES/greeter.po' => $this->po([['Hello', 'Hallo']]),
+            'l10n/de_DE/LC_MESSAGES/greeter.mo' => $this->mo(['Hello' => 'Hallo']),
+        ], git: true);
+        $this->assertFails($this->run_(new TranslationCatalogCheck(), $context), "appear in it as no msgid ('Goodbye')");
+    }
+
+    public function testTheCompletePolicyFailsOnAnUntranslatedEntry(): void
+    {
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(key: 'de.example.greeter'),
+            'civikitchen.yaml' => $this->policyFixture('translations_complete=true'),
+            'Civi/Greeter/Thing.php' => $this->php("E::ts('Hello'); E::ts('Goodbye')"),
+            'l10n/de_DE/LC_MESSAGES/greeter.po' => $this->po([['Hello', 'Hallo'], ['Goodbye', '']]),
+            'l10n/de_DE/LC_MESSAGES/greeter.mo' => $this->mo(['Hello' => 'Hallo']),
+        ], git: true);
+        $this->assertFails($this->run_(new TranslationCatalogCheck(), $context), "1 entr(y/ies) without a translation or marked fuzzy ('Goodbye')");
+    }
+
+    public function testTheCompletePolicyFailsOnAFuzzyEntry(): void
+    {
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(key: 'de.example.greeter'),
+            'civikitchen.yaml' => $this->policyFixture('translations_complete=true'),
+            'Civi/Greeter/Thing.php' => $this->php("E::ts('Hello'); E::ts('Goodbye')"),
+            'l10n/de_DE/LC_MESSAGES/greeter.po' => $this->po([['Hello', 'Hallo'], ['Goodbye', 'Tschüss']], fuzzy: 2),
+            'l10n/de_DE/LC_MESSAGES/greeter.mo' => $this->mo(['Hello' => 'Hallo']),
+        ], git: true);
+        $this->assertFails($this->run_(new TranslationCatalogCheck(), $context), "('Goodbye')");
+    }
+
+    public function testTheCompletePolicyFailsOnAnEmptyPluralForm(): void
+    {
+        $po = <<<'PO'
+            msgid "One item"
+            msgid_plural "%1 items"
+            msgstr[0] "Ein Eintrag"
+            msgstr[1] ""
+            PO;
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(key: 'de.example.greeter'),
+            'civikitchen.yaml' => $this->policyFixture('translations_complete=true'),
+            'l10n/de_DE/LC_MESSAGES/greeter.po' => $po,
+            'l10n/de_DE/LC_MESSAGES/greeter.mo' => $this->mo(["One item\0%1 items" => "Ein Eintrag\0"]),
+        ], git: true);
+        $this->assertFails($this->run_(new TranslationCatalogCheck(), $context), "('One item')");
+    }
+
+    public function testTheCompletePolicyFailsOnAnUntranslatedContextBesideATranslatedOne(): void
+    {
+        $po = <<<'PO'
+            msgid "Open"
+            msgstr "Öffnen"
+
+            msgctxt "toolbar"
+            msgid "Open"
+            msgstr ""
+            PO;
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(key: 'de.example.greeter'),
+            'civikitchen.yaml' => $this->policyFixture('translations_complete=true'),
+            'l10n/de_DE/LC_MESSAGES/greeter.po' => $po,
+            'l10n/de_DE/LC_MESSAGES/greeter.mo' => $this->mo(['Open' => 'Öffnen']),
+        ], git: true);
+        $this->assertFails($this->run_(new TranslationCatalogCheck(), $context), "('Open')");
+    }
+
+    public function testAPartlyTranslatedPluralMustStillBeInTheMo(): void
+    {
+        $po = <<<'PO'
+            msgid "One item"
+            msgid_plural "%1 items"
+            msgstr[0] "Ein Eintrag"
+            msgstr[1] ""
+            PO;
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(key: 'de.example.greeter'),
+            'l10n/de_DE/LC_MESSAGES/greeter.po' => $po,
+            'l10n/de_DE/LC_MESSAGES/greeter.mo' => $this->mo([]),
+        ], git: true);
+        $this->assertFails($this->run_(new TranslationCatalogCheck(), $context), 'missing from it');
+    }
+
+    public function testAMoWithAnOutdatedContextOrPluralTranslationFails(): void
+    {
+        $po = <<<'PO'
+            msgctxt "toolbar"
+            msgid "Open"
+            msgstr "Öffnen"
+
+            msgid "One item"
+            msgid_plural "%1 items"
+            msgstr[0] "Ein Eintrag"
+            msgstr[1] "%1 Einträge"
+            PO;
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(key: 'de.example.greeter'),
+            'l10n/de_DE/LC_MESSAGES/greeter.po' => $po,
+            'l10n/de_DE/LC_MESSAGES/greeter.mo' => $this->mo([
+                "toolbar\x04Open" => 'Aufmachen',
+                "One item\0%1 items" => "Ein Ding\0%1 Dinge",
+            ]),
+        ], git: true);
+        $this->assertFails(
+            $this->run_(new TranslationCatalogCheck(), $context),
+            "2 string(s) carry another translation than in greeter.po ('One item', 'Open')",
+        );
+    }
+
+    public function testTheCompletePolicyFailsOnAMissingPluralForm(): void
+    {
+        $po = <<<'PO'
+            msgid ""
+            msgstr "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+            msgid "One item"
+            msgid_plural "%1 items"
+            msgstr[0] "Ein Eintrag"
+            PO;
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(key: 'de.example.greeter'),
+            'civikitchen.yaml' => $this->policyFixture('translations_complete=true'),
+            'l10n/de_DE/LC_MESSAGES/greeter.po' => $po,
+            'l10n/de_DE/LC_MESSAGES/greeter.mo' => $this->mo(["One item\0%1 items" => 'Ein Eintrag']),
+        ], git: true);
+        $this->assertFails($this->run_(new TranslationCatalogCheck(), $context), "('One item')");
+    }
+
+    public function testALanguageWithOnePluralFormNeedsOneForm(): void
+    {
+        $po = <<<'PO'
+            msgid ""
+            msgstr "Plural-Forms: nplurals=1; plural=0;\n"
+
+            msgid "One item"
+            msgid_plural "%1 items"
+            msgstr[0] "%1 件"
+            PO;
+        $context = $this->repo([
+            'info.xml' => $this->infoXml(key: 'de.example.greeter'),
+            'civikitchen.yaml' => $this->policyFixture('translations_complete=true'),
+            'l10n/ja_JP/LC_MESSAGES/greeter.po' => $po,
+            'l10n/ja_JP/LC_MESSAGES/greeter.mo' => $this->mo(["One item\0%1 items" => '%1 件']),
+        ], git: true);
+        $this->assertSilent($this->run_(new TranslationCatalogCheck(), $context));
+    }
+
     /** msgfmt does not compile what has no translation yet. */
     public function testAnUntranslatedEntryNeedNotBeInTheMo(): void
     {

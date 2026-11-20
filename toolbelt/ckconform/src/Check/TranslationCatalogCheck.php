@@ -10,9 +10,10 @@ use CiviKitchen\Ckconform\PhpSource;
 use CiviKitchen\Ckconform\Reporter;
 
 /**
- * A shipped `l10n/` whose `.mo` is missing or lacks translated msgids of its
- * `.po` (compared by content: git keeps no mtimes). Warns on `ts()` strings in
- * no catalog and on non-literal `ts()` arguments. Silent without `l10n/`.
+ * A shipped `l10n/` whose `.mo` is missing or behind its `.po` (compared by
+ * content: git keeps no mtimes). Warns on `ts()` strings in no catalog and on
+ * non-literal `ts()` arguments; `translations.complete` makes missing and
+ * untranslated strings failures. Silent without `l10n/`.
  */
 final class TranslationCatalogCheck implements Check
 {
@@ -30,6 +31,7 @@ final class TranslationCatalogCheck implements Check
         if ($catalogs === []) {
             return;
         }
+        $complete = $context->policyValue('translations_complete') === 'true';
 
         /** @var array<string, list<string>> $msgids catalog => every msgid in it */
         $msgids = [];
@@ -40,6 +42,9 @@ final class TranslationCatalogCheck implements Check
             }
             $entries = $this->parsePo($source);
             $msgids[$catalog] = array_keys($entries);
+            if ($complete && str_ends_with($catalog, '.po')) {
+                $this->judgeUntranslated($reporter, $catalog, $entries);
+            }
 
             if (str_ends_with($catalog, '.pot')) {
                 // A .pot is the extraction template, not a translation: it has
@@ -58,11 +63,29 @@ final class TranslationCatalogCheck implements Check
             $this->judgeCompiledCatalog($context, $reporter, $catalog, $entries);
         }
 
-        $this->judgeSourceStrings($context, $reporter, $msgids);
+        $this->judgeSourceStrings($context, $reporter, $msgids, $complete);
     }
 
     /**
-     * @param array<string, bool> $entries msgid => is translated
+     * @param array<string, array{translated: bool, present: bool, compiled: array<string, string>}> $entries
+     */
+    private function judgeUntranslated(Reporter $reporter, string $catalog, array $entries): void
+    {
+        $untranslated = array_keys(array_filter($entries, static fn (array $e): bool => !$e['translated']));
+        if ($untranslated === []) {
+            return;
+        }
+        $reporter->fail(sprintf(
+            '%s: %d entr(y/ies) without a translation or marked fuzzy (%s) — translations.complete '
+            . 'requires every string translated',
+            $catalog,
+            count($untranslated),
+            $this->examples($untranslated),
+        ));
+    }
+
+    /**
+     * @param array<string, array{translated: bool, present: bool, compiled: array<string, string>}> $entries
      */
     private function judgeCompiledCatalog(
         Context $context,
@@ -81,8 +104,8 @@ final class TranslationCatalogCheck implements Check
         }
 
         $binary = $context->read($compiled);
-        $originals = $binary === null ? null : $this->moOriginals($binary);
-        if ($originals === null) {
+        $compiledEntries = $binary === null ? null : $this->moEntries($binary);
+        if ($compiledEntries === null) {
             $reporter->fail(
                 "$compiled: not a readable gettext catalog — msgfmt never produced it, or it was truncated"
             );
@@ -90,25 +113,51 @@ final class TranslationCatalogCheck implements Check
             return;
         }
 
-        $translated = array_keys(array_filter($entries));
-        $missing = array_values(array_diff($translated, $originals));
-        if ($missing === []) {
-            return;
+        $originals = array_column($compiledEntries, 0);
+        $byKey = array_column($compiledEntries, 1, 2);
+        $missing = [];
+        $changed = [];
+        foreach ($entries as $msgid => $entry) {
+            if (!$entry['present']) {
+                continue;
+            }
+            if (!in_array($msgid, $originals, true)) {
+                $missing[] = $msgid;
+                continue;
+            }
+            foreach ($entry['compiled'] as $key => $translation) {
+                if (isset($byKey[$key]) && $byKey[$key] !== $translation) {
+                    $changed[] = $msgid;
+                    break;
+                }
+            }
         }
-        $reporter->fail(sprintf(
-            '%s: %d translated string(s) from %s are missing from it (%s) — the compiled catalog is '
-            . 'behind its source, so those translations never reach anyone; recompile with msgfmt',
-            $compiled,
-            count($missing),
-            basename($catalog),
-            $this->examples($missing),
-        ));
+        if ($missing !== []) {
+            $reporter->fail(sprintf(
+                '%s: %d translated string(s) from %s are missing from it (%s) — the compiled catalog is '
+                . 'behind its source, so those translations never reach anyone; recompile with msgfmt',
+                $compiled,
+                count($missing),
+                basename($catalog),
+                $this->examples($missing),
+            ));
+        }
+        if ($changed !== []) {
+            $reporter->fail(sprintf(
+                '%s: %d string(s) carry another translation than in %s (%s) — the compiled catalog is '
+                . 'behind its source; recompile with msgfmt',
+                $compiled,
+                count($changed),
+                basename($catalog),
+                $this->examples($changed),
+            ));
+        }
     }
 
     /**
      * @param array<string, list<string>> $msgids
      */
-    private function judgeSourceStrings(Context $context, Reporter $reporter, array $msgids): void
+    private function judgeSourceStrings(Context $context, Reporter $reporter, array $msgids, bool $complete): void
     {
         $literals = [];
         // Tests are not shipped UI and vendored code has its own catalogs, so
@@ -146,13 +195,18 @@ final class TranslationCatalogCheck implements Check
             if ($missing === []) {
                 continue;
             }
-            $reporter->warn(sprintf(
+            $message = sprintf(
                 '%s: %d string(s) passed to E::ts()/{ts} appear in it as no msgid (%s) — the catalog was '
                 . 'extracted before those strings existed',
                 $catalog,
                 count($missing),
                 $this->examples($missing),
-            ));
+            );
+            if ($complete) {
+                $reporter->fail($message);
+            } else {
+                $reporter->warn($message);
+            }
         }
     }
 
@@ -239,26 +293,66 @@ final class TranslationCatalogCheck implements Check
     }
 
     /**
-     * msgid => "has a non-empty translation". Fuzzy entries count as present but
+     * msgid => whether every entry for it is translated in all its plural forms, whether
+     * any entry is (msgfmt compiles it), and the fully translated entries as gettext key
+     * ("ctxt\x04msgid\0plural") => forms joined by "\0". Fuzzy entries count as present but
      * untranslated (msgfmt omits them); obsolete `#~` entries and the header do not count.
      *
-     * @return array<string, bool>
+     * @return array<string, array{translated: bool, present: bool, compiled: array<string, string>}>
      */
     private function parsePo(string $source): array
     {
+        $records = $this->poRecords($source);
+        $nplurals = null;
+        foreach ($records as $r) {
+            if ($r['msgid'] === '' && $r['ctxt'] === null && preg_match('/nplurals\s*=\s*(\d+)/', implode('', $r['forms']), $m) === 1) {
+                $nplurals = (int) $m[1];
+            }
+        }
+
         $entries = [];
-        $msgid = null;
-        $translated = false;
+        foreach ($records as $r) {
+            $msgid = $r['msgid'];
+            if (!is_string($msgid) || $msgid === '') {
+                continue;
+            }
+            $forms = $r['forms'];
+            $expected = $r['plural'] === null ? 1 : ($nplurals ?? 2);
+            $done = !$r['fuzzy'] && count($forms) >= $expected && !in_array('', $forms, true);
+            $some = !$r['fuzzy'] && array_filter($forms, static fn (string $f): bool => $f !== '') !== [];
+            $previous = $entries[$msgid] ?? ['translated' => true, 'present' => false, 'compiled' => []];
+            $compiled = $previous['compiled'];
+            if ($done) {
+                $key = ($r['ctxt'] === null ? '' : $r['ctxt'] . "\x04") . $msgid . ($r['plural'] === null ? '' : "\0" . $r['plural']);
+                $compiled[$key] = implode("\0", $forms);
+            }
+            $entries[$msgid] = [
+                'translated' => $previous['translated'] && $done,
+                'present' => $previous['present'] || $some,
+                'compiled' => $compiled,
+            ];
+        }
+
+        return $entries;
+    }
+
+    /**
+     * The non-obsolete entries of a .po source in file order, the header included.
+     *
+     * @return list<array{ctxt: ?string, msgid: ?string, plural: ?string, forms: list<string>, fuzzy: bool}>
+     */
+    private function poRecords(string $source): array
+    {
+        $records = [];
+        $record = null;
         $fuzzy = false;
         $obsolete = false;
         $target = null;
-
-        $flush = static function () use (&$entries, &$msgid, &$translated, &$fuzzy, &$obsolete, &$target): void {
-            if (is_string($msgid) && $msgid !== '' && !$obsolete) {
-                $entries[$msgid] = ($entries[$msgid] ?? false) || ($translated && !$fuzzy);
+        $flush = static function () use (&$records, &$record, &$fuzzy, &$obsolete, &$target): void {
+            if ($record !== null && !$obsolete) {
+                $records[] = $record + ['fuzzy' => $fuzzy];
             }
-            $msgid = null;
-            $translated = false;
+            $record = null;
             $fuzzy = false;
             $obsolete = false;
             $target = null;
@@ -280,44 +374,46 @@ final class TranslationCatalogCheck implements Check
                 }
                 continue;
             }
-            if (preg_match('/^msgid\s+"(.*)"$/', $line, $match) === 1) {
-                if ($msgid !== null) {
+            if (preg_match('/^(msgctxt|msgid|msgid_plural|msgstr(?:\[\d+\])?)\s+"(.*)"$/', $line, $match) === 1) {
+                $value = $this->unescape($match[2]);
+                if ($match[1] === 'msgctxt' || ($match[1] === 'msgid' && ($record['msgid'] ?? null) !== null)) {
                     $flush();
                 }
-                $msgid = $this->unescape($match[1]);
-                $target = 'msgid';
+                $record ??= ['ctxt' => null, 'msgid' => null, 'plural' => null, 'forms' => []];
+                $target = match (true) {
+                    $match[1] === 'msgctxt' => 'ctxt',
+                    $match[1] === 'msgid' => 'msgid',
+                    $match[1] === 'msgid_plural' => 'plural',
+                    default => 'forms',
+                };
+                if ($target === 'forms') {
+                    $record['forms'][] = $value;
+                } else {
+                    $record[$target] = $value;
+                }
                 continue;
             }
-            if (preg_match('/^(msgctxt|msgid_plural)\s+"(.*)"$/', $line) === 1) {
-                $target = 'other';
-                continue;
-            }
-            if (preg_match('/^msgstr(?:\[\d+\])?\s+"(.*)"$/', $line, $match) === 1) {
-                $translated = $translated || $this->unescape($match[1]) !== '';
-                $target = 'msgstr';
-                continue;
-            }
-            if (preg_match('/^"(.*)"$/', $line, $match) === 1) {
+            if ($record !== null && $target !== null && preg_match('/^"(.*)"$/', $line, $match) === 1) {
                 $continuation = $this->unescape($match[1]);
-                if ($target === 'msgid') {
-                    $msgid = (string) $msgid . $continuation;
-                } elseif ($target === 'msgstr') {
-                    $translated = $translated || $continuation !== '';
+                if ($target === 'forms') {
+                    $record['forms'][array_key_last($record['forms'])] .= $continuation;
+                } else {
+                    $record[$target] .= $continuation;
                 }
             }
         }
         $flush();
 
-        return $entries;
+        return $records;
     }
 
     /**
-     * The untranslated strings a compiled catalog knows about, or null if the
-     * file is not a gettext catalog. Parsed with unpack(): msgunfmt is often absent.
+     * The entries of a compiled catalog as [msgid, translation, gettext key], or
+     * null if the file is not a gettext catalog. Parsed with unpack(): msgunfmt is often absent.
      *
-     * @return list<string>|null
+     * @return list<array{0: string, 1: string, 2: string}>|null
      */
-    private function moOriginals(string $binary): ?array
+    private function moEntries(string $binary): ?array
     {
         if (strlen($binary) < 24) {
             return null;
@@ -341,27 +437,35 @@ final class TranslationCatalogCheck implements Check
         }
         $count = $header[1];
         $table = $header[2];
+        $translations = $header[3];
         // Reject a truncated catalog before indexing: unpack() on a short read warns.
-        if ($count < 0 || strlen($binary) < $table + $count * 8) {
+        if ($count < 0 || strlen($binary) < max($table, $translations) + $count * 8) {
             return null;
         }
 
-        $originals = [];
+        $entries = [];
         for ($i = 0; $i < $count; ++$i) {
-            $entry = unpack("{$format}2", substr($binary, $table + $i * 8, 8));
-            if ($entry === false || strlen($binary) < $entry[2] + $entry[1]) {
+            $original = $this->moString($binary, $format, $table + $i * 8);
+            $translation = $this->moString($binary, $format, $translations + $i * 8);
+            if ($original === null || $translation === null) {
                 return null;
             }
-            $original = substr($binary, $entry[2], $entry[1]);
-            // A context is stored as "ctxt\x04msgid", a plural as
-            // "singular\0plural"; both reduce to the msgid the .po names.
-            if (str_contains($original, "\x04")) {
-                $original = substr($original, strpos($original, "\x04") + 1);
-            }
-            $originals[] = explode("\0", $original)[0];
+            // A context is stored as "ctxt\x04msgid", a plural as "singular\0plural".
+            $msgid = str_contains($original, "\x04") ? substr($original, strpos($original, "\x04") + 1) : $original;
+            $entries[] = [explode("\0", $msgid)[0], $translation, $original];
         }
 
-        return $originals;
+        return $entries;
+    }
+
+    private function moString(string $binary, string $format, int $descriptor): ?string
+    {
+        $entry = unpack("{$format}2", substr($binary, $descriptor, 8));
+        if ($entry === false || strlen($binary) < $entry[2] + $entry[1]) {
+            return null;
+        }
+
+        return substr($binary, $entry[2], $entry[1]);
     }
 
     private function unescape(string $value): string

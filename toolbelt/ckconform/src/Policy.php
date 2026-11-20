@@ -59,6 +59,7 @@ final class Policy
         'dist_build_output' => 'ckrelease + ckconform: untracked build output staged into the release zip, one path per value',
         'lifecycle_log_ignore' => 'cklifecycle: log patterns to ignore, reason mandatory',
         'javascript_type_check' => 'ckeslint: TypeScript compiler diagnostics over the repo\'s JavaScript, true or false',
+        'translations_complete' => 'ckconform: every ts() string in every .po and every entry translated, true or false',
         // read by ckinit
         'template_custom' => 'ckinit: template-managed files this repo owns instead',
         'renovate_preset' => 'ckinit: the Renovate preset the managed renovate.json extends',
@@ -188,6 +189,7 @@ final class Policy
         foreach ($policy['untagged_versions'] ?? [] as $item) $out['untagged_versions'][] = $item['version'] . ' -- ' . $item['reason'];
         foreach ($policy['civicrm_floor_reasons'] ?? [] as $item) $out['civicrm_floor_reasons'][] = $item['version'] . ' -- ' . $item['reason'];
         if (isset($policy['javascript']['type_check'])) $out['javascript_type_check'] = [$policy['javascript']['type_check'] ? 'true' : 'false'];
+        if (isset($policy['translations']['complete'])) $out['translations_complete'] = [$policy['translations']['complete'] ? 'true' : 'false'];
         if (isset($policy['mutation']['minimum_msi'])) $out['mutation_min_msi'] = [(string) $policy['mutation']['minimum_msi']];
         if (isset($policy['mutation']['minimum_covered_msi'])) $out['mutation_min_covered_msi'] = [(string) $policy['mutation']['minimum_covered_msi']];
         if (isset($policy['mutation']['paths'])) $out['mutation_paths'] = [implode(',', $policy['mutation']['paths'])];
