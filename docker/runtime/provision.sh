@@ -134,6 +134,14 @@ ck_standalone_auth() {
         echo "[civikitchen] ERROR: could not enable standaloneusers (Standalone auth provider)." >&2
         return 1
     fi
+    # Its postInstall creates these roles; an install killed before that step
+    # leaves the extension marked installed, so enabling it again adds none.
+    local missing
+    missing="$(ck_as_web cv ev 'echo implode(" ", array_diff(["admin", "everyone"], \Civi\Api4\Role::get(FALSE)->addSelect("name")->execute()->column("name")));')" || return 1
+    if [[ -n "${missing}" ]]; then
+        echo "[civikitchen] ERROR: standaloneusers is installed but its role(s) ${missing} are missing: the database holds an interrupted first install. Remove the database volume (docker compose down -v) and start again." >&2
+        return 1
+    fi
 }
 
 # Opt-in demo login user (CIVIKITCHEN_DEMO_USER); needs ck_standalone_auth first.

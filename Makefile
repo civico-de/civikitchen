@@ -210,13 +210,14 @@ test-scenario: $(VENDOR_STAMP) ## Declarative scenario schema, plan, Compose ren
 
 # The <requires> resolution itself is ExtensionProvisionerTest in test-shared-php-coverage;
 # these check provision.sh hands it the ext dir, archive dir, mounts and lists.
-test-provision: ## provision.sh: extension provisioning wiring, mounted extensions, core locales, test DB and its boot patch, no civicrm.org calls (fake cv), site port, database marker
+test-provision: ## provision.sh: extension provisioning wiring, mounted extensions, core locales, test DB and its boot patch, no civicrm.org calls (fake cv), site port, database marker, Standalone default roles
 	bash tests/toolbelt/test-provision-requires.sh
 	bash tests/toolbelt/test-provision-mounts.sh
 	bash tests/toolbelt/test-provision-locales.sh
 	bash tests/toolbelt/test-provision-test-db.sh
 	bash tests/toolbelt/test-provision-phone-home.sh
 	bash tests/toolbelt/test-provision-db-marker.sh
+	bash tests/toolbelt/test-provision-standalone-auth.sh
 	bash tests/toolbelt/test-provision-site-port.sh
 	bash tests/toolbelt/test-test-db-boot.sh
 

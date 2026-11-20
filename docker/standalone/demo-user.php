@@ -22,6 +22,18 @@ $demoEmail = getenv('DEMO_EMAIL');
 // (contact_id, domain_id) and (uf_name, domain_id), and re-asserting either on
 // an existing user can collide with another User row and fail every boot.
 
+// `roles:name` drops a name with no Role row without an error.
+$assertAdmin = function (int $userId) use ($demoUser): void {
+  $roles = \Civi\Api4\User::get(FALSE)
+    ->addWhere('id', '=', $userId)
+    ->addSelect('roles:name')
+    ->execute()->single()['roles:name'] ?? [];
+  if (!in_array('admin', $roles, TRUE)) {
+    fwrite(STDERR, "[demo-user] User '{$demoUser}' (id={$userId}) does not hold the admin role.\n");
+    exit(1);
+  }
+};
+
 $existing = \Civi\Api4\User::get(FALSE)
   ->addWhere('username', '=', $demoUser)
   ->addSelect('id', 'contact_id')
@@ -36,6 +48,7 @@ if ($existing) {
     ->addValue('roles:name', ['admin'])
     ->addValue('is_active', TRUE)
     ->execute();
+  $assertAdmin($existing['id']);
   echo "[demo-user] Ensured active admin user '{$demoUser}' (id={$existing['id']}, contact id={$existing['contact_id']}).\n";
   return;
 }
@@ -91,5 +104,6 @@ if (!$ufNameTaken) {
   $create->addValue('uf_name', $demoEmail);
 }
 $userId = $create->execute()->first()['id'];
+$assertAdmin($userId);
 
 echo "[demo-user] Ensured active admin user '{$demoUser}' (id={$userId}, contact id={$contactId}).\n";

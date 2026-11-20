@@ -117,6 +117,16 @@ except that a break the consumers are adjusted for ships as a minor, marked
   `{mode: committed, reason: …}`. A plain string no longer validates:
   `vendor: committed` carried no reason, and any other string had no effect.
 
+### Fixed
+
+- A Standalone first boot on a database whose earlier install was interrupted
+  (for example a container replaced while it was still installing) now stops
+  with an error that tells you to remove the database volume. Before, it
+  reused the half-installed tables and came up without the `admin` and
+  `everyone` roles, so the demo user held no role and its API-key calls failed
+  with "Login not permitted". The demo-user script also fails if the user
+  does not end up holding the `admin` role.
+
 ## [1.66.1] - 2026-11-16
 
 ### Fixed

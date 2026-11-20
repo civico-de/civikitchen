@@ -8,7 +8,7 @@
 #   CK_PROVISION_OVERRIDE=docker/runtime/provision.sh bash tests/images/boot-test-standalone.sh ghcr.io/civico-de/civikitchen:standalone
 #   CK_DATABASE_IMAGE=mysql:8.0 bash tests/images/boot-test-standalone.sh ghcr.io/civico-de/civikitchen:standalone
 # CK_PROVISION_OVERRIDE mounts this checkout's provision.sh, PHP library, PHPUnit
-# bootstrap and profile driver over a published image's.
+# bootstrap, profile driver and demo-user script over a published image's.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
@@ -48,7 +48,8 @@ if [ -n "${CK_PROVISION_OVERRIDE:-}" ]; then
     extra+=(-v "$(cd "$(dirname "${CK_PROVISION_OVERRIDE}")" && pwd)/$(basename "${CK_PROVISION_OVERRIDE}"):/usr/local/share/civikitchen/provision.sh:ro"
         -v "${SRC}/toolbelt/lib/php:/opt/civikitchen/toolbelt/lib/php:ro"
         -v "${SRC}/toolbelt/phpunit:/opt/civikitchen/toolbelt/phpunit:ro"
-        -v "${SRC}/docker/profiles/apply.sh:/opt/civikitchen/docker/profiles/apply.sh:ro")
+        -v "${SRC}/docker/profiles/apply.sh:/opt/civikitchen/docker/profiles/apply.sh:ro"
+        -v "${SRC}/docker/standalone/demo-user.php:/usr/local/share/civikitchen/demo-user.php:ro")
     echo "==> provision.sh overridden from ${CK_PROVISION_OVERRIDE}"
 fi
 
@@ -107,6 +108,20 @@ check "execute() and civicrm_api4() return field maps (field maps/rows: ${rows:-
 # and addJoin() takes NULL or a condition array as $bridge.
 info=$(cv ev '$info = \Civi\Api4\Contact::getInfo(); $join = fn($bridge) => \Civi\Api4\Contact::get(FALSE)->addSelect("id")->addJoin("Email AS e", "LEFT", $bridge, ...($bridge === NULL ? [["id", "=", "e.contact_id"]] : []))->setLimit(1)->execute()->count(); echo (array_filter(array_keys($info), "is_int") === [] && is_array($info["type"]) ? "map" : "other") . "/" . $join(NULL) . "/" . $join(["id", "=", "e.contact_id"]);' | tr -d '[:space:]"' || true)
 check "getInfo() and addJoin() match the patched types (${info:-none})" "[ '${info}' = 'map/1/1' ]"
+
+# 1e) Standalone auth: the default roles exist, the demo user holds admin, and
+# an AuthX API-key call as that user passes the (site_key, perm) guard.
+roles=$(cv ev 'echo implode(",", \Civi\Api4\Role::get(FALSE)->addWhere("name", "IN", ["admin", "everyone"])->addOrderBy("name")->addSelect("name")->execute()->column("name"));' | tr -d '[:space:]"' || true)
+check "standaloneusers roles admin and everyone exist (got ${roles:-none})" "[ '${roles}' = 'admin,everyone' ]"
+demo_roles=$(cv ev 'echo implode(",", \Civi\Api4\User::get(FALSE)->addWhere("username", "=", "admin")->addSelect("roles:name")->execute()->single()["roles:name"] ?? []);' | tr -d '[:space:]"' || true)
+check "demo user admin holds the admin role (got ${demo_roles:-none})" "echo ',${demo_roles},' | grep -q ',admin,'"
+api_key="ckboot$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')"
+cv ev "\Civi\Api4\Contact::update(FALSE)->addWhere('id', '=', \Civi\Api4\User::get(FALSE)->addWhere('username', '=', 'admin')->execute()->single()['contact_id'])->addValue('api_key', '${api_key}')->execute();" >/dev/null || true
+authx=$(docker exec "${APP}" curl -s -w ' HTTP %{http_code}' -H "X-Civi-Auth: Bearer ${api_key}" -H 'X-Requested-With: XMLHttpRequest' \
+    --data-urlencode 'params={"select":["id"],"limit":1}' http://localhost/civicrm/ajax/api4/Contact/get 2>/dev/null || true)
+authx_code="${authx##* HTTP }"
+check "AuthX API-key call as the demo user succeeds (got HTTP ${authx_code:-none})" "[ '${authx_code}' = 200 ]"
+[ "${authx_code}" = 200 ] || echo "    ${authx:0:200}"
 
 # 2) The bind-mounted extension is enabled without CIVIKITCHEN_ENABLE_EXTENSIONS.
 status=$(cv api4 Extension.get +w key=ckbootfixture +s status | tr -d '[:space:]' || true)
