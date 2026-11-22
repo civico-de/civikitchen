@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use CiviKitchen\Toolbelt\Ab\JUnit;
+use CiviKitchen\Toolbelt\Browser\BrowserProbe;
 use CiviKitchen\Toolbelt\Cli\AbCommand;
 use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
@@ -130,7 +131,7 @@ final class AbTest extends TestCase
         self::assertSame(0, $status);
         self::assertSame([], $runner->removed);
         self::assertFileExists("{$this->out}/A.compose.json");
-        self::assertStringContainsString("kept B: docker compose -f {$this->out}/B.compose.json", $output);
+        self::assertStringContainsString('kept B: docker compose -f ' . realpath($this->out) . '/B.compose.json', $output);
     }
 
     public function testAnExistingStackOfThatNameIsNotReused(): void
@@ -169,6 +170,10 @@ final class AbTest extends TestCase
             [['standalone', 'standalone-beta', '--locales', 'it', '--', 'true'], '--locales takes'],
             [['standalone', 'standalone-beta', '--cms', 'all', '--', 'true'], 'unknown option --cms'],
             [['standalone', 'standalone-beta', '--out', '--', 'true'], '--out needs a value'],
+            [['standalone', 'standalone-beta', '--json', '--', 'true'], '--json needs a value'],
+            [['standalone', 'standalone-beta', '--name', 'Bug 1', '--', 'true'], '--name takes'],
+            [['standalone', 'standalone-beta', '--name', '-bad', '--', 'true'], '--name takes'],
+            [['standalone', 'standalone-beta', '--name', '--', 'true'], '--name needs a value'],
         ];
         foreach ($cases as [$arguments, $message]) {
             try {
@@ -201,15 +206,405 @@ final class AbTest extends TestCase
         JUnit::outcomes("{$this->out}/broken.xml");
     }
 
+    public function testJsonWritesStructuredReportInJunitAndExitStatusModes(): void
+    {
+        $runner = new AbRunner();
+        $runner->reports = [
+            'a' => ['T::testPass' => 'passed', 'T::testRegress' => 'passed', 'T::testFix' => 'failed', 'T::testBoth' => 'failed', 'T::testGone' => 'passed'],
+            'b' => ['T::testPass' => 'passed', 'T::testRegress' => 'failed', 'T::testFix' => 'passed', 'T::testBoth' => 'error', 'T::testOnlyB' => 'passed'],
+        ];
+        $runner->status = ['a' => 1, 'b' => 1];
+        $jsonPath = $this->out . '/nested/ab-report.json';
+
+        [$status, $output] = $this->ab($runner, ['standalone-6.16', 'standalone-beta', '--out', $this->out, '--json', $jsonPath, ...self::CHECK]);
+
+        self::assertSame(1, $status);
+        self::assertStringNotContainsString('T::testPass', $output);
+        self::assertFileExists($jsonPath);
+        $report = json_decode((string) file_get_contents($jsonPath), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('junit', $report['mode']);
+        self::assertSame(1, $report['exit_code']);
+        self::assertSame(self::IMAGE . 'standalone-6.16', $report['A']['image']);
+        self::assertSame('CiviCRM 6.16.2', $report['A']['core']);
+        self::assertSame(['T::testRegress'], $report['groups']['regression']);
+        self::assertSame(['T::testFix'], $report['groups']['fixed']);
+        self::assertSame(['T::testBoth'], $report['groups']['both']);
+        self::assertSame(['T::testGone'], $report['groups']['gone']);
+        self::assertSame(['T::testOnlyB'], $report['groups']['only_on_b']);
+        self::assertSame(['T::testPass'], $report['groups']['passed_both']);
+        self::assertSame(5, $report['counts']['a']);
+        self::assertSame(5, $report['counts']['b']);
+        self::assertSame(1, $report['counts']['only_on_b']);
+        self::assertSame(1, $report['counts']['passed_both']);
+        self::assertArrayNotHasKey('surface_diff', $report);
+
+        // Exit-status mode
+        $exitRunner = new AbRunner();
+        $exitRunner->status = ['a' => 0, 'b' => 0];
+        $exitJson = $this->out . '/exit.json';
+        [$exitStatus] = $this->ab($exitRunner, ['standalone', 'standalone-master', '--out', $this->out, '--json', $exitJson, '--', 'true']);
+        self::assertSame(0, $exitStatus);
+        $exitReport = json_decode((string) file_get_contents($exitJson), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('exit-status', $exitReport['mode']);
+        self::assertSame(0, $exitReport['exit_code']);
+        self::assertSame(0, $exitReport['counts']['a']);
+        self::assertSame([], $exitReport['groups']['passed_both']);
+        self::assertSame(0, $exitReport['counts']['passed_both']);
+    }
+
+    public function testNameSetsComposeProjectPrefixForBothStacks(): void
+    {
+        $runner = new AbRunner();
+        $runner->reports = [
+            'a' => ['T::testOne' => 'passed'],
+            'b' => ['T::testOne' => 'passed'],
+        ];
+
+        [$status] = $this->ab($runner, ['standalone-6.16', 'standalone-master', '--name', 'review-pr_42', '--out', $this->out, ...self::CHECK]);
+
+        self::assertSame(0, $status);
+        self::assertArrayHasKey('review-pr_42-a', $runner->configs);
+        self::assertArrayHasKey('review-pr_42-b', $runner->configs);
+        self::assertArrayNotHasKey('ck-ab-standalone-6-16-vs-standalone-master-a', $runner->configs);
+        self::assertSame(['a', 'b'], $runner->removed);
+    }
+
+    public function testSurfaceCapturesDumpsComputesDiffAndIncludesInJson(): void
+    {
+        $runner = new AbRunner();
+        $runner->surfaces = [
+            'a' => ['status' => 0, 'stdout' => (string) json_encode([
+                'api4' => [['entity' => 'Contact', 'action' => 'get', 'permissions' => ['access CiviCRM']]],
+                'api3' => [],
+                'routes' => [],
+                'afform' => [],
+            ]), 'stderr' => ''],
+            'b' => ['status' => 0, 'stdout' => (string) json_encode([
+                'api4' => [['entity' => 'Contact', 'action' => 'get', 'permissions' => ['administer CiviCRM']]],
+                'api3' => [],
+                'routes' => [['path' => 'civicrm/open', 'access' => null, 'callback' => 'CRM_Open']],
+                'afform' => [],
+            ]), 'stderr' => ''],
+        ];
+        $jsonPath = $this->out . '/ab.json';
+
+        [$status, $output] = $this->ab($runner, ['standalone-6.16', 'standalone-master', '--out', $this->out, '--surface', '--json', $jsonPath, '--', 'true']);
+
+        self::assertSame(0, $status);
+        self::assertFileExists("{$this->out}/A.surface.json");
+        self::assertFileExists("{$this->out}/B.surface.json");
+        self::assertFileExists("{$this->out}/surface-diff.json");
+        self::assertStringContainsString('Surface diff:', $output);
+        self::assertStringContainsString('route-no-access', $output);
+        $report = json_decode((string) file_get_contents($jsonPath), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame(2, $report['surface_diff']['counts']['risk_flags']);
+    }
+
+    public function testSurfaceFallsBackToCvScrAndRecordsErrorWhenBothFail(): void
+    {
+        $surfaceA = (string) json_encode(['api4' => [], 'api3' => [], 'routes' => [], 'afform' => []]);
+        $surfaceB = (string) json_encode([
+            'api4' => [['entity' => 'Widget', 'action' => 'get', 'permissions' => ['access CiviCRM']]],
+            'api3' => [],
+            'routes' => [],
+            'afform' => [],
+        ]);
+
+        // Side A lacks `ck surface` (exits 2) and falls back to `cv scr /opt/civikitchen/toolbelt/lib/surface-dump.php`
+        $runner = new AbRunner();
+        $runner->surfaces = [
+            'a' => ['status' => 2, 'stdout' => '', 'stderr' => 'ck: unknown command: surface'],
+            'b' => ['status' => 0, 'stdout' => $surfaceB, 'stderr' => ''],
+        ];
+        $runner->surfaceFallback = [
+            'a' => ['status' => 0, 'stdout' => $surfaceA, 'stderr' => ''],
+        ];
+
+        [$status, $output] = $this->ab($runner, ['standalone-6.16', 'standalone-master', '--out', $this->out, '--surface', '--', 'true']);
+        self::assertSame(0, $status);
+        self::assertFileExists("{$this->out}/A.surface.json");
+        self::assertStringContainsString('api4: +1 -0 ~0', $output);
+        self::assertContains('a:cv-scr-surface', $runner->surfaceCalls);
+
+        // Both primary and fallback fail on side A -> explicit error recorded, run completes
+        $failRunner = new AbRunner();
+        $failRunner->surfaces = [
+            'a' => ['status' => 2, 'stdout' => '', 'stderr' => 'ck: unknown command: surface'],
+            'b' => ['status' => 0, 'stdout' => $surfaceB, 'stderr' => ''],
+        ];
+        $failRunner->surfaceFallback = [
+            'a' => ['status' => 1, 'stdout' => '', 'stderr' => 'No such file or directory'],
+        ];
+        $jsonPath = $this->out . '/fail-surface.json';
+
+        [$status, $output] = $this->ab($failRunner, ['standalone-6.16', 'standalone-master', '--out', $this->out, '--surface', '--json', $jsonPath, '--', 'true']);
+        self::assertSame(0, $status);
+        self::assertStringContainsString('surface comparison failed:', $output);
+        $diffFile = json_decode((string) file_get_contents("{$this->out}/surface-diff.json"), true, 512, JSON_THROW_ON_ERROR);
+        self::assertArrayHasKey('error', $diffFile);
+        self::assertStringContainsString('fallback failed', $diffFile['error']);
+        $report = json_decode((string) file_get_contents($jsonPath), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame($diffFile, $report['surface_diff']);
+    }
+
+    public function testExposeAndPortOverridesPublishPortsAndPrintUrls(): void
+    {
+        $runner = new AbRunner();
+        $jsonPath = $this->out . '/expose.json';
+
+        [$status, $output] = $this->ab(
+            $runner,
+            ['standalone-6.16', 'standalone-master', '--expose', '--out', $this->out, '--json', $jsonPath, '--', 'true'],
+            null,
+            static fn(int $port): bool => $port !== 8400,
+        );
+
+        self::assertSame(0, $status);
+        self::assertStringContainsString("ck ab: A_URL=http://localhost:8401\n", $output);
+        self::assertStringContainsString("ck ab: B_URL=http://localhost:8402\n", $output);
+
+        $aApp = $runner->configs['ck-ab-standalone-6-16-vs-standalone-master-a']['services']['app'];
+        $bApp = $runner->configs['ck-ab-standalone-6-16-vs-standalone-master-b']['services']['app'];
+        self::assertSame(['127.0.0.1:8401:80'], $aApp['ports']);
+        self::assertSame('http://localhost:8401', $aApp['environment']['CIVIKITCHEN_SITE_URL']);
+        self::assertSame(['127.0.0.1:8402:80'], $bApp['ports']);
+        self::assertSame('http://localhost:8402', $bApp['environment']['CIVIKITCHEN_SITE_URL']);
+
+        $report = json_decode((string) file_get_contents($jsonPath), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame(['A' => 'http://localhost:8401', 'B' => 'http://localhost:8402'], $report['urls']);
+        self::assertArrayNotHasKey('browser_diff', $report);
+
+        // Explicit --port-a / --port-b overrides
+        $portRunner = new AbRunner();
+        [$portStatus, $portOutput] = $this->ab(
+            $portRunner,
+            ['standalone-6.16', 'standalone-master', '--port-a', '8450', '--port-b', '8455', '--out', $this->out, '--', 'true'],
+        );
+        self::assertSame(0, $portStatus);
+        self::assertStringContainsString("ck ab: A_URL=http://localhost:8450\n", $portOutput);
+        self::assertStringContainsString("ck ab: B_URL=http://localhost:8455\n", $portOutput);
+    }
+
+    public function testBrowserProbePagesAnonPagesNoA11yAndJsonOutput(): void
+    {
+        $runner = new AbRunner();
+        $runner->reports = [
+            'a' => ['T::testPass' => 'passed'],
+            'b' => ['T::testPass' => 'passed'],
+        ];
+        $calls = [];
+        $probe = new BrowserProbe(
+            dirname(__DIR__, 2),
+            $runner,
+            static function (
+                string $siteUrl,
+                string $outDir,
+                string $prefix,
+                array $pages,
+                array $anonymousPages,
+                bool $runA11y,
+                array $size,
+            ) use (&$calls): array {
+                $calls[] = compact('siteUrl', 'outDir', 'prefix', 'pages', 'anonymousPages', 'runA11y', 'size');
+                if ($prefix === 'A') {
+                    return [
+                        'prefix' => 'A',
+                        'site' => $siteUrl,
+                        'runA11y' => $runA11y,
+                        'routes' => [
+                            [
+                                'route' => 'civicrm/dashboard?reset=1',
+                                'mode' => 'auth',
+                                'hasCrmContainer' => true,
+                                'redirectedToLogin' => false,
+                                'consoleErrors' => [],
+                                'pageErrors' => [],
+                                'networkFailures' => [],
+                                'a11yViolations' => [],
+                                'screenshot' => 'A-civicrm-dashboard-reset-1.png',
+                            ],
+                            [
+                                'route' => 'civicrm/event/info?id=1',
+                                'mode' => 'anon',
+                                'hasCrmContainer' => true,
+                                'redirectedToLogin' => false,
+                                'consoleErrors' => [],
+                                'pageErrors' => [],
+                                'networkFailures' => [],
+                                'a11yViolations' => [],
+                                'screenshot' => 'A-anon-civicrm-event-info-id-1.png',
+                            ],
+                        ],
+                    ];
+                }
+                return [
+                    'prefix' => 'B',
+                    'site' => $siteUrl,
+                    'runA11y' => $runA11y,
+                    'routes' => [
+                        [
+                            'route' => 'civicrm/dashboard?reset=1',
+                            'mode' => 'auth',
+                            'hasCrmContainer' => true,
+                            'redirectedToLogin' => false,
+                            'consoleErrors' => ['TypeError at http://localhost:8401/dash.js'],
+                            'pageErrors' => [],
+                            'networkFailures' => [],
+                            'a11yViolations' => [],
+                            'screenshot' => 'B-civicrm-dashboard-reset-1.png',
+                        ],
+                        [
+                            'route' => 'civicrm/event/info?id=1',
+                            'mode' => 'anon',
+                            'hasCrmContainer' => false,
+                            'redirectedToLogin' => true,
+                            'consoleErrors' => [],
+                            'pageErrors' => [],
+                            'networkFailures' => [],
+                            'a11yViolations' => [],
+                            'screenshot' => 'B-anon-civicrm-event-info-id-1.png',
+                        ],
+                    ],
+                ];
+            },
+        );
+
+        $jsonPath = $this->out . '/browser-ab.json';
+        [$status, $output] = $this->ab(
+            $runner,
+            [
+                'standalone-6.16',
+                'standalone-master',
+                '--page',
+                '/civicrm/dashboard?reset=1',
+                '--anon-page',
+                'civicrm/event/info?id=1',
+                '--no-a11y',
+                '--out',
+                $this->out,
+                '--json',
+                $jsonPath,
+                ...self::CHECK,
+            ],
+            $probe,
+            static fn(int $port): bool => true,
+        );
+
+        self::assertSame(0, $status);
+        self::assertCount(2, $calls);
+        self::assertSame('http://localhost:8400', $calls[0]['siteUrl']);
+        self::assertSame('http://localhost:8401', $calls[1]['siteUrl']);
+        self::assertSame(['civicrm/dashboard?reset=1'], $calls[0]['pages']);
+        self::assertSame(['civicrm/event/info?id=1'], $calls[0]['anonymousPages']);
+        self::assertFalse($calls[0]['runA11y']);
+
+        self::assertFileExists("{$this->out}/A.browser.json");
+        self::assertFileExists("{$this->out}/B.browser.json");
+        self::assertFileExists("{$this->out}/browser-diff.json");
+        self::assertStringContainsString('Browser diff:', $output);
+        self::assertStringContainsString('browser-console-error', $output);
+        self::assertStringContainsString('browser-render-regression', $output);
+
+        $report = json_decode((string) file_get_contents($jsonPath), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame(['A' => 'http://localhost:8400', 'B' => 'http://localhost:8401'], $report['urls']);
+        self::assertSame(1, $report['browser_diff']['counts']['new_console_errors']);
+        self::assertSame(2, $report['browser_diff']['counts']['render_regressions']);
+        self::assertSame('TypeError at http://localhost/dash.js', $report['browser_diff']['new_console_errors'][0]['message']);
+    }
+
+    public function testBrowserProbeFailureRecordsErrorWithoutLosingReport(): void
+    {
+        $runner = new AbRunner();
+        $runner->reports = [
+            'a' => ['T::testPass' => 'passed'],
+            'b' => ['T::testPass' => 'failed'],
+        ];
+        $runner->status = ['a' => 0, 'b' => 1];
+        $failingProbe = new BrowserProbe(
+            dirname(__DIR__, 2),
+            $runner,
+            static function (): array {
+                throw new RuntimeException('playwright image build failed');
+            },
+        );
+        $jsonPath = $this->out . '/probe-fail.json';
+
+        [$status, $output] = $this->ab(
+            $runner,
+            ['standalone-6.16', 'standalone-master', '--page', 'civicrm/dashboard', '--out', $this->out, '--json', $jsonPath, ...self::CHECK],
+            $failingProbe,
+            static fn(int $port): bool => true,
+        );
+
+        self::assertSame(1, $status);
+        self::assertStringContainsString("pass on A, fail on B: 1\n  T::testPass\n", $output);
+        self::assertStringContainsString('browser comparison failed:', $output);
+        $report = json_decode((string) file_get_contents($jsonPath), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame(['T::testPass'], $report['groups']['regression']);
+        self::assertArrayHasKey('error', $report['browser_diff']);
+        self::assertStringContainsString('playwright image build failed', $report['browser_diff']['error']);
+    }
+
+    public function testBrowserModeWithoutCommandAndInvalidBrowserOptions(): void
+    {
+        $runner = new AbRunner();
+        $probe = new BrowserProbe(
+            dirname(__DIR__, 2),
+            $runner,
+            static fn(string $siteUrl, string $outDir, string $prefix): array => [
+                'prefix' => $prefix,
+                'site' => $siteUrl,
+                'runA11y' => true,
+                'routes' => [[
+                    'route' => 'civicrm/dashboard',
+                    'mode' => 'auth',
+                    'hasCrmContainer' => true,
+                    'redirectedToLogin' => false,
+                    'consoleErrors' => [],
+                    'pageErrors' => [],
+                    'networkFailures' => [],
+                    'a11yViolations' => [],
+                    'screenshot' => "{$prefix}-civicrm-dashboard.png",
+                ]],
+            ],
+        );
+
+        [$status, $output] = $this->ab(
+            $runner,
+            ['standalone-6.16', 'standalone-master', '--page', 'civicrm/dashboard', '--out', $this->out],
+            $probe,
+            static fn(int $port): bool => true,
+        );
+        self::assertSame(0, $status);
+        self::assertStringContainsString('Browser diff: no regressions (1 routes)', $output);
+
+        $invalidCases = [
+            [['standalone', 'standalone-beta', '--page', 'admin/search', '--', 'true'], '--page takes a CiviCRM route'],
+            [['standalone', 'standalone-beta', '--anon-page', 'user/login', '--', 'true'], '--anon-page takes a CiviCRM route'],
+            [['standalone', 'standalone-beta', '--port-a', 'abc', '--', 'true'], '--port-a takes a TCP port'],
+            [['standalone', 'standalone-beta', '--port-b', '70000', '--', 'true'], '--port-b takes a TCP port'],
+            [['standalone', 'standalone-beta', '--port-a', '8400', '--port-b', '8400', '--', 'true'], 'must be different ports'],
+        ];
+        foreach ($invalidCases as [$args, $message]) {
+            try {
+                $this->ab(new AbRunner(), $args);
+                self::fail("expected: {$message}");
+            } catch (RuntimeException $e) {
+                self::assertStringContainsString($message, $e->getMessage());
+            }
+        }
+    }
+
     /**
      * @param list<string> $arguments
+     * @param (Closure(int): bool)|null $portFree
      * @return array{int, string}
      */
-    private function ab(AbRunner $runner, array $arguments): array
+    private function ab(AbRunner $runner, array $arguments, ?BrowserProbe $probe = null, ?Closure $portFree = null): array
     {
         ob_start();
         try {
-            $status = (new AbCommand($runner))->run($arguments);
+            $status = (new AbCommand($runner, dirname(__DIR__, 2), $probe, $portFree))->run($arguments);
             return [$status, (string) ob_get_contents()];
         } finally {
             ob_end_clean();
@@ -238,6 +633,15 @@ final class AbRunner extends Runner
     public bool $docker = true;
     public bool $existing = false;
     public int $bootStatus = 0;
+
+    /** @var array<string, array{status: int, stdout: string, stderr: string}> */
+    public array $surfaces = [];
+
+    /** @var array<string, array{status: int, stdout: string, stderr: string}> */
+    public array $surfaceFallback = [];
+
+    /** @var list<string> */
+    public array $surfaceCalls = [];
 
     public function which(string $program): ?string
     {
@@ -283,6 +687,14 @@ final class AbRunner extends Runner
     public function captureSeparate(array $command, ?array $environment = null, ?string $workingDirectory = null): array
     {
         $side = $this->side($command[3]);
+        if (array_slice($command, -2) === ['ck', 'surface']) {
+            $this->surfaceCalls[] = "{$side}:ck-surface";
+            return $this->surfaces[$side] ?? ['status' => 0, 'stdout' => '{"api4":[],"api3":[],"routes":[],"afform":[]}', 'stderr' => ''];
+        }
+        if (in_array('/opt/civikitchen/toolbelt/lib/surface-dump.php', $command, true)) {
+            $this->surfaceCalls[] = "{$side}:cv-scr-surface";
+            return $this->surfaceFallback[$side] ?? ['status' => 1, 'stdout' => '', 'stderr' => 'no surface-dump.php'];
+        }
         if (in_array('cv', $command, true)) {
             return ['status' => 0, 'stdout' => $side === 'a' ? "6.16.2\n" : "6.17.beta1\n", 'stderr' => ''];
         }

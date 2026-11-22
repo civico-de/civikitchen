@@ -26,5 +26,6 @@ COPY toolbelt/bin/ck /opt/civikitchen/toolbelt/bin/ck
 COPY toolbelt/lib/php /opt/civikitchen/toolbelt/lib/php
 COPY toolbelt/playwright/Dockerfile /opt/civikitchen/toolbelt/playwright/Dockerfile
 COPY toolbelt/demo/record.mts /opt/civikitchen/toolbelt/demo/record.mts
+COPY toolbelt/demo/probe.mts /opt/civikitchen/toolbelt/demo/probe.mts
 ENV LANG=C.UTF-8
 ENTRYPOINT ["ck-entrypoint", "php", "/opt/civikitchen/toolbelt/bin/ck"]

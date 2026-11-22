@@ -97,6 +97,9 @@ final class Application
         if ($command === 'schema') {
             return (new SchemaDiffCommand($this->runner))->run($arguments);
         }
+        if ($command === 'surface') {
+            return (new SurfaceCommand($this->checkoutRoot, $this->runner))->run($arguments);
+        }
         if ($command === 'changelog') {
             return (new ChangelogCommand())->run($arguments);
         }
@@ -134,7 +137,7 @@ final class Application
             return (new CiCommand($this->runner))->run($arguments);
         }
         if ($command === 'ab') {
-            return (new AbCommand($this->runner))->run($arguments);
+            return (new AbCommand($this->runner, $this->checkoutRoot))->run($arguments);
         }
         if ($command === 'run') {
             return (new RunCommand($this->runner))->run($arguments);
@@ -181,6 +184,7 @@ ck — CiviKitchen extension-development toolbelt
   ck coverage [args]      PHPUnit coverage floor
   ck lifecycle [args]     install/disable/enable/uninstall checks
   ck schema [args]        install-vs-upgrade schema parity
+  ck surface [args]       dump or diff CiviCRM API, route and Afform surface
   ck smarty [args]        compile shipped Smarty templates
   ck taint [args]         taint analysis
   ck mutate [args]        mutation testing

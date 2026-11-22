@@ -9,6 +9,7 @@ commit that broke it, or record a change on screen.
 |---|---|---|
 | [`ckcoretest`](#core-test-suites-ckcoretest) | Core's own phpunit suites against the installed core; `--ext <name>` for a core extension, `--e2e` for [end-to-end tests](#end-to-end-tests), `--fetch-only` to fetch the tests without running them | In the app container |
 | [`ckeslint --core`](#type-checking-cores-javascript) | Type-checks core's JavaScript for upstream bug reports | In the app container |
+| [`ck surface`](#api-route-and-afform-surface-ck-surface) | Dumps a site's APIv4, APIv3, route, and Afform permissions as JSON, or diffs two dumps offline | Container / anywhere (`--diff`) |
 | [`make build CIVICRM_SOURCE=git`](#standalone-on-an-unreleased-branch) | Builds Standalone from any core branch, tag or commit; mounting a core checkout tests a change on it | Checkout |
 | [`ck run`](#one-command-on-one-version-ck-run) | One command in a fresh stack on one version | Host |
 | [`ck ab`](#comparing-two-versions-ck-ab) | The same command on two versions, compared per test | Host |
@@ -201,8 +202,46 @@ side only, or one without test cases, is an error.
 The output names the CiviCRM version of each side, and for a git-built image
 the commits it holds. The daily tags move, so note those commits with a
 result. Both reports stay in the output directory (`--out`, default
-`./ck-ab-<A>-vs-<B>`). The stacks, their volumes and their compose files are
+`./ck-ab-<A>-vs-<B>`). `--json <path>` writes the full structured comparison
+(`A`, `B`, `mode`, `groups`, `counts`, `exit_code`, plus `urls`, `surface_diff`,
+and `browser_diff` when requested) to a JSON file. `--surface` also dumps each
+side's API, route, and Afform permissions (`A.surface.json`, `B.surface.json`,
+`surface-diff.json`) and prints a surface summary with risk flags.
+
+For real-browser Standalone probing, pass repeatable `--page <civicrm/...>`
+(authenticated as `admin`/`admin`) and `--anon-page <civicrm/...>`
+(unauthenticated context) routes. `ck ab` publishes free localhost ports
+starting from 8400 (overridable with `--port-a` / `--port-b`, or requested
+alone with `--expose`), prints `A_URL` and `B_URL`, runs Playwright with axe-core
+WCAG 2.1 AA checks enabled by default (`--no-a11y` disables them), saves
+full-page screenshots under `<out>/screenshots/`, and writes
+`A.browser.json`, `B.browser.json`, and `browser-diff.json` comparing console
+errors, uncaught page errors, HTTP `>= 400` responses, `#crm-container` /
+login-redirect regressions, and new accessibility violations.
+
+The compose projects are `ck-ab-<A>-vs-<B>-a` and `-b`, or `<project>-a` and
+`<project>-b` when `--name <project>` is given so concurrent runs on the same
+images do not collide. The stacks, their volumes and their compose files are
 removed at the end; with `--keep` the stacks and the compose files stay.
+
+## API, route, and Afform surface: `ck surface`
+
+`ck surface` captures a deterministic JSON snapshot of a site's APIv4 actions,
+APIv3 actions, menu routes, and Afform forms along with their declared
+permissions, or compares two snapshots:
+
+```bash
+ck surface --out A.surface.json
+ck surface --diff A.surface.json B.surface.json
+ck surface --diff A.surface.json B.surface.json --json --fail-on-risk
+```
+
+Running `ck surface` without `--diff` executes inside a CiviCRM container via
+`cv scr`. `ck surface --diff <A.json> <B.json>` runs anywhere without CiviCRM
+and reports additions, removals, permission changes, and `risk_flags` (such as
+new public Afforms, routes without `access_arguments`, weakened permissions, or
+tightened permissions marked `rg-perm`). With `--fail-on-risk`, it exits 1 when
+any risk flag is present.
 
 ## Finding the commit: `ck bisect`
 

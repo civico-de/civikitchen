@@ -50,12 +50,18 @@ final class StandaloneStack
         return $value;
     }
 
+    /** The localhost URL a published stack listens on. */
+    public static function siteUrl(int $port): string
+    {
+        return "http://localhost:{$port}";
+    }
+
     /**
      * Writes the compose file; a project of that name must not exist yet.
      *
      * @param list<string> $mounts
      */
-    public function prepare(string $project, string $image, array $mounts, ?string $locales, string $file): string
+    public function prepare(string $project, string $image, array $mounts, ?string $locales, string $file, ?int $httpPort = null): string
     {
         $containers = $this->runner->capture(['docker', 'ps', '-a', '-q', '--filter', "label=com.docker.compose.project={$project}"]);
         if ($containers['status'] !== 0) {
@@ -101,6 +107,10 @@ final class StandaloneStack
                 ],
             ],
         ];
+        if ($httpPort !== null) {
+            $config['services']['app']['ports'] = ["127.0.0.1:{$httpPort}:80"];
+            $config['services']['app']['environment']['CIVIKITCHEN_SITE_URL'] = self::siteUrl($httpPort);
+        }
         if ($locales !== null) {
             $config['services']['app']['environment']['CIVIKITCHEN_LOCALES'] = $locales;
         }
