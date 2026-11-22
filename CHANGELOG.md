@@ -14,6 +14,25 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.72.0] - 2026-11-22
+
+### Added
+
+- `ck surface` command and `toolbelt/lib/surface-dump.php` to dump live CiviCRM
+  Standalone APIv4 entities/actions, routes, Afforms, permissions, settings, and
+  hooks.
+- Structured A/B reporting and Standalone browser A/B verification flags on
+  `ck ab`: `--json`, `--surface`, `--page`, `--anon-page`, `--no-a11y`,
+  `--expose`, `--port-a`, `--port-b`, and `--name`, including
+  `groups.passed_both` / `counts.passed_both` in `ab-report.json` and
+  `toolbelt/demo/probe.mts` Playwright + axe-core probing.
+
+### Fixed
+
+- Seed `tests/phpunit/bootstrap.local.php` for new extensions so the PHPStan
+  tests config always has a file to analyse, and load the headless helpers from
+  the image's PHPStan bootstrap.
+
 ## [1.71.0] - 2026-11-20
 
 ### Changed
@@ -3067,7 +3086,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.71.0...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.72.0...HEAD
+[1.72.0]: https://github.com/civico-de/civikitchen/compare/v1.71.0...v1.72.0
 [1.71.0]: https://github.com/civico-de/civikitchen/compare/v1.70.0...v1.71.0
 [1.70.0]: https://github.com/civico-de/civikitchen/compare/v1.69.0...v1.70.0
 [1.69.0]: https://github.com/civico-de/civikitchen/compare/v1.68.0...v1.69.0
