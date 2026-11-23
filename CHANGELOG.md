@@ -14,6 +14,15 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Fixed
+
+- The Standalone images for CiviCRM 6.17 to 6.20 build again: the container-reuse
+  core patch is split so its `use` import, which those releases already carry,
+  no longer blocks the rest of the patch.
+- The profile browser suite no longer fails on 6.21: the `NULL` id fix is in
+  core, so the registration test lost its upstream-bug marker and the null-id
+  test is marked only for versions below 6.21.
+
 ## [1.72.0] - 2026-11-22
 
 ### Added

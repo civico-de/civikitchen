@@ -91,7 +91,7 @@ test.describe('extension stack', () => {
 
   // The shape core's own forms send for a new record: hooks are promised an int or NULL id.
   test('a save with an explicit null id passes the hooks', () => {
-    upstreamBug({ url: 'https://github.com/civicrm/civicrm-core/pull/38110', profile: 'dach' });
+    upstreamBug({ url: 'https://github.com/civicrm/civicrm-core/pull/38111', fixedIn: '6.21', profile: 'dach' });
     const tag = `e2e-null-${Date.now()}`;
     const [contact] = api4<{ id: number }>('Contact.save', {
       records: [{ id: null, contact_type: 'Individual', first_name: 'Erika', last_name: tag }],

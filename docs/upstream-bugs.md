@@ -42,4 +42,4 @@ starts to appear outside the declared conditions.
 
 | Bug | Affected | Marked tests | Upstream |
 |---|---|---|---|
-| `CRM_Core_DAO::writeRecord()` passes `''` instead of `NULL` as id to `hook_civicrm_pre` when APIv4 saves a record with `id: null`. A hook typed `?int $id`, as CiviSEPA's, throws a `TypeError`. | every version for the API call; from 6.21 the event registration form saves this way | `stack.spec.ts` (save with an explicit null id), `events.spec.ts` (anonymous registration), both with `dach` | [civicrm-core#38110](https://github.com/civicrm/civicrm-core/pull/38110), open |
+| `CRM_Core_DAO::writeRecord()` passes `''` instead of `NULL` as id to `hook_civicrm_pre` when APIv4 saves a record with `id: null`. A hook typed `?int $id`, as CiviSEPA's, throws a `TypeError`. | every version below 6.21 | `stack.spec.ts` (save with an explicit null id), with `dach` | [civicrm-core#38111](https://github.com/civicrm/civicrm-core/pull/38111), merged into 6.21 |

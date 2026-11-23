@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { searchPageSuite } from './search-pages';
-import { api4, civiUrl, expectHealthy, requireProfile, upstreamBug, watchFailures } from './site';
+import { api4, civiUrl, expectHealthy, requireProfile, watchFailures } from './site';
 
 searchPageSuite('events', 'civicrm/demo/events');
 
@@ -8,8 +8,6 @@ test.describe('events profile, public registration', () => {
   requireProfile('events');
 
   test('an anonymous visitor registers for an upcoming event', async ({ page }) => {
-    // CiviSEPA's typed pre hook rejects the '' id the 6.21 registration form saves with.
-    upstreamBug({ url: 'https://github.com/civicrm/civicrm-core/pull/38110', since: '6.21', profile: 'dach' });
     const failures = watchFailures(page);
     const [event] = api4<{ id: number }>('Event.get', {
       select: ['id'],
