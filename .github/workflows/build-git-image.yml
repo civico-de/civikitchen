@@ -156,6 +156,11 @@ jobs:
       - name: Promote tested candidate to its moving tag
         env:
           CK_TAG: standalone-${{ inputs.tag }}
+          CK_TAG_SHORT: ${{ inputs.tag }}
+          CK_REF: ${{ inputs.ref }}
         run: |
           IMG="${IMAGE_PREFIX}:${CK_TAG}"
           docker buildx imagetools create -t "$IMG" "$IMG-${GITHUB_SHA}"
+          if [ "$CK_REF" != "$CK_TAG_SHORT" ]; then
+            docker buildx imagetools create -t "${IMAGE_PREFIX}:standalone-${CK_REF}" "$IMG-${GITHUB_SHA}"
+          fi

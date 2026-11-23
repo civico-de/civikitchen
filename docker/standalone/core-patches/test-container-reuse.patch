@@ -69,7 +69,7 @@ index 36ef59d0a9..29716ccb09 100644
 +   */
 +  private function loadTestContainer(string $envId) {
 +    $test = $GLOBALS['CIVICRM_TEST_CASE'] ?? NULL;
-+    $testListeners = $test instanceof \Civi\Test\HeadlessInterface ? EventScanner::findListeners($test) : [];
++    $testListeners = $test instanceof \Civi\Test\HeadlessInterface ? \Civi\Core\Event\EventScanner::findListeners($test) : [];
 +    $testHooks = array_map(fn($event) => ltrim($event, '&'), array_keys($testListeners));
 +    if (array_intersect(self::COMPILE_HOOKS, $testHooks)) {
 +      $containerBuilder = $this->createContainer();
