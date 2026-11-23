@@ -14,6 +14,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.72.1] - 2026-11-24
+
 ### Fixed
 
 - The Standalone images for CiviCRM 6.17 to 6.20 build again: the container-reuse
@@ -3095,7 +3097,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.72.0...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.72.1...HEAD
+[1.72.1]: https://github.com/civico-de/civikitchen/compare/v1.72.0...v1.72.1
 [1.72.0]: https://github.com/civico-de/civikitchen/compare/v1.71.0...v1.72.0
 [1.71.0]: https://github.com/civico-de/civikitchen/compare/v1.70.0...v1.71.0
 [1.70.0]: https://github.com/civico-de/civikitchen/compare/v1.69.0...v1.70.0
