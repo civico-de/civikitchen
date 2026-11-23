@@ -115,4 +115,23 @@ cp "$work/patches/10-change.patch" "$work/sp/10-change.patch"
 out=$(bash "$apply" "$work/sc" "$work/sp") || fail "a patch without Since: needed a core version"
 [ "$out" = "applied 10-change.patch" ] || fail "a patch without Since: changed behaviour: $out"
 
+# The shipped container-reuse patches over CiviCRM 6.20.1's Civi/Core/Container.php, which
+# already imports EventScanner, and over the same file without that import (the 6.21 branch).
+shipped_core="$root/docker/standalone/core-patches"
+mkdir -p "$work/ship"
+cp "$shipped_core"/test-container-reuse*.patch "$work/ship/"
+for variant in imported unimported; do
+  /bin/rm -rf "$work/ship-core"
+  mkdir -p "$work/ship-core/Civi/Core"
+  cp "$root/tests/toolbelt/fixtures/core-6.20.1-Container.php.txt" "$work/ship-core/Civi/Core/Container.php"
+  [ "$variant" = imported ] || sed -i.bak '/^use Civi.Core.Event.EventScanner;$/d' "$work/ship-core/Civi/Core/Container.php"
+  out=$(bash "$apply" "$work/ship-core" "$work/ship") || fail "shipped container patches rejected on core with $variant EventScanner"
+  grep -q '^applied test-container-reuse.patch$' <<<"$out" || fail "$variant: container patch not applied: $out"
+  [ "$(grep -c '^use Civi.Core.Event.EventScanner;$' "$work/ship-core/Civi/Core/Container.php")" = 1 ] \
+    || fail "$variant: EventScanner is not imported exactly once"
+  grep -q 'COMPILE_HOOKS' "$work/ship-core/Civi/Core/Container.php" || fail "$variant: patch body missing"
+  out=$(bash "$apply" "$work/ship-core" "$work/ship") || fail "$variant: shipped container patches not contained on a second run"
+  [ "$(grep -c '^contained ' <<<"$out")" = 2 ] || fail "$variant: expected both contained, got: $out"
+done
+
 echo "core patches: OK"

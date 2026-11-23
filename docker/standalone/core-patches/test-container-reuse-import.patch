@@ -1,0 +1,17 @@
+Import for test-container-reuse.patch. Core 6.17-6.20 already import EventScanner, so
+this part is contained there; the 6.21 branch lacks it.
+
+Upstream: https://github.com/civicrm/civicrm-core/pull/37835
+
+diff --git a/Civi/Core/Container.php b/Civi/Core/Container.php
+index 36ef59d0a9..29716ccb09 100644
+--- a/Civi/Core/Container.php
++++ b/Civi/Core/Container.php
+@@ -4,6 +4,7 @@ namespace Civi\Core;
+ use Civi\Core\Compiler\AutoServiceScannerPass;
+ use Civi\Core\Compiler\EventScannerPass;
+ use Civi\Core\Compiler\SpecProviderPass;
++use Civi\Core\Event\EventScanner;
+ use Civi\Core\Event\GenericHookEvent;
+ use Civi\Core\Lock\LockManager;
+ use Symfony\Component\Config\ConfigCache;
