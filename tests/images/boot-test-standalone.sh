@@ -199,7 +199,7 @@ for round in 1 2; do
         echo "  ✓ ck_headless contract holds on the ${round}. run"
     else
         echo "  ✗ ck_headless contract fails on the ${round}. run"
-        tail -30 "${FIXTURE}/phpunit-${round}.log"
+        tail -n 30 "${FIXTURE}/phpunit-${round}.log"
         fail=1
     fi
 done
@@ -224,7 +224,7 @@ check "cklifecycle passes records kept by cleanup never" "lifecycle ckmanagedkep
 for name in cksettingsbad_snake cksettingsbad_table cksettingsbad_callback; do
     check "the settings check names ${name}" "grep -q 'FAILED: ${name}:' '${FIXTURE}/lifecycle-cksettingsbad.log'"
 done
-[ "${fail}" = 0 ] || tail -20 "${FIXTURE}"/lifecycle-*.log
+[ "${fail}" = 0 ] || tail -n 20 "${FIXTURE}"/lifecycle-*.log
 
 # 11) cksmarty on managed bodies and rewrites: core replaces tokens before
 # Smarty compiles, so a token is no Smarty error, an unclosed {if} is.
@@ -244,7 +244,7 @@ check "cksmarty names the broken tally" "grep -q 'SearchDisplay SearchDisplay_ck
 if [ "$(cv ev 'echo (int) method_exists("Civi\\Token\\TokenCompatSubscriber", "renderConditionalPunctuation");' | tr -d '"')" = 1 ]; then
     check "cksmarty passes a rewrite with conditional punctuation" "smarty cksearchpunct"
 fi
-[ "${fail}" = 0 ] || tail -20 "${FIXTURE}"/smarty-*.log
+[ "${fail}" = 0 ] || tail -n 20 "${FIXTURE}"/smarty-*.log
 
 # 12) A profile set with neither API users nor an AuthX policy leaves the
 # AuthX header policy alone; same calls as provision.sh.
