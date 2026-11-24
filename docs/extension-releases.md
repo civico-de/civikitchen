@@ -203,13 +203,16 @@ directory named after the extension key. The development layer is left out:
 
 ```
 .github/ .docker/ .civikitchen/ .claude/ tests/ node_modules/
-.gitattributes .gitignore .editorconfig civikitchen.yaml .phpunit.result.cache
+.editorconfig civikitchen.yaml .phpunit.result.cache
 .gitlab-ci.yml renovate.json mago.toml phpcs.xml(.dist)
 composer-dependency-analyser.php phpstan.neon(.dist) phpstan-tests.neon(.dist)
 phpstanBootstrap.php phpunit.xml(.dist) phpunit-unit.xml.dist .oxlintrc.json
 playwright.config.ts/.js vitest.config.ts/.js
 package-lock.json bun.lock(b) tsconfig.json
 ```
+
+.gitattributes and .gitignore are left out at any depth, so the one
+`lfs_exempt` puts beside exempt media never ships.
 
 Secrets are never packed, whatever the policy says: .git, .env and .env.*,
 .envrc, .netrc, .npmrc, .pypirc, auth.json and credentials.json. To print the

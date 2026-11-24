@@ -36,6 +36,15 @@ final class DistPathsTest extends CheckTestCase
         }
     }
 
+    public function testGitFilesNeverShipAtAnyDepth(): void
+    {
+        $excluded = DistPaths::excluded($this->repo([]));
+        foreach (['.gitattributes', 'images/.gitattributes', 'l10n/de/.gitignore'] as $path) {
+            self::assertFalse(DistPaths::ships($path, $excluded), $path);
+        }
+        self::assertTrue(DistPaths::ships('images/icon.png', $excluded));
+    }
+
     public function testUnifiedConfigCannotBeForcedIntoARelease(): void
     {
         $context = $this->repo([

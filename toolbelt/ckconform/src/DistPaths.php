@@ -41,11 +41,17 @@ final class DistPaths
         'node_modules',
     ];
 
+    /**
+     * Git's per-directory files, excluded at any depth: lfs_exempt puts a
+     * .gitattributes beside the media it exempts.
+     *
+     * @var list<string>
+     */
+    public const NAMES = ['.gitattributes', '.gitignore'];
+
     /** @var list<string> */
     public const FILES = [
         ...self::PROTECTED_PATHS,
-        '.gitattributes',
-        '.gitignore',
         '.editorconfig',
         'civikitchen.yaml',
         '.gitlab-ci.yml',
@@ -78,12 +84,13 @@ final class DistPaths
      * The central list adjusted by this repo's civikitchen.yaml policy; an entry
      * ending in `/` is a directory, everything else a file name.
      *
-     * @return array{dirs: list<string>, files: list<string>}
+     * @return array{dirs: list<string>, files: list<string>, names: list<string>}
      */
     public static function excluded(Context $context): array
     {
         $dirs = self::DIRS;
         $files = self::FILES;
+        $names = self::NAMES;
 
         foreach (self::listValue($context, 'dist_exclude') as $item) {
             if (self::problem($item, 'dist.exclude') !== null) {
@@ -101,9 +108,10 @@ final class DistPaths
             if (self::isProtected($keep)) continue;
             $dirs = array_values(array_filter($dirs, static fn (string $d): bool => $d !== $keep));
             $files = array_values(array_filter($files, static fn (string $f): bool => $f !== $keep));
+            $names = array_values(array_filter($names, static fn (string $n): bool => $n !== $keep));
         }
 
-        return ['dirs' => $dirs, 'files' => $files];
+        return ['dirs' => $dirs, 'files' => $files, 'names' => $names];
     }
 
     /**
@@ -162,12 +170,16 @@ final class DistPaths
 
     /**
      * Would this repo-relative path land in the archive? Root-anchored like the
-     * build; file entries are prefix-matched too, as a git pathspec is.
+     * build; file entries are prefix-matched too, as a git pathspec is. Names
+     * match at any depth.
      *
-     * @param array{dirs: list<string>, files: list<string>} $excluded
+     * @param array{dirs: list<string>, files: list<string>, names: list<string>} $excluded
      */
     public static function ships(string $path, array $excluded): bool
     {
+        if (in_array(basename($path), $excluded['names'], true)) {
+            return false;
+        }
         foreach ([...$excluded['dirs'], ...$excluded['files']] as $entry) {
             if ($path === $entry || str_starts_with($path, $entry . '/') || (strpbrk($entry, '*?[') !== false && fnmatch($entry, $path, FNM_PATHNAME))) {
                 return false;

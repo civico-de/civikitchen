@@ -551,7 +551,8 @@ policy:
 
 The same paths need a .gitattributes of their own that takes them out of the
 filter (`*.png -filter -diff -merge`), or git reports them as modified in
-every checkout; the check fails until it is there.
+every checkout; the check fails until it is there. The release archive
+leaves that file out.
 
 ### Translations
 

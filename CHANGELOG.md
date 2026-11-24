@@ -14,6 +14,13 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Fixed
+
+- `ckrelease dist` leaves `.gitattributes` and `.gitignore` out at any depth,
+  not only at the repository root. The `.gitattributes` that `lfs_exempt`
+  requires beside exempt media failed the release as a dev path in the archive.
+  `ckconform --dist-paths` lists them as `name <name>`.
+
 ## [1.72.1] - 2026-11-23
 
 ### Fixed
