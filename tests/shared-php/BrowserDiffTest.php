@@ -109,6 +109,70 @@ final class BrowserDiffTest extends TestCase
         ], $data['screenshots']);
     }
 
+    public function testAssetCacheCodesInStackTracesProduceNoRegressions(): void
+    {
+        $route = static fn(string $prefix, string $cacheCode): array => [
+            'prefix' => $prefix,
+            'routes' => [[
+                'route' => 'civicrm/mock-search',
+                'mode' => 'auth',
+                'hasCrmContainer' => true,
+                'redirectedToLogin' => false,
+                'consoleErrors' => [
+                    "TypeError: Cannot read properties of undefined (reading 'tally')\n"
+                    . "    at controller.\$onInit (http://localhost/core/ext/search_kit/ang/table.component.js?r={$cacheCode}:28:27)\n"
+                    . "    at forEach (http://localhost/core/bower_components/angular/angular.js?r={$cacheCode}:396:18)",
+                ],
+                'pageErrors' => [],
+                'networkFailures' => [
+                    ['status' => 404, 'method' => 'GET', 'urlPath' => "/civicrm/ajax/angular-modules?format=js&r={$cacheCode}&modules=af"],
+                    ['status' => 500, 'method' => 'GET', 'urlPath' => '/civicrm/ajax/rest?entity=Contact&_=' . strlen($cacheCode) . '1732470000'],
+                ],
+                'a11yViolations' => [],
+                'screenshot' => "{$prefix}-auth-civicrm-mock-search.png",
+            ]],
+        ];
+        $fileA = "{$this->tempDir}/A.browser.json";
+        $fileB = "{$this->tempDir}/B.browser.json";
+        file_put_contents($fileA, json_encode($route('A', 'Xb3kq_US')));
+        file_put_contents($fileB, json_encode($route('B', 'I8upken_US')));
+
+        $diff = BrowserDiff::fromFiles($fileA, $fileB);
+
+        self::assertSame([], $diff->toArray()['new_console_errors']);
+        self::assertSame([], $diff->toArray()['new_network_failures']);
+        self::assertFalse($diff->hasRegressions());
+    }
+
+    public function testShiftedScriptPositionsProduceNoRegressionButNewFramesDo(): void
+    {
+        $route = static fn(string $prefix, array $errors): array => [
+            'prefix' => $prefix,
+            'routes' => [[
+                'route' => 'civicrm/dashboard',
+                'mode' => 'auth',
+                'hasCrmContainer' => true,
+                'redirectedToLogin' => false,
+                'consoleErrors' => $errors,
+                'pageErrors' => [],
+                'networkFailures' => [],
+                'a11yViolations' => [],
+                'screenshot' => "{$prefix}-auth-civicrm-dashboard.png",
+            ]],
+        ];
+        $trace = static fn(int $line): string => "TypeError: x is undefined\n"
+            . "    at ctrl.load (http://localhost/core/ext/widget/ang/widget.js?r=abc:{$line}:9)\n"
+            . "    at http://localhost/core/js/Common.js:{$line}";
+        $fileA = "{$this->tempDir}/A.browser.json";
+        $fileB = "{$this->tempDir}/B.browser.json";
+        file_put_contents($fileA, json_encode($route('A', [$trace(28)])));
+        file_put_contents($fileB, json_encode($route('B', [$trace(31), 'Failed to load module at http://localhost/core/js/Common.js:40:2'])));
+
+        $newErrors = BrowserDiff::fromFiles($fileA, $fileB)->toArray()['new_console_errors'];
+
+        self::assertSame(['Failed to load module at http://localhost/core/js/Common.js'], array_column($newErrors, 'message'));
+    }
+
     public function testDetectsAllRegressionCategoriesAndFormatsSummary(): void
     {
         $before = [
@@ -213,7 +277,7 @@ final class BrowserDiffTest extends TestCase
         self::assertSame(8, $data['counts']['risk_flags']);
 
         self::assertSame('Refused script at http://localhost/bad.js', $data['new_console_errors'][0]['message']);
-        self::assertSame('Uncaught TypeError: CRM.foo is not a function at http://[::1]/app.js:12', $data['new_page_errors'][0]['message']);
+        self::assertSame('Uncaught TypeError: CRM.foo is not a function at http://[::1]/app.js', $data['new_page_errors'][0]['message']);
         self::assertSame('POST', $data['new_network_failures'][0]['method']);
         self::assertSame(500, $data['new_network_failures'][0]['status']);
         self::assertSame('impact-increased', $data['new_a11y_violations'][0]['change']);

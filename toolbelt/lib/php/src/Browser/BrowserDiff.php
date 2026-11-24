@@ -81,11 +81,21 @@ final class BrowserDiff
     }
 
     /**
-     * Strips volatile localhost port numbers so A and B error messages compare cleanly.
+     * Strips volatile localhost ports, cache-buster values (CiviCRM's per-install `r=`
+     * resource code, jQuery's `_=` timestamp) and script line:column positions, which
+     * shift when B edits a file in the trace, so A and B messages compare cleanly.
      */
     public static function normalizeMessage(string $message): string
     {
-        $normalized = preg_replace('/(localhost|127\.0\.0\.1|\[::1\]):\d+/i', '$1', $message);
+        $normalized = preg_replace(
+            [
+                '/(localhost|127\.0\.0\.1|\[::1\]):\d+/i',
+                '/([?&](?:r|_)=)[^&#\s:)\'"]*/',
+                '/(\.m?js(?:\?[^\s:)\'"]*)?)(?::\d+){1,2}(?=[\s)\'"]|$)/mi',
+            ],
+            ['$1', '$1', '$1'],
+            $message,
+        );
         return $normalized ?? $message;
     }
 

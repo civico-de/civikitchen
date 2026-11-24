@@ -24,6 +24,14 @@ except that a break the consumers are adjusted for ships as a minor, marked
   boot. A core checkout mounted at another commit no longer needs a rebuilt
   image when its composer dependencies differ.
 
+### Fixed
+
+- **`ck ab --page` no longer reports A's console errors and network failures as
+  new on B**: the browser diff ignores cache-buster values (CiviCRM's `r=`
+  resource code, jQuery's `_=`), which differ per install, and script
+  line:column positions, which shift when B edits a file in a stack trace.
+  Reported messages carry the normalized form.
+
 ## [1.72.2] - 2026-11-24
 
 ### Fixed
