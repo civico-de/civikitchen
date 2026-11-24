@@ -199,20 +199,19 @@ not byte for byte.
 ## What the archive contains
 
 The tracked files at the tag plus declared build output, under one top-level
-directory named after the extension key. The development layer is left out:
+directory named after the extension key. The development layer is left out at
+any depth, so a frontend/vitest.config.ts or the .gitattributes `lfs_exempt`
+puts beside exempt media never ships:
 
 ```
 .github/ .docker/ .civikitchen/ .claude/ tests/ node_modules/
-.editorconfig civikitchen.yaml .phpunit.result.cache
+.gitattributes .gitignore .editorconfig civikitchen.yaml .phpunit.result.cache
 .gitlab-ci.yml renovate.json mago.toml phpcs.xml(.dist)
 composer-dependency-analyser.php phpstan.neon(.dist) phpstan-tests.neon(.dist)
 phpstanBootstrap.php phpunit.xml(.dist) phpunit-unit.xml.dist .oxlintrc.json
 playwright.config.ts/.js vitest.config.ts/.js
 package-lock.json bun.lock(b) tsconfig.json
 ```
-
-.gitattributes and .gitignore are left out at any depth, so the one
-`lfs_exempt` puts beside exempt media never ships.
 
 Secrets are never packed, whatever the policy says: .git, .env and .env.*,
 .envrc, .netrc, .npmrc, .pypirc, auth.json and credentials.json. To print the
@@ -230,7 +229,9 @@ package-level copies of the excluded paths are stripped too. A committed
 frontend build in dist/ is the shipped artifact; an uncommitted one is
 declared as build output.
 
-Gitignored files are absent anyway. Adjust the list per repo:
+Gitignored files are absent anyway. Adjust the list per repo; an entry without
+a `/` is a name and matches at any depth, one with a `/` is a path from the
+repository root:
 
 ```yaml
 policy:
@@ -245,8 +246,7 @@ policy:
 
 `ckrelease verify` re-checks the built zip: one top-level directory named
 after the key, info.xml at the released version, every declared build output,
-and no excluded name as a path segment at any depth, which catches a nested
-tests/ directory. The list lives here and in civikitchen.yaml, not in
+and no excluded name as a path segment at any depth. The list lives here and in civikitchen.yaml, not in
 export-ignore attributes
 ([ADR-0003](adr/0003-release-exclusions-live-in-civikitchen.md)); a repo's own
 export-ignore entries still apply on top.

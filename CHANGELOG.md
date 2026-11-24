@@ -14,6 +14,16 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Fixed
+
+- `ckrelease dist` leaves the excluded names out at any depth, as
+  `ckrelease verify` already checked: a nested `vitest.config.ts`,
+  `tsconfig.json` or `tests/` directory no longer fails the release as a
+  dev path in the archive. An entry without a `/` is a name matched at any
+  depth, one with a `/` stays a path from the repository root.
+  `ckconform --dist-paths` no longer prints `name` lines; `dir` and `file`
+  entries carry that distinction.
+
 ## [1.73.0] - 2026-11-24
 
 ### Added

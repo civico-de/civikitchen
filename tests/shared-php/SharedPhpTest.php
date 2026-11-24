@@ -1015,14 +1015,17 @@ final class SharedPhpTest extends TestCase
         self::assertSame('', $this->git($repository, 'diff', '--cached', '--name-only'));
     }
 
-    public function testReleaseLeavesOutGitFilesBesideShippedMedia(): void
+    public function testReleaseLeavesOutDevelopmentFilesAtAnyDepth(): void
     {
         $repository = $this->stagedRepository(['ang/app.bundle.js']);
         $this->write($repository, 'images/icon.png', 'png');
         $this->write($repository, 'images/.gitattributes', "*.png -filter -diff -merge\n");
         $this->write($repository, 'l10n/.gitignore', "*.mo\n");
         $this->write($repository, 'l10n/de_DE.po', 'msgid ""');
-        $this->git($repository, 'add', 'images', 'l10n');
+        $this->write($repository, 'frontend/src/main.ts', 'main();');
+        $this->write($repository, 'frontend/vitest.config.ts', 'export default {};');
+        $this->write($repository, 'frontend/tests/main.test.ts', 'test();');
+        $this->git($repository, 'add', 'images', 'l10n', 'frontend');
         $this->git($repository, '-c', 'user.name=ck', '-c', 'user.email=ck@example.org', 'commit', '-q', '-m', 'media');
         $this->write($repository, 'ang/app.bundle.js', 'built();');
 
@@ -1031,8 +1034,9 @@ final class SharedPhpTest extends TestCase
         self::assertSame(0, $status);
         self::assertContains('org.example.staged/images/icon.png', $entries);
         self::assertContains('org.example.staged/l10n/de_DE.po', $entries);
+        self::assertContains('org.example.staged/frontend/src/main.ts', $entries);
         foreach ($entries as $entry) {
-            self::assertDoesNotMatchRegularExpression('#/\.git(attributes|ignore)$#', $entry);
+            self::assertDoesNotMatchRegularExpression('#/\.git(attributes|ignore)$|/vitest\.config\.ts$|/tests/#', $entry);
         }
     }
 

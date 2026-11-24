@@ -55,7 +55,7 @@ if (!in_array($format, ['human', 'json', 'github', 'sarif'], true)) {
  *
  *   eval "$(ckconform --policy-env)"   # CK_POLICY_MIN_COVERAGE='70', …
  *   ckconform --policy <key>           # every value of one key, one per line
- *   ckconform --dist-paths             # `dir <name>` / `file <name>` / `name <name>` (any depth), then `stage <path>`, one per line
+ *   ckconform --dist-paths             # `dir <entry>` / `file <entry>` (no `/`: any depth), then `stage <path>`, one per line
  *
  * --policy-env strips the ` -- <reason>`, --policy keeps values verbatim.
  * They run before the info.xml gate and before any check is constructed.
@@ -112,9 +112,6 @@ switch ($argv[1] ?? '') {
         }
         foreach ($distPaths['files'] as $file) {
             echo 'file ', $file, "\n";
-        }
-        foreach ($distPaths['names'] as $name) {
-            echo 'name ', $name, "\n";
         }
         foreach (DistPaths::staged($distContext) as $path) {
             echo 'stage ', $path, "\n";

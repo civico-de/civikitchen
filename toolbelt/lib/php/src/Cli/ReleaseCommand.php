@@ -27,8 +27,6 @@ final class ReleaseCommand implements Command
     private array $excludedDirectories = [];
     /** @var list<string> */
     private array $excludedFiles = [];
-    /** @var list<string> File names excluded at any depth. */
-    private array $excludedNames = [];
     /** @var list<string> */
     private array $stagedPaths = [];
 
@@ -131,8 +129,6 @@ final class ReleaseCommand implements Command
                 $this->excludedDirectories[] = substr($line, 4);
             } elseif (str_starts_with($line, 'file ')) {
                 $this->excludedFiles[] = substr($line, 5);
-            } elseif (str_starts_with($line, 'name ')) {
-                $this->excludedNames[] = substr($line, 5);
             } elseif (str_starts_with($line, 'stage ')) {
                 $this->stagedPaths[] = substr($line, 6);
             }
@@ -237,10 +233,13 @@ final class ReleaseCommand implements Command
         }
         $pathspec = [];
         foreach ([...$this->excludedDirectories, ...$this->excludedFiles] as $item) {
-            $pathspec[] = ($item === '.env.*' ? ':(glob,exclude)' : ':(exclude)') . $item;
-        }
-        foreach ($this->excludedNames as $name) {
-            $pathspec[] = ':(glob,exclude)**/' . $name;
+            if (str_contains($item, '/')) {
+                $pathspec[] = ':(exclude)' . $item;
+            } else {
+                // A name, at any depth: as the entry itself and as a directory's contents.
+                $pathspec[] = ':(glob,exclude)**/' . $item;
+                $pathspec[] = ':(glob,exclude)**/' . $item . '/**';
+            }
         }
         $status = $this->runner->passthrough($repository->gitCommand(['archive', '--format=zip', '-9', "--prefix={$this->metadata['key']}/", '-o', $zip, $tree, '--', '.', ...$pathspec]));
         if ($status !== 0) {
@@ -372,7 +371,6 @@ final class ReleaseCommand implements Command
             array_shift($segments);
             foreach ($segments as $segment) {
                 if (in_array($segment, $this->excludedDirectories, true) || in_array($segment, $this->excludedFiles, true)
-                    || in_array($segment, $this->excludedNames, true)
                     || $segment === '.env' || str_starts_with($segment, '.env.')) {
                     $offenders[] = $entry;
                     break;

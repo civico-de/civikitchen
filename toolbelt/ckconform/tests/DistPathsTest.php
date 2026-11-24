@@ -36,13 +36,25 @@ final class DistPathsTest extends CheckTestCase
         }
     }
 
-    public function testGitFilesNeverShipAtAnyDepth(): void
+    public function testNamesNeverShipAtAnyDepth(): void
     {
         $excluded = DistPaths::excluded($this->repo([]));
-        foreach (['.gitattributes', 'images/.gitattributes', 'l10n/de/.gitignore'] as $path) {
+        foreach (['.gitattributes', 'images/.gitattributes', 'l10n/de/.gitignore', 'frontend/vitest.config.ts', 'frontend/tests/a.test.ts', 'lib/.env.local'] as $path) {
             self::assertFalse(DistPaths::ships($path, $excluded), $path);
         }
         self::assertTrue(DistPaths::ships('images/icon.png', $excluded));
+        self::assertTrue(DistPaths::ships('frontend/src/testsuite.ts', $excluded));
+    }
+
+    public function testExcludedPathsStayAnchoredAtTheRoot(): void
+    {
+        $excluded = DistPaths::excluded($this->repo([
+            'civikitchen.yaml' => "version: 1\npolicy:\n  dist:\n    exclude:\n      - docs/internal\n      - scripts/\n",
+        ]));
+        self::assertFalse(DistPaths::ships('docs/internal/plan.md', $excluded));
+        self::assertTrue(DistPaths::ships('ang/docs/internal/help.html', $excluded));
+        self::assertFalse(DistPaths::ships('scripts/deploy.sh', $excluded));
+        self::assertFalse(DistPaths::ships('lib/scripts/run.sh', $excluded));
     }
 
     public function testUnifiedConfigCannotBeForcedIntoARelease(): void
