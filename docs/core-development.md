@@ -198,6 +198,19 @@ ck ab standalone standalone --mount "$HOME/fix/tests:/var/www/html/core/tests:ro
 
 `--locales` installs core language files in both, as with `ck run`.
 
+`--browser` starts a headless Chrome on each app's network, so browser tests
+(`Civi\Test\MinkBase`) run on both sides:
+
+```bash
+ck ab standalone-master standalone-master --browser \
+  --mount-a "$HOME/base/ext/afform/core:/var/www/html/core/ext/afform/core:ro" \
+  --mount-b "$HOME/fix/ext/afform/core:/var/www/html/core/ext/afform/core:ro" \
+  -- ckcoretest --e2e --ext afform/mock --log-junit /tmp/ck-ab.xml tests/phpunit/E2E
+```
+
+The tests reach the site on port 80 inside the stack, so `--browser` does not
+combine with `--page`, `--anon-page`, `--expose` or the port options.
+
 When the command writes a JUnit report to `/tmp/ck-ab.xml`, `ck ab` compares
 per test and lists four groups: pass on A and fail on B, fail on A and pass on
 B, fail on both, and ran on A but skipped or missing on B. The exit status is

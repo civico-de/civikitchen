@@ -5,6 +5,7 @@ declare(strict_types=1);
 use CiviKitchen\Toolbelt\Ab\JUnit;
 use CiviKitchen\Toolbelt\Browser\BrowserProbe;
 use CiviKitchen\Toolbelt\Cli\AbCommand;
+use CiviKitchen\Toolbelt\Cli\StandaloneStack;
 use CiviKitchen\Toolbelt\Filesystem\Directory;
 use CiviKitchen\Toolbelt\Process\Runner;
 use PHPUnit\Framework\TestCase;
@@ -174,6 +175,9 @@ final class AbTest extends TestCase
             [['standalone', 'standalone-beta', '--name', 'Bug 1', '--', 'true'], '--name takes'],
             [['standalone', 'standalone-beta', '--name', '-bad', '--', 'true'], '--name takes'],
             [['standalone', 'standalone-beta', '--name', '--', 'true'], '--name needs a value'],
+            [['standalone', 'standalone-beta', '--browser', '--expose', '--', 'true'], 'cannot be combined with --page'],
+            [['standalone', 'standalone-beta', '--browser', '--port-a', '8450', '--', 'true'], 'cannot be combined with --page'],
+            [['standalone', 'standalone-beta', '--browser', '--page', 'civicrm/admin'], 'cannot be combined with --page'],
         ];
         foreach ($cases as [$arguments, $message]) {
             try {
@@ -345,6 +349,31 @@ final class AbTest extends TestCase
         self::assertStringContainsString('fallback failed', $diffFile['error']);
         $report = json_decode((string) file_get_contents($jsonPath), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame($diffFile, $report['surface_diff']);
+    }
+
+    public function testBrowserStartsAHeadlessChromeInEachAppsNetwork(): void
+    {
+        $runner = new AbRunner();
+
+        [$status] = $this->ab($runner, ['standalone-6.16', 'standalone-beta', '--browser', '--out', $this->out,
+            '--', 'ckcoretest', '--e2e', '--ext', 'afform/mock', 'tests/phpunit/E2E']);
+
+        self::assertSame(0, $status);
+        foreach (['a', 'b'] as $side) {
+            $browser = $runner->configs["ck-ab-standalone-6-16-vs-standalone-beta-{$side}"]['services']['browser'];
+            self::assertSame('service:app', $browser['network_mode']);
+            self::assertSame(StandaloneStack::BROWSER_IMAGE, $browser['image']);
+        }
+
+        $plain = new AbRunner();
+        $this->ab($plain, ['standalone-6.16', 'standalone-beta', '--out', $this->out, '--', 'true']);
+        self::assertArrayNotHasKey('browser', $plain->configs['ck-ab-standalone-6-16-vs-standalone-beta-a']['services']);
+    }
+
+    public function testBrowserImageMatchesTheExtensionTemplatePin(): void
+    {
+        $template = (string) file_get_contents(dirname(__DIR__, 2) . '/scaffold/template/extension/.docker/docker-compose.yml');
+        self::assertStringContainsString('image: ' . StandaloneStack::BROWSER_IMAGE . "\n", $template);
     }
 
     public function testExposeAndPortOverridesPublishPortsAndPrintUrls(): void

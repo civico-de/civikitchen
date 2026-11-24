@@ -14,6 +14,8 @@ final class StandaloneStack
     private const SOURCE_LOG = '/usr/local/share/civikitchen/civicrm-source.log';
     // The images' start period plus every retry of their healthcheck.
     private const BOOT_SECONDS = 900;
+    // Headless Chrome for Civi\Test\MinkBase; the same pin as the extension template's browser service.
+    public const BROWSER_IMAGE = 'chromedp/headless-shell:152.0.7939.3';
 
     public function __construct(private readonly Runner $runner)
     {
@@ -59,9 +61,11 @@ final class StandaloneStack
     /**
      * Writes the compose file; a project of that name must not exist yet.
      *
+     * With $browser, a headless Chrome shares the app's network, so MinkBase reaches it at localhost:9222.
+     *
      * @param list<string> $mounts
      */
-    public function prepare(string $project, string $image, array $mounts, ?string $locales, string $file, ?int $httpPort = null): string
+    public function prepare(string $project, string $image, array $mounts, ?string $locales, string $file, ?int $httpPort = null, bool $browser = false): string
     {
         $containers = $this->runner->capture(['docker', 'ps', '-a', '-q', '--filter', "label=com.docker.compose.project={$project}"]);
         if ($containers['status'] !== 0) {
@@ -113,6 +117,15 @@ final class StandaloneStack
         }
         if ($locales !== null) {
             $config['services']['app']['environment']['CIVIKITCHEN_LOCALES'] = $locales;
+        }
+        if ($browser) {
+            $config['services']['browser'] = [
+                'image' => self::BROWSER_IMAGE,
+                'pull_policy' => 'missing',
+                'network_mode' => 'service:app',
+                // With the default 64 MB /dev/shm Chrome drops script loads (net::ERR_INSUFFICIENT_RESOURCES).
+                'shm_size' => '2gb',
+            ];
         }
         file_put_contents($file, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
         return $file;

@@ -41,6 +41,8 @@ ck ab — run the same check on two CiviCRM versions and compare the results
   --surface            capture API, route, and Afform surface on both sides and report surface diff
   --page <route>       probe an authenticated CiviCRM route (civicrm/...) in Playwright on both sides (repeatable)
   --anon-page <route>  probe an unauthenticated CiviCRM route (civicrm/...) in Playwright on both sides (repeatable)
+  --browser            start a headless Chrome beside each app for browser tests
+                       (Civi\Test\MinkBase), e.g. -- ckcoretest --e2e --ext afform/mock ...
   --no-a11y            disable axe-core WCAG 2.1 AA checks during browser probing (enabled by default)
   --expose             publish free localhost ports on both stacks and print A_URL / B_URL
   --port-a <port>      explicit localhost port for stack A (default: free port from 8400)
@@ -120,6 +122,7 @@ TXT;
                     $options['locales'],
                     "{$out}/{$side}.compose.json",
                     $ports[$side] ?? null,
+                    $options['browser'],
                 );
             }
             foreach ($files as $file) {
@@ -534,6 +537,7 @@ TXT;
      *   pages: list<string>,
      *   anon_pages: list<string>,
      *   a11y: bool,
+     *   browser: bool,
      *   expose: bool,
      *   port_a: ?int,
      *   port_b: ?int,
@@ -559,6 +563,7 @@ TXT;
         $pages = [];
         $anonPages = [];
         $a11y = true;
+        $browser = false;
         $expose = false;
         $portA = null;
         $portB = null;
@@ -570,6 +575,10 @@ TXT;
             }
             if ($argument === '--surface') {
                 $surface = true;
+                continue;
+            }
+            if ($argument === '--browser') {
+                $browser = true;
                 continue;
             }
             if ($argument === '--no-a11y') {
@@ -624,6 +633,10 @@ TXT;
         if ($images[0] === $images[1] && $mounts['A'] === $mounts['B']) {
             throw new RuntimeException("both sides are {$images[0]} with the same mounts; nothing to compare");
         }
+        // The browser shares the app's network, where the site answers on port 80, not on a published port.
+        if ($browser && ($pages !== [] || $anonPages !== [] || $expose || $portA !== null || $portB !== null)) {
+            throw new RuntimeException('--browser runs browser tests against port 80 inside the stack; it cannot be combined with --page, --anon-page, --expose or --port-a/--port-b');
+        }
         if ($portA !== null && $portB !== null && $portA === $portB) {
             throw new RuntimeException('--port-a and --port-b must be different ports');
         }
@@ -639,6 +652,7 @@ TXT;
             'pages' => $pages,
             'anon_pages' => $anonPages,
             'a11y' => $a11y,
+            'browser' => $browser,
             'expose' => $expose,
             'port_a' => $portA,
             'port_b' => $portB,

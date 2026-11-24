@@ -14,6 +14,14 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- **`ck ab --browser`**: starts a headless Chrome beside each app, so browser
+  tests (`Civi\Test\MinkBase`) run on both sides, e.g.
+  `ck ab … --browser -- ckcoretest --e2e --ext afform/mock tests/phpunit/E2E`.
+  It cannot be combined with `--page`, `--anon-page`, `--expose` or the port
+  options.
+
 ## [1.73.1] - 2026-11-24
 
 ### Fixed
