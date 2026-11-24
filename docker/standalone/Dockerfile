@@ -145,6 +145,10 @@ RUN --mount=type=secret,id=composer_auth,env=COMPOSER_AUTH bash /opt/civikitchen
 ARG CIVICRM_VERSION
 COPY --from=download --chown=www-data:www-data /tmp/civicrm/civicrm-standalone /var/www/html
 COPY --from=download /tmp/core-patches.log /tmp/civicrm-source.log /usr/local/share/civikitchen/
+# The composer inputs vendor/ was installed from; the entrypoint reinstalls when the mounted ones differ.
+RUN cat /var/www/html/core/composer.json /var/www/html/core/composer.lock | sha256sum | cut -d' ' -f1 \
+        > /var/www/html/core/vendor/.civikitchen-composer-inputs \
+    && chown www-data:www-data /var/www/html/core/vendor/.civikitchen-composer-inputs
 # The seed snapshot store; mount a host directory to keep snapshots across stacks.
 RUN chown www-data:www-data /var/www \
     && install -d -o www-data -g www-data /var/lib/civikitchen/snapshots

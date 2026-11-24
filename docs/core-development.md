@@ -123,8 +123,14 @@ services:
 ```
 
 Run `cv flush` after each toggle, or the Angular and asset caches keep the old
-files. A change to composer dependencies, or to anything outside the mounted
-directory, needs a rebuilt image.
+files. A change to anything outside the mounted directory needs a rebuilt
+image, except composer dependencies: mount the checkout's `composer.json`,
+`composer.lock` and `tools/scripts/composer` (its post-install scripts, which
+the release tarball lacks) too, and on boot the Standalone image runs
+`composer install` when the two files differ from the ones its `vendor/` was
+installed from. That needs network access; a failed install stops the boot. A
+`vendor/` mounted from a host checkout stays as it is, and the boot says so; a
+volume first filled from the image carries its marker and is synced like it.
 
 To work with core's git history in a CMS site, build a buildkit image with
 `--build-arg KEEP_GIT=1`

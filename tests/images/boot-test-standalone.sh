@@ -260,4 +260,62 @@ authx_after=$(cv ev "${authx_get}" || true)
 check "a profile without API users keeps authx_header_cred (${authx_before:-?} -> ${authx_after:-?})" \
     "[ -n '${authx_before}' ] && [ '${authx_before}' != '[]' ] && [ '${authx_before}' = '${authx_after}' ]"
 
+# 13) Core composer files other than the ones vendor/ was installed from sync
+# vendor/ at boot; the image's own, as in the boot above, do not.
+check "the image's own core composer files start no composer install" \
+    "! docker logs '${APP}' 2>&1 | grep -E 'differ from the installed vendor/|mounted from outside' >/dev/null"
+edit_json='$f = $argv[1]; $j = json_decode(file_get_contents($f), true); $j[$argv[2]] = "0";
+    echo json_encode($j, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);'
+docker exec "${APP}" cat /var/www/html/core/composer.lock > "${FIXTURE}/original.lock"
+docker exec "${APP}" php -r "${edit_json}" /var/www/html/core/composer.lock content-hash > "${FIXTURE}/changed.lock"
+docker exec "${APP}" php -r "${edit_json}" /var/www/html/core/composer.json description > "${FIXTURE}/changed.json"
+echo '{broken' > "${FIXTURE}/broken.lock"
+# Stub post-install scripts: the release tarball has no tools/scripts/composer.
+mkdir -p "${FIXTURE}/composer-scripts"
+docker exec "${APP}" php -r '$j = json_decode(file_get_contents("/var/www/html/core/composer.json"), true);
+    foreach ($j["scripts"]["post-install-cmd"] ?? [] as $c) { echo basename(explode(" ", $c)[1] ?? ""), "\n"; }' \
+    | while read -r script; do printf '#!/bin/sh\n' > "${FIXTURE}/composer-scripts/${script}"; done
+scripts_mount=(-v "${FIXTURE}/composer-scripts:/var/www/html/core/tools/scripts/composer:ro")
+boot_once() { # <log name> <docker run args...>
+    local name=$1 rc=0
+    shift
+    docker run --rm "${scripts_mount[@]}" "$@" "${IMAGE}" true > "${FIXTURE}/vendor-sync-${name}.log" 2>&1 || rc=$?
+    echo "${rc}" > "${FIXTURE}/vendor-sync-${name}.rc"
+}
+boot_once lock -v "${FIXTURE}/changed.lock:/var/www/html/core/composer.lock:ro"
+boot_once json -v "${FIXTURE}/changed.json:/var/www/html/core/composer.json:ro"
+boot_once broken -v "${FIXTURE}/broken.lock:/var/www/html/core/composer.lock:ro"
+synced() { # <log name>: booted and ran composer install
+    [ "$(cat "${FIXTURE}/vendor-sync-$1.rc")" = 0 ] \
+        && grep -qF 'differ from the installed vendor/' "${FIXTURE}/vendor-sync-$1.log"
+}
+check "a changed core composer.lock runs composer install at boot" "synced lock"
+check "a changed core composer.json runs composer install at boot" "synced json"
+check "broken core composer files fail the boot" \
+    "[ \"\$(cat '${FIXTURE}/vendor-sync-broken.rc')\" != 0 ] && grep -qF 'composer install for the mounted core composer files failed' '${FIXTURE}/vendor-sync-broken.log'"
+# A container whose mounted lock returns to the image's reinstalls from it.
+cp "${FIXTURE}/changed.lock" "${FIXTURE}/switch.lock"
+docker create --name "${APP}-switch" "${scripts_mount[@]}" -v "${FIXTURE}/switch.lock:/var/www/html/core/composer.lock:ro" \
+    "${IMAGE}" true >/dev/null
+docker start -a "${APP}-switch" > "${FIXTURE}/vendor-sync-switch1.log" 2>&1 || true
+cat "${FIXTURE}/original.lock" > "${FIXTURE}/switch.lock"
+docker start -a "${APP}-switch" > "${FIXTURE}/vendor-sync-switch2.log" 2>&1 || true
+docker rm -f "${APP}-switch" >/dev/null
+check "a lock switched back to the image's reinstalls vendor/" \
+    "grep -qF 'differ from the installed vendor/' '${FIXTURE}/vendor-sync-switch2.log'"
+# A failed install leaves vendor/ unproven; the image's own lock then reinstalls.
+docker create --name "${APP}-failed" "${scripts_mount[@]}" -v "${FIXTURE}/switch.lock:/var/www/html/core/composer.lock:ro" \
+    "${IMAGE}" true >/dev/null
+cat "${FIXTURE}/broken.lock" > "${FIXTURE}/switch.lock"
+docker start -a "${APP}-failed" > "${FIXTURE}/vendor-sync-failed1.log" 2>&1 || true
+cat "${FIXTURE}/original.lock" > "${FIXTURE}/switch.lock"
+docker start -a "${APP}-failed" > "${FIXTURE}/vendor-sync-failed2.log" 2>&1 || true
+docker rm -f "${APP}-failed" >/dev/null
+check "a lock restored after a failed install reinstalls vendor/" \
+    "grep -qF 'differ from the installed vendor/' '${FIXTURE}/vendor-sync-failed2.log'"
+boot_once foreign -v "${FIXTURE}/composer-scripts:/var/www/html/core/vendor:ro"
+check "a vendor/ mounted from outside is named, not synced" \
+    "grep -qF 'mounted from outside the image' '${FIXTURE}/vendor-sync-foreign.log'"
+[ "${fail}" = 0 ] || tail -n 20 "${FIXTURE}"/vendor-sync-*.log
+
 verdict "${IMAGE} on ${DATABASE_IMAGE}"

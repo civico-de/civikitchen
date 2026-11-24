@@ -50,6 +50,29 @@ ck_attach_scenario_extension
 ck_warn_removed_auto_composer
 
 # ---------------------------------------------------------------------------
+# Core composer.json/composer.lock other than the ones vendor/ was installed
+# from (a core checkout mounted at another commit) get their own vendor/ before
+# CiviCRM boots; same flags as the build.
+CORE_COMPOSER_INPUTS=/var/www/html/core/vendor/.civikitchen-composer-inputs
+if [[ -f "${CORE_COMPOSER_INPUTS}" ]]; then
+    core_inputs="$(cat /var/www/html/core/composer.json /var/www/html/core/composer.lock | sha256sum | cut -d' ' -f1)"
+    if [[ "${core_inputs}" != "$(cat "${CORE_COMPOSER_INPUTS}")" ]]; then
+        echo "[civikitchen] core composer.json/composer.lock differ from the installed vendor/; running composer install"
+        # An interrupted install leaves no matching marker, so the next boot installs again.
+        ck_as_web truncate -s 0 "${CORE_COMPOSER_INPUTS}"
+        if ! ck_as_web env COMPOSER_COMPILE=1 composer --working-dir=/var/www/html/core install \
+            --no-dev --no-interaction --no-progress --ignore-platform-req='ext-*'; then
+            echo "[civikitchen] ERROR: composer install for the mounted core composer files failed" \
+                "(its post-install scripts come from the checkout's tools/scripts/composer; mount that too)" >&2
+            exit 1
+        fi
+        echo "${core_inputs}" | ck_as_web tee "${CORE_COMPOSER_INPUTS}" >/dev/null
+    fi
+else
+    echo "[civikitchen] core vendor/ is mounted from outside the image; its composer files are not synced"
+fi
+
+# ---------------------------------------------------------------------------
 # Auto-install.
 export CIVICRM_DB_HOST="${CIVICRM_DB_HOST:-db}"
 export CIVICRM_DB_PORT="${CIVICRM_DB_PORT:-3306}"

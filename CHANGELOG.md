@@ -14,6 +14,16 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- **Standalone images sync core `vendor/` to mounted composer files**: a core
+  `composer.json` or `composer.lock` other than the ones `vendor/` was installed
+  from runs `composer install` on boot, before the install, with the image's
+  build flags. Mount the checkout's `tools/scripts/composer` with them; the
+  release tarball lacks those post-install scripts. A failed install stops the
+  boot. A core checkout mounted at another commit no longer needs a rebuilt
+  image when its composer dependencies differ.
+
 ## [1.72.2] - 2026-11-24
 
 ### Fixed
