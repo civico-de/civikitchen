@@ -14,6 +14,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.72.2] - 2026-11-24
+
 ### Fixed
 
 - `ckrelease dist` leaves `.gitattributes` and `.gitignore` out at any depth,
@@ -3104,7 +3106,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.72.1...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.72.2...HEAD
+[1.72.2]: https://github.com/civico-de/civikitchen/compare/v1.72.1...v1.72.2
 [1.72.1]: https://github.com/civico-de/civikitchen/compare/v1.72.0...v1.72.1
 [1.72.0]: https://github.com/civico-de/civikitchen/compare/v1.71.0...v1.72.0
 [1.71.0]: https://github.com/civico-de/civikitchen/compare/v1.70.0...v1.71.0
