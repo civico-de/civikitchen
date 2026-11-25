@@ -14,6 +14,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+## [1.74.1] - 2026-11-25
+
 ### Fixed
 
 - **`ckcoretest` on a release image with single test files mounted below
@@ -3160,7 +3162,8 @@ except that a break the consumers are adjusted for ships as a minor, marked
 - First boot no longer wipes a persistent dev database, and the install is
   retryable.
 
-[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.74.0...HEAD
+[Unreleased]: https://github.com/civico-de/civikitchen/compare/v1.74.1...HEAD
+[1.74.1]: https://github.com/civico-de/civikitchen/compare/v1.74.0...v1.74.1
 [1.74.0]: https://github.com/civico-de/civikitchen/compare/v1.73.1...v1.74.0
 [1.73.1]: https://github.com/civico-de/civikitchen/compare/v1.73.0...v1.73.1
 [1.73.0]: https://github.com/civico-de/civikitchen/compare/v1.72.2...v1.73.0
