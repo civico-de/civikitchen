@@ -11,9 +11,9 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 
 core="$work/core"
 router="$core/tests/extensions/router-test"
-mkdir -p "$core/xml" "$core/tests/phpunit/CRM" "$core/tests/phpunit/E2E" "$core/ext/afform/mock" \
+mkdir -p "$core/xml" "$core/tests/phpunit/CRM" "$core/tests/phpunit/CiviTest" "$core/tests/phpunit/E2E" "$core/ext/afform/mock" \
   "$router/tests/phpunit/CRM" "$work/bin"
-touch "$core/phpunit.xml.dist" "$router/phpunit.xml.dist" "$router/tests/phpunit/CRM/PageTest.php"
+touch "$core/phpunit.xml.dist" "$core/tests/phpunit/CiviTest/bootstrap.php" "$router/phpunit.xml.dist" "$router/tests/phpunit/CRM/PageTest.php"
 echo '<?xml version="1.0"?><version><version_no>6.20.alpha1</version_no></version>' > "$core/xml/version.xml"
 cat > "$work/bin/phpunit" <<'FAKE'
 #!/usr/bin/env bash
@@ -128,9 +128,12 @@ grep -q 'CIVICRM_SOURCE=git' "$work/err" || fail "the refusal must point at git-
 # tests/ from a checkout mounted into a release tarball: the phpunit config and the seed
 # SQL still come from the tag, and the mounted tests stay as they are.
 git init --quiet --initial-branch=main "$work/tagged"
-mkdir -p "$work/tagged/tests/phpunit" "$work/tagged/sql"
+mkdir -p "$work/tagged/tests/phpunit/CiviTest" "$work/tagged/sql"
+echo 'of the tag' > "$work/tagged/tests/phpunit/CiviTest/bootstrap.php"
 echo '<phpunit bootstrap="tests/phpunit/CiviTest/bootstrap.php"/>' > "$work/tagged/phpunit.xml.dist"
 echo 'of the tag' > "$work/tagged/tests/phpunit/FromTagTest.php"
+mkdir -p "$work/tagged/tests/phpunit/Mounted"
+echo 'of the tag' > "$work/tagged/tests/phpunit/Mounted/FromTagTest.php"
 echo 'seed' > "$work/tagged/sql/test_data.mysql"
 echo 'second' > "$work/tagged/sql/test_data_second_domain.mysql"
 mkdir -p "$work/tagged/ext/afform/mock/tests" "$work/tagged/ext/search_kit/tests"
@@ -140,11 +143,13 @@ git -C "$work/tagged" add --all
 git -C "$work/tagged" -c user.name=Test -c user.email=test@example.org -c commit.gpgsign=false commit --quiet --message release
 git -C "$work/tagged" tag 6.20.1
 mounted="$work/mounted"
-mkdir -p "$mounted/xml" "$mounted/sql" "$mounted/tests/phpunit"
+mkdir -p "$mounted/xml" "$mounted/sql" "$mounted/tests/phpunit/CiviTest"
+echo "of the checkout" > "$mounted/tests/phpunit/CiviTest/bootstrap.php"
 echo '<?xml version="1.0"?><version><version_no>6.20.1</version_no></version>' > "$mounted/xml/version.xml"
 echo 'of the checkout' > "$mounted/tests/phpunit/ReproducerTest.php"
 echo 'of the checkout' > "$mounted/sql/test_data.mysql"
-CK_CORE_DIR="$mounted" CK_CORE_REPO="$work/tagged" bash "$root/toolbelt/bin/ckcoretest" --fetch-only >"$work/out" 2>&1 \
+printf '90 36 0:52 /src/tests %s/tests rw - virtiofs mount0 rw\n' "$mounted" > "$work/mountinfo-mounted"
+CK_MOUNTINFO="$work/mountinfo-mounted" CK_CORE_DIR="$mounted" CK_CORE_REPO="$work/tagged" bash "$root/toolbelt/bin/ckcoretest" --fetch-only >"$work/out" 2>&1 \
   || fail "a mounted tests/ without phpunit.xml.dist must fetch the config: $(cat "$work/out")"
 grep -q 'bootstrap=' "$mounted/phpunit.xml.dist" || fail "phpunit.xml.dist was not fetched from the tag: $(cat "$work/out")"
 [ "$(cat "$mounted/sql/test_data_second_domain.mysql")" = second ] || fail "the missing seed SQL was not fetched from the tag"
@@ -179,6 +184,51 @@ CK_MOUNTINFO="$work/mountinfo" CK_CORE_DIR="$tarball" CK_CORE_REPO="$work/tagged
   || fail "core and unmounted extensions must get the tag's tests: $(cat "$work/out")"
 [[ "$(cat "$tarball/ext/afform/mock/tests/ReproducerTest.php" 2>/dev/null)" == 'of the checkout' \
   && ! -e "$tarball/ext/afform/mock/tests/FromTagTest.php" ]] || fail "a mounted extension's tests must stay as they are: $(cat "$work/out")"
+
+# Single files mounted below tests/ (a branch's changes over a release image): the tag's
+# tests fill everything around them, and the mounted files stay.
+single="$work/single"
+mkdir -p "$single/xml" "$single/sql" "$single/tests/phpunit" "$single/ext/search_kit/tests"
+echo '<?xml version="1.0"?><version><version_no>6.20.1</version_no></version>' > "$single/xml/version.xml"
+echo 'of the branch' > "$single/tests/phpunit/ChangedTest.php"
+echo 'of the branch' > "$single/ext/search_kit/tests/ChangedTest.php"
+mkdir -p "$single/tests/phpunit/with space"
+echo 'of the branch' > "$single/tests/phpunit/with space/ChangedTest.php"
+# A mounted phpunit.xml.dist and bootstrap of the branch do not make the partial tree a
+# checkout; a file left from an earlier fetch goes.
+echo 'of the branch' > "$single/phpunit.xml.dist"
+mkdir -p "$single/tests/phpunit/CiviTest"
+echo 'of the branch' > "$single/tests/phpunit/CiviTest/bootstrap.php"
+echo 'stale' > "$single/tests/phpunit/StaleTest.php"
+# A mounted directory gets nothing of the tag's, not even what it lacks.
+mkdir -p "$single/tests/phpunit/Mounted"
+{
+  printf '90 36 0:52 /src/a %s/tests/phpunit/ChangedTest.php ro - virtiofs mount0 rw\n' "$single"
+  printf '91 36 0:52 /src/a %s/ext/search_kit/tests/ChangedTest.php rw - virtiofs mount0 rw\n' "$single"
+  printf '92 36 0:52 /src/a %s/tests/phpunit/with\\040space/ChangedTest.php rw - virtiofs mount0 rw\n' "$single"
+  printf '93 36 0:52 /src/a %s/phpunit.xml.dist ro - virtiofs mount0 rw\n' "$single"
+  printf '94 36 0:52 /src/a %s/tests/phpunit/CiviTest/bootstrap.php ro - virtiofs mount0 rw\n' "$single"
+  printf '95 36 0:52 /src/d %s/tests/phpunit/Mounted rw - virtiofs mount0 rw\n' "$single"
+} > "$work/mountinfo-single"
+# Run as root, the fetch hands its files to www-data; a mounted file is the host's and stays.
+mkdir -p "$work/chownbin"
+printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$@" >> "%s/chowned"\n' "$work" > "$work/chownbin/chown"
+chmod +x "$work/chownbin/chown"
+PATH="$work/chownbin:$PATH" CK_MOUNTINFO="$work/mountinfo-single" CK_CORE_DIR="$single" CK_CORE_REPO="$work/tagged" bash "$root/toolbelt/bin/ckcoretest" --fetch-only >"$work/out" 2>&1 \
+  || fail "single mounted test files must not stop the fetch: $(cat "$work/out")"
+grep -q "$single/tests/phpunit/FromTagTest.php" "$work/chowned" || fail "the fetched tests must go to www-data"
+if grep -q 'ChangedTest.php\|phpunit.xml.dist\|bootstrap.php' "$work/chowned"; then
+  fail "mounted files must not be chowned: $(grep 'ChangedTest.php\|phpunit.xml.dist\|bootstrap.php' "$work/chowned")"
+fi
+[[ -e "$single/tests/phpunit/FromTagTest.php" && -e "$single/ext/search_kit/tests/FromTagTest.php" \
+  && -e "$single/tests/.ckcoretest-version" ]] \
+  || fail "the tag's tests must fill the tree around single mounted files: $(cat "$work/out")"
+[[ "$(cat "$single/tests/phpunit/ChangedTest.php")" == 'of the branch' \
+  && "$(cat "$single/ext/search_kit/tests/ChangedTest.php")" == 'of the branch' \
+  && "$(cat "$single/phpunit.xml.dist")" == 'of the branch' \
+  && "$(cat "$single/tests/phpunit/CiviTest/bootstrap.php")" == 'of the branch' \
+  && ! -e "$single/tests/phpunit/StaleTest.php" && ! -e "$single/tests/phpunit/Mounted/FromTagTest.php" ]] \
+  || fail "single mounted test files must stay as they are"
 
 # A mounted tests/ without tests/phpunit is refused, not emptied.
 emptymount="$work/emptymount"

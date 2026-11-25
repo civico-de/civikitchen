@@ -22,6 +22,7 @@ case " $* " in
     cd "$CK_FAKE/core" && sh -c "$CK_FAKE_CHECK"
     exit $? ;;
   " ps "*) echo "$CK_FAKE_EXISTING"; exit 0 ;;
+  *" chown "*) exit 0 ;;
   *" up "*)
     cp "$3" "$CK_FAKE/compose.json"
     git -C "$CK_FAKE/core" rev-parse HEAD > "$CK_FAKE/booted-on"

@@ -156,7 +156,10 @@ status of `ck run`.
 
 On a release image, `ckcoretest` fetches the tag's `tests/` and the suites
 under `ext/*/tests`. A mounted directory keeps its own tests: an extension
-mounted from a checkout runs the tests of that checkout.
+mounted from a checkout runs the tests of that checkout. Files mounted one
+by one below `tests/` stay too, and the tag's tests fill in the rest: after
+the boot, ck hands the directories Docker created around the mounts to
+www-data.
 
 The images carry no core language files, so CiviCRM offers only en_US.
 `--locales de_DE,es_MX,fr_CA,fr_FR,it_IT,nl_NL` installs those at boot, as

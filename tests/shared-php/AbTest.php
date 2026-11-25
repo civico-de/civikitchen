@@ -53,12 +53,29 @@ final class AbTest extends TestCase
         $b = $runner->configs['ck-ab-standalone-6-16-vs-standalone-beta-b']['services']['app'];
         self::assertSame(self::IMAGE . 'standalone-beta', $b['image']);
         self::assertSame(['/src/myext:/var/www/html/ext/myext'], $b['volumes']);
+        self::assertSame(['a' => ['/var/www/html/ext'], 'b' => ['/var/www/html/ext']], $runner->owned);
         self::assertSame('it_IT', $b['environment']['CIVIKITCHEN_LOCALES']);
         self::assertSame($runner->configs['ck-ab-standalone-6-16-vs-standalone-beta-a']['services']['db'], $runner->configs['ck-ab-standalone-6-16-vs-standalone-beta-b']['services']['db']);
         // Both stacks are gone, the reports stay.
         self::assertSame(['a', 'b'], $runner->removed);
         self::assertFileDoesNotExist("{$this->out}/A.compose.json");
         self::assertFileExists("{$this->out}/B.junit.xml");
+    }
+
+    public function testMountParentsAreTheImageDirectoriesAroundTheMounts(): void
+    {
+        $mounts = [
+            '/src/A.php:/var/www/html/core/tests/phpunit/A.php:ro',
+            '/src/myext:/var/www/html/ext/myext',
+            '/src/vendor:/var/www/html/ext/myext/sub/vendor',
+            '/etc/x:/etc/x',
+        ];
+        self::assertSame(
+            ['/var/www/html/core', '/var/www/html/core/tests', '/var/www/html/core/tests/phpunit', '/var/www/html/ext'],
+            StandaloneStack::mountParents($mounts),
+        );
+        // Inside a mounted checkout everything is the host's.
+        self::assertSame(['/var/www/html/ext'], StandaloneStack::mountParents([...$mounts, '/src/core:/var/www/html/core/']));
     }
 
     public function testIdenticalResultsExitZero(): void
@@ -656,6 +673,9 @@ final class AbRunner extends Runner
     /** @var list<string> */
     public array $removed = [];
 
+    /** @var array<string, list<string>> per side, the directories handed to www-data */
+    public array $owned = [];
+
     /** @var list<string> sides the check ran on */
     public array $ran = [];
 
@@ -700,6 +720,10 @@ final class AbRunner extends Runner
             return ['status' => 0, 'output' => "[civikitchen] ERROR: provisioning failed\n"];
         }
         $side = $this->side($command[3]);
+        if (in_array('chown', $command, true)) {
+            $this->owned[$side] = array_slice($command, 10, (int) array_search('-maxdepth', $command, true) - 10);
+            return ['status' => 0, 'output' => ''];
+        }
         if (!isset($this->reports[$side])) {
             return ['status' => 1, 'output' => 'no such file'];
         }

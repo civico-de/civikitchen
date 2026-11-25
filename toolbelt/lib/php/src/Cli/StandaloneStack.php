@@ -11,6 +11,7 @@ use RuntimeException;
 final class StandaloneStack
 {
     private const IMAGE = 'ghcr.io/civico-de/civikitchen:';
+    private const WEB_ROOT = '/var/www/html';
     private const SOURCE_LOG = '/usr/local/share/civikitchen/civicrm-source.log';
     // The images' start period plus every retry of their healthcheck.
     private const BOOT_SECONDS = 900;
@@ -142,6 +143,39 @@ final class StandaloneStack
             $log = $this->runner->capture(['docker', 'compose', '-f', $file, 'logs', '--no-color', '--tail', '40', 'app']);
             throw new RuntimeException("the stack of {$file} did not boot. The end of its log:\n" . $log['output']);
         }
+        $config = json_decode((string) file_get_contents($file), true, flags: JSON_THROW_ON_ERROR);
+        $parents = self::mountParents($config['services']['app']['volumes'] ?? []);
+        if ($parents !== []) {
+            // Docker creates a mount's missing parents as root; www-data writes beside the mount (ckcoretest's tests/).
+            $own = $this->runner->capture(['docker', 'compose', '-f', $file, 'exec', '-T', '-u', 'root', 'app',
+                'find', ...$parents, '-maxdepth', '0', '-user', 'root', '-exec', 'chown', 'www-data:www-data', '{}', '+']);
+            if ($own['status'] !== 0) {
+                throw new RuntimeException("could not hand the parents of the mounts in {$file} to www-data:\n" . $own['output']);
+            }
+        }
+    }
+
+    /**
+     * The directories below the web root that hold a mount without being part of one.
+     *
+     * @param list<string> $volumes compose volumes, `<src>:<dst>[:ro]`
+     * @return list<string>
+     */
+    public static function mountParents(array $volumes): array
+    {
+        $targets = array_map(static fn (string $v): string => rtrim((string) preg_replace('/^.*:(\/[^:]*)(:r[ow])?$/', '$1', $v), '/'), $volumes);
+        $parents = [];
+        foreach ($targets as $target) {
+            for ($dir = dirname($target); str_starts_with($dir, self::WEB_ROOT . '/'); $dir = dirname($dir)) {
+                $inMount = array_filter($targets, static fn (string $t): bool => str_starts_with("{$dir}/", "{$t}/"));
+                if ($inMount === []) {
+                    $parents[$dir] = true;
+                }
+            }
+        }
+        $parents = array_keys($parents);
+        sort($parents);
+        return $parents;
     }
 
     /** Removes containers and volumes; false when compose could not. */

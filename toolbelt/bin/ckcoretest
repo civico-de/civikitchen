@@ -57,16 +57,60 @@ if [ -z "${version}" ]; then
   exit 1
 fi
 
+# Bind mounts below the core hold a checkout's files: the tag's tests never replace them.
+mounts=()
+if [ -r "${CK_MOUNTINFO:-/proc/self/mountinfo}" ]; then
+  while read -r _ _ _ _ point _; do
+    # Mount points escape space, tab and newline as \040 \011 \012.
+    point="$(printf '%b' "${point}")"
+    case "${point}/" in "${CK_CORE_DIR}"/*) mounts+=("${point}") ;; esac
+  done < "${CK_MOUNTINFO:-/proc/self/mountinfo}"
+fi
+in_mount() {
+  local m
+  for m in ${mounts[@]+"${mounts[@]}"}; do
+    case "$1/" in "${m}"/*) return 0 ;; esac
+  done
+  return 1
+}
+has_mount_below() {
+  local m
+  for m in ${mounts[@]+"${mounts[@]}"}; do
+    case "${m}/" in "$1"/?*) return 0 ;; esac
+  done
+  return 1
+}
+is_mount_point() {
+  local m
+  for m in ${mounts[@]+"${mounts[@]}"}; do
+    [ "$1" != "${m}" ] || return 0
+  done
+  return 1
+}
+# find arguments that skip every mount.
+prune=()
+for m in ${mounts[@]+"${mounts[@]}"}; do prune+=(-path "${m}" -prune -o); done
+# Replaces dest with the tag's tree around the mounted files in it.
+fill() {
+  local m skip=()
+  for m in ${mounts[@]+"${mounts[@]}"}; do
+    case "${m}" in "$2"/*) skip+=(--exclude="./${m#"$2"/}") ;; esac
+  done
+  find "$2" ${prune[@]+"${prune[@]}"} ! -type d -exec rm -f {} +
+  tar -C "$1" -cf - . | tar -C "$2" -xf - --skip-old-files ${skip[@]+"${skip[@]}"}
+}
+
 marker="${CK_CORE_DIR}/tests/.ckcoretest-version"
 # fetch: all (tests/ and what belongs to it), config (a tests/ mounted from a
 # checkout into a release tarball, which still lacks the rest) or none.
 fetch=none
-if [ -d "${CK_CORE_DIR}/tests/phpunit" ] && [ ! -f "${marker}" ]; then
-  if [ -f "${CK_CORE_DIR}/phpunit.xml.dist" ]; then
-    echo "[ckcoretest] ${CK_CORE_DIR}/tests already present (git checkout?) — not touching it"
-  else
-    fetch=config
-  fi
+# A checkout's tests/ is complete; single mounted files, such as a branch's changes, are not.
+boot="${CK_CORE_DIR}/tests/phpunit/CiviTest/bootstrap.php"
+config="${CK_CORE_DIR}/phpunit.xml.dist"
+if [ -f "${boot}" ] && [ -f "${config}" ] && [ ! -f "${marker}" ] && ! is_mount_point "${boot}" && ! is_mount_point "${config}"; then
+  echo "[ckcoretest] ${CK_CORE_DIR}/tests already present (git checkout?) — not touching it"
+elif [ -d "${CK_CORE_DIR}/tests/phpunit" ] && [ ! -f "${marker}" ] && in_mount "${CK_CORE_DIR}/tests"; then
+  fetch=config
 elif [ ! -f "${marker}" ] || [ "$(cat "${marker}")" != "${version}" ]; then
   fetch=all
 fi
@@ -100,29 +144,22 @@ if [ "${fetch}" != none ]; then
   # phpunit.xml.dist last: beside a mounted tests/ it is what says nothing is left to fetch.
   for file in sql/test_data.mysql sql/test_data_second_domain.mysql phpunit.xml.dist; do
     # Beside a mounted tests/, a file that is there may be a checkout's: it stays.
-    if [ "${fetch}" = all ] || [ ! -e "${CK_CORE_DIR}/${file}" ]; then
+    if ! in_mount "${CK_CORE_DIR}/${file}" && { [ "${fetch}" = all ] || [ ! -e "${CK_CORE_DIR}/${file}" ]; }; then
       cp "${src}/core/${file}" "${CK_CORE_DIR}/${file}"
       owned+=("${CK_CORE_DIR}/${file}")
     fi
   done
   if [ "${fetch}" = all ]; then
-    # Bind mounts below the core hold a checkout's files: the tag's tests never replace them.
-    mounts=()
-    while read -r _ _ _ _ point _; do
-      case "${point}/" in "${CK_CORE_DIR}"/*) mounts+=("${point}") ;; esac
-    done < "${CK_MOUNTINFO:-/proc/self/mountinfo}"
-    in_mount() {
-      local m
-      for m in ${mounts[@]+"${mounts[@]}"}; do
-        case "$1/" in "${m}"/*) return 0 ;; esac
-      done
-      return 1
-    }
     if in_mount "${CK_CORE_DIR}/tests"; then
       ck_die "${CK_CORE_DIR}/tests is mounted but has no tests/phpunit; mount a checkout's tests/ or none."
     fi
-    rm -rf "${CK_CORE_DIR}/tests"
-    mv "${src}/core/tests" "${CK_CORE_DIR}/tests"
+    if has_mount_below "${CK_CORE_DIR}/tests"; then
+      echo "[ckcoretest] files below tests/ are mounted — filling the rest from the tag"
+      fill "${src}/core/tests" "${CK_CORE_DIR}/tests"
+    else
+      rm -rf "${CK_CORE_DIR}/tests"
+      mv "${src}/core/tests" "${CK_CORE_DIR}/tests"
+    fi
     owned+=("${CK_CORE_DIR}/tests")
     # ext suites can nest (ext/afform/core/tests), so walk rather than glob
     while IFS= read -r d; do
@@ -133,13 +170,21 @@ if [ "${fetch}" != none ]; then
         echo "[ckcoretest] ${rel} is mounted — keeping its tests"
         continue
       fi
-      rm -rf "${dest}"
-      mv "${d}" "${dest}"
+      if has_mount_below "${dest}"; then
+        mkdir -p "${dest}"
+        fill "${d}" "${dest}"
+      else
+        rm -rf "${dest}"
+        mv "${d}" "${dest}"
+      fi
       owned+=("${dest}")
     done < <(find "${src}/core/ext" -type d -name tests -prune 2>/dev/null)
     echo "${version}" > "${marker}"
   fi
-  chown -R www-data:www-data ${owned[@]+"${owned[@]}"} 2>/dev/null || true
+  # Mounted files are the host's: run as root, chown would change them there.
+  if [ "${#owned[@]}" -gt 0 ]; then
+    find "${owned[@]}" ${prune[@]+"${prune[@]}"} -exec chown -h www-data:www-data {} + 2>/dev/null || true
+  fi
 fi
 
 if [ "${1:-}" = "--fetch-only" ]; then

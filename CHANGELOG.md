@@ -14,6 +14,18 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Fixed
+
+- **`ckcoretest` on a release image with single test files mounted below
+  `tests/`** (`ck ab`/`ck run --mount <file>:/var/www/html/core/tests/…`) now
+  fetches the tag's tests around them. It used to take the partial tree for a
+  mounted checkout and ran without `tests/phpunit/CiviTest/bootstrap.php`.
+  After the boot, `ck ab`, `ck run` and `ck bisect` give the directories
+  Docker created around their mounts to www-data. A branch's own
+  `phpunit.xml.dist` or `CiviTest/bootstrap.php` mounted that way no longer
+  passes for a complete checkout, files from an earlier fetch go, and the
+  fetch never chowns a mounted file.
+
 ## [1.74.0] - 2026-11-24
 
 ### Added
