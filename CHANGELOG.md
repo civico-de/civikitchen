@@ -14,6 +14,15 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Added
+
+- **`ck steps <site-url> <steps.ts>`** runs a steps module, the one
+  `ck demo --steps` takes, in a browser against a site that is already running
+  and prints one line of JSON: whether the steps finished, what they threw or
+  returned, the page they ended on as text, and the script errors. `--cms`
+  picks the login and route form of the CMS. The browser's container sees the
+  module and nothing else of the host.
+
 ### Changed
 
 - **`ckdeps` accepts the PHP extensions every CiviCRM site has** without an

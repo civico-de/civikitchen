@@ -15,6 +15,7 @@ commit that broke it, or record a change on screen.
 | [`ck ab`](#comparing-two-versions-ck-ab) | The same command on two versions, compared per test | Host |
 | [`ck bisect`](#finding-the-commit-ck-bisect) | The core commit at which a check starts to fail | Host |
 | [`ck demo`](#recording-a-change-before-and-after-ck-demo) | Videos of a core change before and after, side by side, on one CMS or all | Host |
+| [`ck steps`](#driving-a-running-site-ck-steps) | One steps module in a browser against a running site; what it did and where it ended, as JSON | Host |
 
 The host commands run through `scaffold/ck`, which needs only Docker, or
 without a checkout through the
@@ -394,3 +395,44 @@ each site under the same `localhost` URL the site was installed with. Docker
 writes the videos into the output directory, so Docker must share it: on colima
 and Docker Desktop, keep it under `$HOME`. `ck demo` checks this before it
 boots a stack.
+
+## Driving a running site: `ck steps`
+
+`ck steps` runs one steps module in a browser against a site that is already
+up, such as a stack `ck demo --keep` or `ck ab --keep --expose` left running,
+and reports the result on stdout instead of recording a video:
+
+```bash
+ck steps http://localhost:8300 ./search.ts
+ck steps http://localhost:8301 ./search.ts --cms joomla --phase before
+```
+
+The module is the one [`ck demo --steps`](#recording-a-change-before-and-after-ck-demo)
+takes, so steps worked out against a running site record unchanged later.
+`ck steps` logs in as admin/admin, calls the module and prints one line of
+JSON:
+
+| Field | Meaning |
+| --- | --- |
+| `ok` | `true` when the module returned, `false` when it threw or ran out of `--timeout` (default 120 seconds) |
+| `error` | what it threw, with Playwright's call log |
+| `value` | what it returned, if that is JSON |
+| `url`, `title`, `text` | where the steps ended: the address, the title and the page as an accessibility tree, cut at 6000 characters |
+| `errors` | the script errors the pages logged |
+
+It exits 0 when the steps finished, 1 when they threw or ran out of time, and
+2 when the browser could not run them, for example because the login failed;
+only then is there no report. The browser's container ends on its own half a minute
+after the steps' time limit; steps that never yield are reported as out of time
+then. The first run on a host builds the browser's image, which takes minutes;
+`ck steps --build-image` does that ahead and prints the tag. `--cms` names the CMS the site runs (default
+`standalone`) and decides the login form and how `url()` builds a route;
+`--phase` is handed to the module and `--size` sets the viewport. The steps start on
+the page the login leaves; `--page <route>` opens a route first, for a module that
+relies on the page `ck demo --page` showed before it.
+
+The browser runs in the same image as the recorder, on the host network. Its
+container gets the module and the runner script read-only and nothing else of
+the host: no checkout, no Docker socket. The module must lie below `$HOME`, the
+civikitchen checkout or the current git work tree, in a directory `ck` can write to:
+the runner script lies beside the module while the browser runs.

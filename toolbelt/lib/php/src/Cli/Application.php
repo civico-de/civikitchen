@@ -148,6 +148,9 @@ final class Application
         if ($command === 'demo') {
             return (new DemoCommand($this->checkoutRoot, $this->runner))->run($arguments);
         }
+        if ($command === 'steps') {
+            return (new StepsCommand($this->checkoutRoot, $this->runner))->run($arguments);
+        }
         if ($command === 'playwright') {
             return (new PlaywrightCommand($this->checkoutRoot, $this->runner))->run($arguments);
         }
@@ -200,6 +203,7 @@ ck — CiviKitchen extension-development toolbelt
   ck core-test [args]     CiviCRM core PHPUnit suites
   ck test-reset [args]    reset the standalone scratch DB
   ck demo [args]          record a core change before and after (on the host: scaffold/ck)
+  ck steps [args]         run a steps module in a browser against a running site (on the host: scaffold/ck)
   ck ab [args]            run one check on two CiviCRM versions and compare (on the host: scaffold/ck)
   ck run [args]           run a command in a fresh Standalone stack of one version (on the host: scaffold/ck)
   ck bisect [args]        find the civicrm-core commit at which a check starts to fail (on the host: scaffold/ck)
