@@ -14,6 +14,14 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Changed
+
+- **`ckdeps` accepts the PHP extensions every CiviCRM site has** without an
+  `ext-*` entry in composer.json: those civicrm-core requires (`intl`,
+  `mbstring`, `curl`, …) and those PHP enables by default (`filter`, `ctype`,
+  `dom`, …). A repo using `filter_var()` no longer fails on a shadow
+  `ext-filter`; optional extensions such as `gd` or `redis` are still reported.
+
 ### Fixed
 
 - **`ck ab` from the `civikitchen-cli` image** compares JUnit reports again.

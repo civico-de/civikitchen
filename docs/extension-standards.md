@@ -398,9 +398,13 @@ extensions the repo deliberately does not require.
 ckdeps checks composer.json against what the code uses and reports shadow,
 unused and dev-in-prod dependencies. The bundled config knows that CiviCRM is
 not a composer dependency, down to the Guzzle, PSR and Symfony packages core
-ships, so an extension typing against those must not require a second copy. A
-repo's own composer-dependency-analyser.php replaces the bundled config and
-has to restate those patterns.
+ships, so an extension typing against those must not require a second copy.
+The same holds for PHP extensions every CiviCRM site has: those civicrm-core's
+composer.json requires and those PHP enables by default (`filter`, `ctype`,
+`dom`, …) need no `ext-*` entry; optional ones such as `gd` or `redis` do. The
+list is in `toolbelt/lib/composer-deps.php`. A repo's own
+composer-dependency-analyser.php replaces the bundled config and has to restate
+those patterns.
 
 ### cksmarty
 

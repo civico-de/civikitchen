@@ -15,6 +15,9 @@ class Configuration {
 
   public static ?string $functionsRegex = NULL;
 
+  /** @var array<string, list<string>> */
+  public static array $ignoredExtensions = [];
+
   public function ignoreUnknownClassesRegex(string $regex): self {
     self::$classesRegex = $regex;
     return $this;
@@ -22,6 +25,17 @@ class Configuration {
 
   public function ignoreUnknownFunctionsRegex(string $regex): self {
     self::$functionsRegex = $regex;
+    return $this;
+  }
+
+  /**
+   * @param list<string> $extensions
+   * @param list<string> $errorTypes
+   */
+  public function ignoreErrorsOnExtensions(array $extensions, array $errorTypes): self {
+    foreach ($extensions as $extension) {
+      self::$ignoredExtensions[$extension] = $errorTypes;
+    }
     return $this;
   }
 
@@ -47,6 +61,7 @@ class ErrorType {
 namespace CiviKitchen\Tests;
 
 use ShipMonk\ComposerDependencyAnalyser\Config\Configuration;
+use ShipMonk\ComposerDependencyAnalyser\Config\ErrorType;
 
 $root = dirname(__DIR__, 2);
 require $root . '/toolbelt/lib/composer-deps.php';
@@ -153,9 +168,32 @@ foreach (['civicrm_api3' => 1, 'civix_something' => 1, 'array_map' => 0] as $fun
   }
 }
 
+// 1 = every CiviCRM site has it (core requires it, or PHP enables it by default),
+// so using it is not a shadow dependency. 0 = optional, so it stays a finding.
+$extensions = [
+  'ext-filter' => 1,
+  'ext-ctype' => 1,
+  'ext-intl' => 1,
+  'ext-mbstring' => 1,
+  'ext-curl' => 1,
+  'ext-dom' => 1,
+  'ext-gd' => 0,
+  'ext-imap' => 0,
+  'ext-redis' => 0,
+  'ext-soap' => 0,
+  'ext-sodium' => 0,
+];
+foreach ($extensions as $extension => $want) {
+  $got = (Configuration::$ignoredExtensions[$extension] ?? NULL) === [ErrorType::SHADOW_DEPENDENCY] ? 1 : 0;
+  if ($got !== $want) {
+    fwrite(STDERR, sprintf("%s: expected shadow ignore=%d, got %d\n", $extension, $want, $got));
+    $failures++;
+  }
+}
+
 if ($failures > 0) {
   fwrite(STDERR, sprintf("%d ckdeps ignore-pattern case(s) failed\n", $failures));
   exit(1);
 }
 
-echo "ok   ckdeps ignore patterns cover core-provided classes only\n";
+echo "ok   ckdeps ignore patterns cover core-provided classes and extensions only\n";

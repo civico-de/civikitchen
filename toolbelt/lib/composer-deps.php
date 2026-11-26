@@ -3,6 +3,7 @@
 declare(strict_types = 1);
 
 use ShipMonk\ComposerDependencyAnalyser\Config\Configuration;
+use ShipMonk\ComposerDependencyAnalyser\Config\ErrorType;
 
 /**
  * Default config for `ckdeps` (shipmonk/composer-dependency-analyser). Core's
@@ -22,6 +23,12 @@ $configuration = (new Configuration())
     . '|Pager(?:_|$)|ezc(?:Base|Mail)|TCPDF|HTMLPurifier(?:_|$)|Smarty\\\\)~',
   )
   ->ignoreUnknownFunctionsRegex('~^(civicrm_|civi|CiviMix\\\\)~')
+  // PHP extensions every CiviCRM site has: civicrm-core's composer.json requires
+  // the first row, PHP enables the second by default. Optional ones stay findings.
+  ->ignoreErrorsOnExtensions([
+    'ext-bcmath', 'ext-curl', 'ext-fileinfo', 'ext-intl', 'ext-mbstring', 'ext-mysqli', 'ext-openssl', 'ext-xml', 'ext-zip',
+    'ext-ctype', 'ext-dom', 'ext-filter', 'ext-iconv', 'ext-libxml', 'ext-session', 'ext-simplexml', 'ext-tokenizer', 'ext-xmlreader', 'ext-xmlwriter',
+  ], [ErrorType::SHADOW_DEPENDENCY])
   // Paths are validated against the CWD, so a shared config cannot name
   // directories (node_modules) that only some repos have.
   ->disableReportingUnmatchedIgnores();
