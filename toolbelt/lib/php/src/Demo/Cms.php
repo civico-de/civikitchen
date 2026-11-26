@@ -39,7 +39,7 @@ final class Cms
         $buildkitApp = ['CIVICRM_DB_HOST' => 'db', 'CIVICRM_DB_ROOT_PASSWORD' => 'root'];
         $drupalLogin = ['url' => '/user/login', 'username' => '#edit-name', 'password' => '#edit-pass'];
         return match ($name) {
-            // Core PRs target master, which only the git-built Standalone image tracks.
+            // Core PRs target master, so every CMS boots from its git-built master image.
             'standalone' => new self(
                 $name,
                 'Standalone',
@@ -67,7 +67,7 @@ final class Cms
             'wordpress' => new self(
                 $name,
                 'WordPress',
-                $image ?? self::IMAGE . 'wordpress',
+                $image ?? self::IMAGE . 'wordpress-master',
                 'buildkit',
                 self::BUILDKIT_SITE,
                 $buildkitApp,
@@ -80,7 +80,7 @@ final class Cms
             'drupal10' => new self(
                 $name,
                 'Drupal 10',
-                $image ?? self::IMAGE . 'drupal10',
+                $image ?? self::IMAGE . 'drupal10-master',
                 'buildkit',
                 self::BUILDKIT_SITE,
                 $buildkitApp,
@@ -92,7 +92,7 @@ final class Cms
             'drupal11' => new self(
                 $name,
                 'Drupal 11',
-                $image ?? self::IMAGE . 'drupal11',
+                $image ?? self::IMAGE . 'drupal11-master',
                 'buildkit',
                 self::BUILDKIT_SITE,
                 $buildkitApp,
@@ -104,7 +104,7 @@ final class Cms
             'joomla' => new self(
                 $name,
                 'Joomla',
-                $image ?? self::IMAGE . 'joomla',
+                $image ?? self::IMAGE . 'joomla-master',
                 'buildkit',
                 self::BUILDKIT_SITE,
                 $buildkitApp,
@@ -122,7 +122,7 @@ final class Cms
             'backdrop' => new self(
                 $name,
                 'Backdrop',
-                $image ?? self::IMAGE . 'backdrop',
+                $image ?? self::IMAGE . 'backdrop-master',
                 'buildkit',
                 self::BUILDKIT_SITE,
                 $buildkitApp,

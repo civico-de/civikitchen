@@ -1,12 +1,13 @@
 # Images
 
-CiviKitchen publishes six kinds of image. All but the CLI are tags of
+CiviKitchen publishes seven kinds of image. All but the CLI are tags of
 `ghcr.io/civico-de/civikitchen`; the CLI is a package of its own.
 
 | Image | Tags | Contents | Use it for |
 |---|---|---|---|
 | [Standalone (dev)](#standalone-dev) | `:standalone`, `:standalone-<minor>` | CiviCRM Standalone and the full toolchain; needs a MariaDB beside it | Extension development and CI |
 | [Standalone from git](#tags-and-versions) | `:standalone-master`, `:standalone-beta` | The standalone dev image built daily from civicrm-core's `master` and its newest release branch | Testing against unreleased core |
+| [Buildkit flavors from git](#tags-and-versions) | `:<cms>-master` | A buildkit flavor built daily on civicrm-core's `master` | A core change on a CMS |
 | [Buildkit flavors (dev)](#buildkit-flavors-dev) | `:drupal10`, `:drupal11`, `:wordpress`, `:joomla`, `:backdrop` | CiviCRM on a CMS, built by civibuild, with the same toolchain; needs a MariaDB beside it | CMS-specific behaviour |
 | [Demo](#demo-images) | `:standalone-demo`, `:<cms>-demo` | One container with an embedded MariaDB and baked demo data | Demos, evaluation, screenshots |
 | [CLI](#cli-image) | `civikitchen-cli` | ck's host commands and the docker CLI, no CiviCRM | Running ck without a checkout |
@@ -441,6 +442,7 @@ repo:
 | `:civiproxy` | The pinned CiviProxy release on the current php:apache base. |
 | `:standalone-master` | The head of civicrm-core master, built daily from git by *Build Git Images*. |
 | `:standalone-beta` | The head of core's newest X.Y branch, built daily from git. Shortly after a release this may still be the branch that just shipped. |
+| `:drupal10-master`, `:drupal11-master`, `:wordpress-master`, `:joomla-master`, `:backdrop-master` | A buildkit flavor with civicrm-core master as civibuild installs it, built daily by *Build Git Images*. Each tag moves on its own, so one may be a day behind the others. |
 
 To read the CiviCRM version of a pulled image without booting it:
 

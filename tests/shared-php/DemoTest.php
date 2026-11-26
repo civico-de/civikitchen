@@ -359,6 +359,14 @@ DIFF;
         Stack::prepare(Cms::named('joomla'), 'x', $file, 8300, new DemoRunner(''));
     }
 
+    public function testEveryCmsBootsFromItsMasterImageUnlessAnotherIsNamed(): void
+    {
+        foreach (Cms::NAMES as $name) {
+            self::assertSame("ghcr.io/civico-de/civikitchen:{$name}-master", Cms::named($name)->image);
+        }
+        self::assertSame('local:joomla', Cms::named('joomla', 'local:joomla')->image);
+    }
+
     public function testTheRecorderLeavesAnExistingRecordScriptAlone(): void
     {
         file_put_contents($this->temporary . '/.record.mts', 'mine');

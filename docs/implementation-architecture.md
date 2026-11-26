@@ -7,7 +7,7 @@ own job ([ADR-0015](adr/0015-php-shell-typescript-boundaries.md)):
 |---|---|---|
 | PHP | Structured and reusable logic: parsing YAML, JSON, XML and ZIP archives, policy, version constraints, filesystem rules, reusable process handling | `toolbelt/lib/php`, reached through the `ck` CLI; `ckconform` and `scaffold/ckinit.php` are PHP programs of their own |
 | Shell | Bootstrapping: container entrypoints, user switching, environment export, pipes and the final exec, where the operating system is the API | Image entrypoints, provisioning, `scaffold/`, the [shell adapters](#command-layout) in `toolbelt/bin` |
-| TypeScript | Browser automation only: the Playwright suites and the recording script that `ck demo` runs | The project's Playwright image |
+| TypeScript | Browser automation only: the Playwright suites and the scripts that `ck demo` and `ck steps` run | The project's Playwright image |
 
 Shell must not embed PHP programs or implement a second parser for a
 structured format.

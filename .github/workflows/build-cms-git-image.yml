@@ -1,0 +1,176 @@
+# One git-built CMS tag: build a CMS family on civicrm-core `ref` on both
+# arches, merge, smoke-test, then move `:<family>-<tag>`. Called once per
+# family by build-git-images.yml, so a failing family holds back only its tag.
+name: Build CMS git image
+
+on:
+  workflow_call:
+    inputs:
+      family:
+        description: CMS family, as cms-families.sh names it (e.g. joomla).
+        required: true
+        type: string
+      site_type:
+        description: The family's civibuild site type (e.g. joomla-demo).
+        required: true
+        type: string
+      ref:
+        description: civicrm-core branch civibuild installs.
+        required: true
+        type: string
+      tag:
+        description: Published as `:<family>-<tag>`.
+        required: true
+        type: string
+
+# A called workflow does not inherit the caller's env.
+env:
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/civikitchen
+
+# Default for every job; the ones that push to GHCR widen it within the
+# caller's grant.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, amd64]
+        include:
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Candidate tag only; promote moves the moving tag after the smoke tests
+      # pass.
+      - name: Build and push ${{ inputs.family }} candidate image from git
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          # Authenticated GitHub dist downloads for composer; see the Dockerfile.
+          secrets: |
+            composer_auth={"github-oauth":{"github.com":"${{ github.token }}"}}
+          file: docker/buildkit/Dockerfile
+          target: final
+          platforms: ${{ matrix.platform }}
+          push: true
+          build-args: |
+            PHP_VERSION=8.3
+            DEFAULT_SITE_TYPE=${{ inputs.site_type }}
+            CIVICRM_VERSION=${{ inputs.ref }}
+            CIVICRM_BUILD_VERSION=${{ inputs.ref }}
+          tags: |
+            ${{ env.IMAGE_PREFIX }}:${{ inputs.family }}-${{ inputs.tag }}-${{ github.sha }}-${{ matrix.arch }}
+          cache-from: type=registry,ref=${{ env.IMAGE_PREFIX }}-buildcache:buildkit-git-${{ inputs.tag }}-${{ matrix.arch }}
+          # The image is pushed before the cache export, so a failed export
+          # (`error writing layer blob: not_found`) must not fail the job.
+          cache-to: type=registry,ref=${{ env.IMAGE_PREFIX }}-buildcache:buildkit-git-${{ inputs.tag }}-${{ matrix.arch }},mode=max,ignore-error=true
+          # The caller's daily cron rebuilds from scratch: a cached apt layer
+          # would keep serving outdated packages past their security fix.
+          no-cache: ${{ github.event_name == 'schedule' }}
+          # The bake clones the branch inside a RUN, whose cached layer no new
+          # commit invalidates: a manual run would promote yesterday's core.
+          no-cache-filters: builder
+
+  merge:
+    needs: build
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/merge-manifest.yml
+    with:
+      prefix: ${{ inputs.family }}-
+      tags: ${{ format('[{0}]', toJSON(inputs.tag)) }}
+
+  # The dev-tools and boot tests of Build CMS Images' smoke-test-buildkit.
+  # Not Trivy-scanned: only core's own tree differs from the scanned stable images.
+  smoke-test:
+    needs: merge
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/arm64, linux/amd64]
+        include:
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout (for the test scripts)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Functional test of bundled dev tools
+        env:
+          IMG: ${{ env.IMAGE_PREFIX }}:${{ inputs.family }}-${{ inputs.tag }}-${{ github.sha }}
+          PLATFORM: ${{ matrix.platform }}
+        run: .github/scripts/run-dev-tools-test.sh
+
+      - name: Boot test (real first-boot path against an external DB)
+        env:
+          IMG: ${{ env.IMAGE_PREFIX }}:${{ inputs.family }}-${{ inputs.tag }}-${{ github.sha }}
+          VARIANT: ${{ inputs.family }}
+        run: .github/scripts/buildkit-boot-test.sh
+
+  promote:
+    # `imagetools create` from the candidate manifest list keeps it multi-arch.
+    needs: smoke-test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote tested candidate to its moving tag
+        env:
+          CK_TAG: ${{ inputs.family }}-${{ inputs.tag }}
+        run: |
+          IMG="${IMAGE_PREFIX}:${CK_TAG}"
+          docker buildx imagetools create -t "$IMG" "$IMG-${GITHUB_SHA}"

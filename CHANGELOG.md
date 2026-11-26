@@ -22,9 +22,17 @@ except that a break the consumers are adjusted for ships as a minor, marked
   returned, the page they ended on as text, and the script errors. `--cms`
   picks the login and route form of the CMS. The browser's container sees the
   module and nothing else of the host.
+- **`:<cms>-master` images**: `:drupal10-master`, `:drupal11-master`,
+  `:wordpress-master`, `:joomla-master` and `:backdrop-master` are the buildkit
+  flavors on civicrm-core master, built, boot-tested and promoted daily by
+  *Build Git Images*, each on its own.
 
 ### Changed
 
+- **`ck demo --cms` boots a CMS from its `:<cms>-master` image**, as Standalone
+  already did, so a core pull request applies to the CMS sites too. Before, a
+  CMS booted from the current release, where a change written against master
+  often did not apply. `--image <cms>=<ref>` still picks another image.
 - **`ckdeps` accepts the PHP extensions every CiviCRM site has** without an
   `ext-*` entry in composer.json: those civicrm-core requires (`intl`,
   `mbstring`, `curl`, …) and those PHP enables by default (`filter`, `ctype`,
