@@ -558,6 +558,14 @@ jobs:
           DIGEST: ${{ fromJSON(needs.scan-cli.outputs.digests)[matrix.tag] }}
         run: docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -e CK_USER="$(id -u):$(id -g)" "${IMAGE_PREFIX}@${DIGEST}" run --help
 
+      - name: The host commands find every PHP function and class they use
+        env:
+          DIGEST: ${{ fromJSON(needs.scan-cli.outputs.digests)[matrix.tag] }}
+        run: >-
+          docker run --rm --entrypoint php -v "$PWD/tests/images:/check:ro" "${IMAGE_PREFIX}@${DIGEST}"
+          /check/cli-extensions.php /opt/civikitchen/toolbelt/lib/php/src
+          'Cli\AbCommand' 'Cli\RunCommand' 'Cli\BisectCommand' 'Cli\DemoCommand' 'Cli\PlaywrightCommand'
+
       - name: Promote the scanned candidate to :latest
         env:
           DIGEST: ${{ fromJSON(needs.scan-cli.outputs.digests)[matrix.tag] }}

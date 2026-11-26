@@ -14,6 +14,15 @@ except that a break the consumers are adjusted for ships as a minor, marked
 
 ## [Unreleased]
 
+### Fixed
+
+- **`ck ab` from the `civikitchen-cli` image** compares JUnit reports again.
+  The image lacked PHP's SimpleXML extension, so a run that wrote
+  `/tmp/ck-ab.xml` ended in `Call to undefined function simplexml_load_file()`
+  after both sides had passed. The image's smoke test now checks that every
+  PHP function and class the host commands (`ab`, `run`, `bisect`, `demo`,
+  `playwright`) use exists in the image.
+
 ## [1.74.1] - 2026-11-25
 
 ### Fixed

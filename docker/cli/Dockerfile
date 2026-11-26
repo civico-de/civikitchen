@@ -18,7 +18,7 @@ ENTRYPOINT ["ck-entrypoint"]
 FROM docker-cli AS cli
 RUN apk upgrade --no-cache \
  && apk add --no-cache curl git setpriv \
-      php84 php84-ctype php84-dom php84-mbstring php84-openssl php84-pcntl php84-posix php84-tokenizer \
+      php84 php84-ctype php84-dom php84-mbstring php84-openssl php84-pcntl php84-posix php84-simplexml php84-tokenizer \
  && ln -s /usr/bin/php84 /usr/local/bin/php
 COPY docker/cli/entrypoint.sh /usr/local/bin/ck-entrypoint
 COPY package.json package-lock.json /opt/civikitchen/
